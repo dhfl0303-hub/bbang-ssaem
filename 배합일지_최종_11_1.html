@@ -156,6 +156,17 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 .acc-print-btn{display:flex;align-items:center;justify-content:center;gap:6px;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;width:100%;}
 @media print{body *{display:none!important;}.print-area{display:block!important;}.print-area *{display:revert!important;}@page{margin:10mm;size:A4;}}
 </style>
+<script>
+  firebase.initializeApp({
+    apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
+    authDomain:"bbang-ssaem-prod.firebaseapp.com",
+    projectId:"bbang-ssaem-prod",
+    storageBucket:"bbang-ssaem-prod.firebasestorage.app",
+    messagingSenderId:"685237617449",
+    appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
+  });
+  window._db = firebase.firestore();
+</script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
@@ -577,7 +588,8 @@ function selectProduct(code){
     const off=!md?'off':'';
     let flour='';
     if(md){ const fi=md.ingredients.find(i=>FLOUR_NAMES.includes(i.name)); flour=fi?Number(fi.amount).toLocaleString()+'g':''; }
-    return `<div class="machine-btn ${off}" onclick="${md?`selectMachine('${m}')`:''}" >
+    const fn1 = md ? "selectMachine('"+m+"')" : '';
+    return '<div class="machine-btn '+off+'" onclick="'+fn1+'" >';
       <div class="machine-btn-name">배합${m}</div>
       <div class="machine-btn-flour">${flour}</div>
     </div>`;
@@ -626,8 +638,8 @@ function renderBatchPage(){
   document.getElementById('machineMini').innerHTML=['1','2','3'].map(mc=>{
     const md2=p.batches[mc]; const off=!md2?'off':'';
     const w=md2?Number(md2.weight).toLocaleString()+'g':'-';
-    const clickFn = md2 ? "changeMachine('"+mc+"')" : '';
-    return '<div class="mm-btn '+(mc===m?'active ':'')+off+'" onclick="'+clickFn+'">배합'+mc+' ('+w+')</div>';
+    const fn2 = md2 ? "changeMachine('"+mc+"')" : '';
+    return '<div class="mm-btn '+(mc===m?'active ':'')+off+'" onclick="'+fn2+'">배합'+mc+' ('+w+')</div>';
   }).join('');
   renderIngredients(md.ingredients);
 }
