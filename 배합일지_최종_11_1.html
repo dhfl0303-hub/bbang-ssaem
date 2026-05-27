@@ -52,7 +52,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 
 /* 배합 설정 */
 .machine-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
-.machine-btn{padding:20px 8px;text-align:center;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);cursor:pointer;transition:all 0.15s;}
+.machine-btn{padding:14px 8px;text-align:center;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);cursor:pointer;transition:all 0.15s;}
 .machine-btn.active{border:2px solid var(--primary);background:var(--primary-light);}
 .machine-btn.off{opacity:0.35;cursor:not-allowed;}
 .machine-btn-name{font-size:18px;font-weight:700;color:var(--text);}
@@ -588,11 +588,17 @@ function selectProduct(code){
     const off=!md?'off':'';
     let flour='';
     if(md){ const fi=md.ingredients.find(i=>FLOUR_NAMES.includes(i.name)); flour=fi?Number(fi.amount).toLocaleString()+'g':''; }
+    const ingList = md ? md.ingredients.map(i=>
+      '<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid #f0f0f0;">' +
+      '<span style="color:#333;">'+i.name+'</span>' +
+      '<span style="color:#666;font-weight:600;">'+Number(i.amount).toLocaleString()+'g</span></div>'
+    ).join('') : '';
     const fn1 = md ? "selectMachine('"+m+"')" : '';
-    return '<div class="machine-btn '+off+'" onclick="'+fn1+'" >';
-      <div class="machine-btn-name">배합${m}</div>
-      <div class="machine-btn-flour">${flour}</div>
-    </div>`;
+    return '<div class="machine-btn '+off+'" onclick="'+fn1+'" style="text-align:left;padding:14px;">' +
+      '<div class="machine-btn-name" style="text-align:center;margin-bottom:4px;">배합'+m+'</div>' +
+      '<div class="machine-btn-flour" style="text-align:center;margin-bottom:8px;">'+flour+'</div>' +
+      '<div style="max-height:200px;overflow-y:auto;">'+ingList+'</div>' +
+      '</div>';
   }).join('');
   document.getElementById('countInput').value=1;
   S.totalBatches=1;
