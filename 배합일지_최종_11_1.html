@@ -366,8 +366,7 @@ function onWorkerSelect(){
   if(sel.value === '__del__'){
     const workers = loadWorkers();
     if(!workers.length){ sel.value=''; return; }
-    const target = prompt('삭제할 작업자 이름을 입력하세요:
-'+workers.join(', '));
+    const target = prompt('삭제할 작업자: '+workers.join(', '));
     if(target && workers.includes(target)){
       saveWorkers(workers.filter(w=>w!==target));
       renderWorkerSelect();
