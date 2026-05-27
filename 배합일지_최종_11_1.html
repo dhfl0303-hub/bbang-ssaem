@@ -156,27 +156,18 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 .acc-print-btn{display:flex;align-items:center;justify-content:center;gap:6px;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;width:100%;}
 @media print{body *{display:none!important;}.print-area{display:block!important;}.print-area *{display:revert!important;}@page{margin:10mm;size:A4;}}
 </style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
-(function(){
-  function loadScript(src, cb){
-    var s=document.createElement('script');
-    s.src=src; s.onload=cb; document.head.appendChild(s);
-  }
-  loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js', function(){
-    loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js', function(){
-      firebase.initializeApp({
-        apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
-        authDomain:"bbang-ssaem-prod.firebaseapp.com",
-        projectId:"bbang-ssaem-prod",
-        storageBucket:"bbang-ssaem-prod.firebasestorage.app",
-        messagingSenderId:"685237617449",
-        appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
-      });
-      window._db=firebase.firestore();
-      console.log("Firebase 연결 완료");
-    });
+  firebase.initializeApp({
+    apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
+    authDomain:"bbang-ssaem-prod.firebaseapp.com",
+    projectId:"bbang-ssaem-prod",
+    storageBucket:"bbang-ssaem-prod.firebasestorage.app",
+    messagingSenderId:"685237617449",
+    appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
   });
-})();
+  window._db = firebase.firestore();
 </script>
 </head>
 <body>
@@ -192,7 +183,10 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
     <span class="tb-sep">·</span>
     <span class="tb-num" id="tbNum"></span>
   </div>
-  <button id="syncBtn" onclick="syncToServer()" style="margin-left:auto;background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>
+  <div style="margin-left:auto;display:flex;gap:8px;">
+    <button onclick="openAdmin()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⚙️ 설정</button>
+    <button id="syncBtn" onclick="syncToServer()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>
+  </div>
 </div>
 
 <div class="content">
@@ -203,7 +197,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
           <div class="main-date" id="mainDate"></div>
-          <div class="main-worker" id="mainWorker"></div>
+          <div class="main-worker" id="mainWorker" onclick="openAdmin()" style="cursor:pointer;"></div>
         </div>
         
       </div>
@@ -358,6 +352,10 @@ function renderWorkerSelect(){
   const cur = loadSettings().workerName;
   const sel = document.getElementById('workerSelect');
   if(!sel) return;
+  if(!workers.length){
+    sel.innerHTML = '<option value="">아래에서 작업자 추가하세요</option>';
+    return;
+  }
   sel.innerHTML = '<option value="">작업자 선택</option>' +
     workers.map(w=>`<option value="${w}" ${w===cur?'selected':''}>${w}</option>`).join('') +
     '<option value="__del__">─ 삭제하기</option>';
@@ -901,14 +899,16 @@ async function syncToServer(){
   btn.disabled = true;
   try {
     // localStorage의 모든 배합 기록 수집
-    const keys = Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
-    const allData = {};
-    keys.forEach(k=>{ allData[k] = JSON.parse(localStorage.getItem(k)||'[]'); });
-    // Firebase 연동 (추후 구현) - 현재는 동기화 완료 표시만
-    // TODO: Firebase Firestore에 저장
-    console.log('동기화 데이터:', allData);
-    btn.textContent = '✅ 동기화 완료';
-    setTimeout(()=>{ btn.textContent='🔄 동기화'; btn.disabled=false; }, 2000);
+    const keys=Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
+    let recs=[]; keys.forEach(k=>{recs=recs.concat(JSON.parse(localStorage.getItem(k)||'[]'));});
+    if(!recs.length){btn.textContent='⚠️ 데이터 없음';setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000);return;}
+    const db=window._db; let count=0;
+    for(const r of recs){
+      await db.collection('batchRecords').doc(r.sessionKey||String(Date.now()+count)).set({...r,_syncedAt:new Date().toISOString()});
+      count++;
+    }
+    btn.textContent='✅ '+count+'건 완료';
+    setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2500);
   } catch(e) {
     btn.textContent = '❌ 실패';
     setTimeout(()=>{ btn.textContent='🔄 동기화'; btn.disabled=false; }, 2000);

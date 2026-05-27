@@ -176,27 +176,41 @@ select.form-input{cursor:pointer;}
   .tab-btn{font-size:11px;padding:10px 4px;}
 }
 </style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
-(function(){
-  function loadScript(src, cb){
-    var s=document.createElement('script');
-    s.src=src; s.onload=cb; document.head.appendChild(s);
-  }
-  loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js', function(){
-    loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js', function(){
-      firebase.initializeApp({
-        apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
-        authDomain:"bbang-ssaem-prod.firebaseapp.com",
-        projectId:"bbang-ssaem-prod",
-        storageBucket:"bbang-ssaem-prod.firebasestorage.app",
-        messagingSenderId:"685237617449",
-        appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
-      });
-      window._db=firebase.firestore();
-      console.log("Firebase 연결 완료");
-    });
+  firebase.initializeApp({
+    apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
+    authDomain:"bbang-ssaem-prod.firebaseapp.com",
+    projectId:"bbang-ssaem-prod",
+    storageBucket:"bbang-ssaem-prod.firebasestorage.app",
+    messagingSenderId:"685237617449",
+    appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
   });
-})();
+  window._db = firebase.firestore();
+</script>
+
+async function syncToServer(){
+  const btn=document.getElementById('syncBtn');
+  btn.textContent='⏳ 동기화 중...'; btn.disabled=true;
+  try{
+    if(!window._db) throw new Error('Firebase 미연결');
+    const db=window._db;
+    const lots=JSON.parse(localStorage.getItem('완제품_lots')||'[]');
+    if(!lots.length){btn.textContent='⚠️ 데이터 없음';setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000);return;}
+    let count=0;
+    for(const lot of lots){
+      const docId=(lot.lot_number||String(Date.now()+count)).replace(/[/.]/g,'_');
+      await db.collection('finishedLots').doc(docId).set({...lot,_syncedAt:new Date().toISOString()});
+      count++;
+    }
+    btn.textContent='✅ '+count+'건 완료';
+    setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2500);
+  }catch(e){
+    console.error(e);btn.textContent='❌ 실패';
+    setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000);
+  }
+}
 </script>
 </head>
 <body>

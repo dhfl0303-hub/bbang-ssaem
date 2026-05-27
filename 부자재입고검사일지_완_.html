@@ -99,27 +99,38 @@ input[type=number]{-moz-appearance:textfield;text-align:center;}
   .page.print-target{display:block!important;padding:0;}
 }
 </style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
-(function(){
-  function loadScript(src, cb){
-    var s=document.createElement('script');
-    s.src=src; s.onload=cb; document.head.appendChild(s);
-  }
-  loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js', function(){
-    loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js', function(){
-      firebase.initializeApp({
-        apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
-        authDomain:"bbang-ssaem-prod.firebaseapp.com",
-        projectId:"bbang-ssaem-prod",
-        storageBucket:"bbang-ssaem-prod.firebasestorage.app",
-        messagingSenderId:"685237617449",
-        appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
-      });
-      window._db=firebase.firestore();
-      console.log("Firebase 연결 완료");
-    });
+  firebase.initializeApp({
+    apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
+    authDomain:"bbang-ssaem-prod.firebaseapp.com",
+    projectId:"bbang-ssaem-prod",
+    storageBucket:"bbang-ssaem-prod.firebasestorage.app",
+    messagingSenderId:"685237617449",
+    appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
   });
-})();
+  window._db = firebase.firestore();
+</script>
+
+async function syncToServer(){
+  const btn=document.getElementById('syncBtn');
+  btn.textContent='⏳ 동기화 중...'; btn.disabled=true;
+  try{
+    if(!window._db) throw new Error('Firebase 미연결');
+    const db=window._db;
+    const a=JSON.parse(localStorage.getItem('subIncomingRecords')||'[]');
+    const b=JSON.parse(localStorage.getItem('subsidiaryStock')||'[]');
+    let count=0;
+    for(const r of a){await db.collection('subIncomingRecords').doc(String(r.id||Date.now()+count)).set({...r,_syncedAt:new Date().toISOString()});count++;}
+    for(const r of b){await db.collection('subsidiaryStock').doc(String(r.lot||Date.now()+count)).set({...r,_syncedAt:new Date().toISOString()});count++;}
+    btn.textContent='✅ '+count+'건 완료';
+    setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2500);
+  }catch(e){
+    console.error(e);btn.textContent='❌ 실패';
+    setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000);
+  }
+}
 </script>
 </head>
 <body>

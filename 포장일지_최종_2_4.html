@@ -123,27 +123,18 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 .print-area{display:none;}
 @media print{body *{display:none!important;}.print-area{display:block!important;}.print-area *{display:revert!important;}@page{margin:10mm;size:A4;}}
 </style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
-(function(){
-  function loadScript(src, cb){
-    var s=document.createElement('script');
-    s.src=src; s.onload=cb; document.head.appendChild(s);
-  }
-  loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js', function(){
-    loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js', function(){
-      firebase.initializeApp({
-        apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
-        authDomain:"bbang-ssaem-prod.firebaseapp.com",
-        projectId:"bbang-ssaem-prod",
-        storageBucket:"bbang-ssaem-prod.firebasestorage.app",
-        messagingSenderId:"685237617449",
-        appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
-      });
-      window._db=firebase.firestore();
-      console.log("Firebase 연결 완료");
-    });
+  firebase.initializeApp({
+    apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
+    authDomain:"bbang-ssaem-prod.firebaseapp.com",
+    projectId:"bbang-ssaem-prod",
+    storageBucket:"bbang-ssaem-prod.firebasestorage.app",
+    messagingSenderId:"685237617449",
+    appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
   });
-})();
+  window._db = firebase.firestore();
 </script>
 </head>
 <body>
