@@ -626,7 +626,8 @@ function renderBatchPage(){
   document.getElementById('machineMini').innerHTML=['1','2','3'].map(mc=>{
     const md2=p.batches[mc]; const off=!md2?'off':'';
     const w=md2?Number(md2.weight).toLocaleString()+'g':'-';
-    return `<div class="mm-btn ${mc===m?'active':''} ${off}" onclick="${md2?`changeMachine('${mc}')`:''}"">배합${mc} (${w})</div>`;
+    const clickFn = md2 ? "changeMachine('"+mc+"')" : '';
+    return '<div class="mm-btn '+(mc===m?'active ':'')+off+'" onclick="'+clickFn+'">배합'+mc+' ('+w+')</div>';
   }).join('');
   renderIngredients(md.ingredients);
 }
