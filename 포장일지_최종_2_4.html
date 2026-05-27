@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>포장일지</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+:root{
+  --primary:#c0386b;--primary-light:#fce8f0;--primary-dark:#8c1a45;
+  --success:#1e9e6e;--success-light:#e6f5ef;
+  --warning:#e07b1a;--warning-light:#fdf0e0;
+  --border:#e0e4ea;--bg:#f4f6fa;--bg2:#fff;
+  --text:#1a1d23;--text2:#5a6070;--text3:#9aa0ad;
+  --danger:#d63031;--radius:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text);}
+
+/* 상단바 */
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--primary);min-height:56px;display:flex;align-items:center;padding:0 14px;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.15);flex-wrap:wrap;}
+.back-btn{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.18);border:none;cursor:pointer;color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.tb-title{color:#fff;font-size:18px;font-weight:700;flex:1;}
+.tb-sub{color:rgba(255,255,255,0.75);font-size:13px;white-space:nowrap;}
+
+/* 공통 */
+.content{padding-top:72px;min-height:100vh;}
+.page{display:none;padding:16px;}
+.page.active{display:block;}
+.card{background:var(--bg2);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden;}
+.card-hd{padding:10px 16px;background:var(--bg);border-bottom:1px solid var(--border);font-size:14px;font-weight:700;color:var(--text2);}
+.card-bd{padding:16px;}
+.sec{font-size:13px;font-weight:700;color:var(--text2);margin:14px 0 8px;}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;}
+.field-label{font-size:12px;color:var(--text3);margin-bottom:4px;font-weight:500;}
+.field-input{background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:12px;font-size:15px;font-family:"Noto Sans KR",sans-serif;color:var(--text);width:100%;outline:none;}
+.field-input:focus{border-color:var(--primary);background:#fff;}
+.field-input.readonly{background:var(--primary-light);border-color:#b3cef0;color:var(--primary-dark);font-weight:700;}
+.field-input.success{background:var(--success-light);border-color:#7ec8a4;color:var(--success);font-weight:700;}
+
+/* 버튼 */
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:10px;cursor:pointer;font-family:"Noto Sans KR",sans-serif;font-weight:700;transition:all 0.15s;width:100%;}
+.btn:active{transform:scale(0.97);}
+.btn-primary{background:var(--primary);color:#fff;padding:16px;font-size:16px;}
+.btn-success{background:var(--success);color:#fff;padding:16px;font-size:16px;}
+.btn-outline{background:transparent;color:var(--primary);border:1.5px solid var(--primary);padding:14px;font-size:15px;}
+.btn-sm{padding:10px 14px;font-size:13px;border-radius:8px;width:auto;}
+.month-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
+.month-btn{padding:14px 8px;text-align:center;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);cursor:pointer;font-size:15px;font-weight:500;color:var(--text2);transition:all 0.15s;}
+.month-btn.active{border:2px solid var(--primary);background:var(--primary-light);color:var(--primary);font-weight:700;}
+.month-btn:active{transform:scale(0.97);}
+
+/* 메인 */
+.main-hd{background:var(--primary);padding:20px 16px;margin:-16px -16px 16px;}
+.main-date{color:rgba(255,255,255,0.75);font-size:14px;margin-bottom:4px;}
+.main-worker{color:#fff;font-size:22px;font-weight:700;}
+.main-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;}
+.stat-box{background:rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;}
+.stat-lbl{font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:3px;}
+.stat-val{font-size:20px;font-weight:700;color:#fff;}
+.search-box{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:12px;}
+.search-input{border:none;background:transparent;font-size:15px;font-family:"Noto Sans KR",sans-serif;flex:1;outline:none;color:var(--text);}
+.product-list{display:flex;flex-direction:column;gap:8px;}
+.product-item{display:flex;align-items:center;justify-content:space-between;padding:16px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all 0.15s;}
+.product-item:active{background:var(--primary-light);border-color:var(--primary);}
+.product-name{font-size:17px;font-weight:700;}
+.product-code{font-size:12px;color:var(--text3);margin-top:2px;}
+
+/* 설비 세팅 */
+.setting-box{background:var(--warning-light);border:1px solid #f0c080;border-radius:10px;padding:14px;margin-bottom:10px;}
+.setting-title{font-size:13px;font-weight:700;color:var(--warning);margin-bottom:10px;}
+.setting-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.setting-item{background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #f0c080;}
+.setting-name{font-size:11px;color:var(--text3);margin-bottom:4px;}
+.setting-val{font-size:16px;font-weight:700;color:var(--warning);}
+
+/* 완료 */
+.done-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);}
+.done-item:last-child{border-bottom:none;}
+.done-lot{font-size:14px;font-weight:700;color:var(--primary);}
+.done-sub{font-size:12px;color:var(--text3);margin-top:2px;}
+.done-badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:var(--success-light);color:var(--success);}
+.lot-box{background:var(--primary-light);border:1px solid #b3cef0;border-radius:10px;padding:12px 14px;margin-bottom:14px;}
+.lot-lbl{font-size:11px;color:var(--primary);font-weight:700;margin-bottom:3px;}
+.lot-num{font-size:15px;font-weight:700;color:var(--primary-dark);}
+.complete-icon{width:70px;height:70px;border-radius:50%;background:var(--success-light);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:34px;}
+.complete-title{text-align:center;font-size:20px;font-weight:700;margin-bottom:6px;}
+.complete-sub{text-align:center;font-size:13px;color:var(--text2);margin-bottom:20px;}
+.result-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;}
+.result-table th{background:var(--bg);padding:8px 10px;font-size:12px;font-weight:700;color:var(--text2);text-align:left;border-bottom:1px solid var(--border);}
+.result-table td{padding:8px 10px;border-bottom:1px solid var(--border);}
+.result-table tr:last-child td{border-bottom:none;}
+.divider{height:1px;background:var(--border);margin:14px 0;}
+.mt-12{margin-top:12px;}
+.tc{text-align:center;}
+.txs{font-size:13px;color:var(--text2);}
+
+/* 아코디언 */
+.accordion-item{background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;}
+.accordion-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;}
+.accordion-hd:active{background:var(--primary-light);}
+.accordion-lot{font-size:14px;font-weight:700;color:var(--primary);}
+.accordion-sub{font-size:12px;color:var(--text3);margin-top:2px;}
+.accordion-arrow{font-size:16px;color:var(--text3);transition:transform 0.2s;flex-shrink:0;}
+.accordion-arrow.open{transform:rotate(180deg);}
+.accordion-body{display:none;border-top:1px solid var(--border);padding:14px 16px;}
+.accordion-body.open{display:block;}
+.acc-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;}
+.acc-table th{background:var(--bg);padding:7px 10px;font-size:12px;font-weight:700;color:var(--text2);text-align:left;border-bottom:1px solid var(--border);}
+.acc-table td{padding:7px 10px;border-bottom:1px solid var(--border);}
+.acc-table tr:last-child td{border-bottom:none;}
+.acc-print-btn{display:flex;align-items:center;justify-content:center;gap:6px;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;width:100%;}
+
+.device-btn{padding:14px 16px;border:2px solid var(--border);border-radius:10px;background:var(--bg);cursor:pointer;transition:all 0.15s;}
+.device-btn.active{border-color:var(--primary);background:var(--primary-light);}
+.device-name{font-size:15px;font-weight:700;color:var(--text);}
+.device-btn.active .device-name{color:var(--primary);}
+.device-temp{font-size:12px;color:var(--text3);margin-top:3px;}
+.device-btn.active .device-temp{color:var(--primary);}
+.device-check{font-size:22px;color:var(--border);font-weight:700;flex-shrink:0;}
+.device-btn.active .device-check{color:var(--primary);}
+.print-area{display:none;}
+@media print{body *{display:none!important;}.print-area{display:block!important;}.print-area *{display:revert!important;}@page{margin:10mm;size:A4;}}
+</style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
+  authDomain:"bbang-ssaem-prod.firebaseapp.com",
+  projectId:"bbang-ssaem-prod",
+  storageBucket:"bbang-ssaem-prod.firebasestorage.app",
+  messagingSenderId:"685237617449",
+  appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
+});
+window._db = firebase.firestore();
+</script>
+</head>
+<body>
+
+<!-- 상단바 -->
+<div class="topbar">
+  <button class="back-btn" id="backBtn" style="display:none" onclick="goBack()">←</button>
+  <div class="tb-title" id="tbTitle">포장일지</div>
+  <div class="tb-sub" id="tbSub"></div>
+  <button id="syncBtn" onclick="syncToServer()" style="margin-left:auto;background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>
+</div>
+
+<div class="content">
+
+  <!-- 메인 -->
+  <div class="page active" id="page-main">
+    <div class="main-hd">
+      <div class="main-date" id="mainDate"></div>
+      <div class="main-worker" id="mainWorker"></div>
+      <div class="main-stats">
+        <div class="stat-box"><div class="stat-lbl">오늘 완료 포장</div><div class="stat-val" id="statDone">0건</div></div>
+        <div class="stat-box"><div class="stat-lbl">총 생산수량</div><div class="stat-val" id="statTotal">0개</div></div>
+      </div>
+    </div>
+
+    <div class="sec">오늘 완료된 포장</div>
+    <div id="todayList"><div class="tc txs" style="padding:16px 0">오늘 완료된 포장이 없습니다</div></div>
+
+    <div class="sec mt-12">제품 선택</div>
+    <div class="search-box">
+      <span style="color:var(--text3);font-size:16px">🔍</span>
+      <input class="search-input" placeholder="제품명 검색..." id="searchInput" oninput="filterProducts()">
+    </div>
+    <div class="product-list" id="productList"></div>
+  </div>
+
+  <!-- 포장 입력 -->
+  <div class="page" id="page-form">
+    <div class="lot-box">
+      <div class="lot-lbl">포장로트번호</div>
+      <div class="lot-num" id="packLot">-</div>
+    </div>
+
+    <!-- 설비 세팅 -->
+    <div class="card">
+      <div class="card-hd">⚙ 사용 설비 선택</div>
+      <div class="card-bd">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:10px">현재 포장에 사용하는 설비를 선택하세요</div>
+        <div style="display:flex;flex-direction:column;gap:8px" id="deviceList">
+          <div class="device-btn" id="dev-sealing" onclick="toggleDevice('sealing')">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div class="device-name">자동삼면포장기</div>
+                <div class="device-temp" id="temp-sealing">접합온도: -℃</div>
+              </div>
+              <div class="device-check" id="check-sealing">○</div>
+            </div>
+          </div>
+          <div class="device-btn" id="dev-sealer" onclick="toggleDevice('sealer')">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div class="device-name">실링기</div>
+                <div class="device-temp" id="temp-sealer">접합온도: -℃</div>
+              </div>
+              <div class="device-check" id="check-sealer">○</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 내포장 -->
+    <div class="card">
+      <div class="card-hd">📦 내포장</div>
+      <div class="card-bd">
+        <div class="row">
+          <div>
+            <div class="field-label">작업인원</div>
+            <input class="field-input" type="number" id="workers" placeholder="명">
+          </div>
+          <div>
+            <div class="field-label">입수량 (개/박스)</div>
+            <input class="field-input" type="number" id="perBox" placeholder="개">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <div class="field-label">작업시작시간</div>
+            <input class="field-input" id="startTime" placeholder="0830" maxlength="4" inputmode="numeric" oninput="fmtTime(this)">
+          </div>
+          <div>
+            <div class="field-label">작업종료시간</div>
+            <input class="field-input" id="endTime" placeholder="1430" maxlength="4" inputmode="numeric" oninput="fmtTime(this)">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <div class="field-label">생산수량 (개)</div>
+            <input class="field-input" type="number" id="qtyPcs" placeholder="개" oninput="calcBoxes()">
+          </div>
+          <div>
+            <div class="field-label">생산수량 (박스)</div>
+            <input class="field-input readonly" id="qtyBoxes" placeholder="자동계산" readonly>
+          </div>
+        </div>
+        <div>
+          <div class="field-label">잔량 (개)</div>
+          <input class="field-input" type="number" id="remaining" placeholder="개" style="margin-bottom:14px">
+        </div>
+        <div class="field-label">소비기한</div>
+        <div class="month-btns">
+          <div class="month-btn" onclick="setExpiry(6)">6개월</div>
+          <div class="month-btn" onclick="setExpiry(9)">9개월</div>
+          <div class="month-btn" onclick="setExpiry(12)">12개월</div>
+        </div>
+        <input class="field-input readonly success" id="expiryDate" placeholder="소비기한 자동계산" readonly>
+      </div>
+    </div>
+
+    <!-- 외포장 -->
+    <div class="card">
+      <div class="card-hd">🏷 외포장</div>
+      <div class="card-bd">
+        <div class="row">
+          <div>
+            <div class="field-label">필름포장지 사용량</div>
+            <input class="field-input" type="number" id="filmQty" placeholder="m 또는 개">
+          </div>
+          <div>
+            <div class="field-label">필름포장지 입고일</div>
+            <input class="field-input" id="filmDate" placeholder="YYMMDD" maxlength="8" inputmode="numeric" oninput="fmtDate(this)">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <div class="field-label">벌크비닐 사용량</div>
+            <input class="field-input" type="number" id="bulkQty" placeholder="개">
+          </div>
+          <div>
+            <div class="field-label">벌크비닐 입고일</div>
+            <input class="field-input" id="bulkDate" placeholder="YYMMDD" maxlength="8" inputmode="numeric" oninput="fmtDate(this)">
+          </div>
+        </div>
+        <div>
+          <div class="field-label">박스 사용량</div>
+          <input class="field-input" type="number" id="boxQty" placeholder="개">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary mt-12" onclick="goSign()">✓ 다음 (서명)</button>
+  </div>
+
+  <!-- 서명 화면 -->
+  <div class="page" id="page-sign">
+    <div class="card">
+      <div class="card-hd">✍️ 서명</div>
+      <div class="card-bd">
+        <div style="font-size:14px;color:var(--text2);margin-bottom:12px">아래 칸에 손가락으로 서명해주세요</div>
+        <canvas id="signCanvas" style="width:100%;height:200px;border:2px solid var(--border);border-radius:10px;background:#fff;touch-action:none;display:block;"></canvas>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button onclick="clearSign()" style="flex:1;padding:12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);font-size:14px;font-weight:600;cursor:pointer;color:var(--text2);">다시 서명</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary mt-12" onclick="completeWithSign()">✓ 포장 완료 → 로트 생성</button>
+  </div>
+
+  <!-- 완료 화면 -->
+  <div class="page" id="page-done">
+    <div class="card">
+      <div class="card-bd" style="padding:24px 16px">
+        <div class="complete-icon">✅</div>
+        <div class="complete-title" id="doneTitle">포장 완료!</div>
+        <div class="complete-sub" id="doneSub"></div>
+        <div id="doneResult"></div>
+        <div class="divider"></div>
+        <button class="btn btn-primary" onclick="printReport()" style="margin-bottom:10px">🖨️ PDF 출력</button>
+        <button class="btn btn-outline" onclick="goHome()">홈으로 돌아가기</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="print-area" id="printArea"></div>
+
+<script>
+const RECIPE_DB = {"P001": {"name": "거북이단과자생지", "code": "P001", "batches": {"1": {"weight": 528, "ingredients": [{"name": "제빵용고급밀가루", "amount": 360}, {"name": "하얀설탕", "amount": 45}, {"name": "안데스트레샬소금", "amount": 7}, {"name": "탈지분유", "amount": 10}, {"name": "에스500키모", "amount": 5}, {"name": "세미드라이이스트 골드", "amount": 8}, {"name": "휘핑크림", "amount": 60}, {"name": "아카시아청", "amount": 13}, {"name": "고메버터(플로리)", "amount": 20}]}, "2": {"weight": 44000, "ingredients": [{"name": "제빵용고급밀가루", "amount": 30000}, {"name": "하얀설탕", "amount": 3750}, {"name": "안데스트레샬소금", "amount": 583}, {"name": "탈지분유", "amount": 833}, {"name": "에스500키모", "amount": 417}, {"name": "세미드라이이스트 골드", "amount": 667}, {"name": "휘핑크림", "amount": 5000}, {"name": "아카시아청", "amount": 1083}, {"name": "고메버터(플로리)", "amount": 1667}]}, "3": {"weight": 88000, "ingredients": [{"name": "제빵용고급밀가루", "amount": 60000}, {"name": "하얀설탕", "amount": 7500}, {"name": "안데스트레샬소금", "amount": 1167}, {"name": "탈지분유", "amount": 1667}, {"name": "에스500키모", "amount": 833}, {"name": "세미드라이이스트 골드", "amount": 1333}, {"name": "휘핑크림", "amount": 10000}, {"name": "아카시아청", "amount": 2167}, {"name": "고메버터(플로리)", "amount": 3333}]}}}, "P002": {"name": "곡물베이글TATAS", "code": "P002", "batches": {"1": {"weight": 47583, "ingredients": [{"name": "제빵용고급밀가루", "amount": 30000}, {"name": "하얀설탕", "amount": 3750}, {"name": "안데스트레샬소금", "amount": 583}, {"name": "탈지분유", "amount": 833}, {"name": "세미드라이이스트 골드", "amount": 500}, {"name": "휘핑크림", "amount": 5000}, {"name": "아카시아청", "amount": 1083}, {"name": "고메버터(플로리)", "amount": 1667}, {"name": "멀티그레인", "amount": 4167}]}, "2": {"weight": 63445, "ingredients": [{"name": "제빵용고급밀가루", "amount": 40000}, {"name": "하얀설탕", "amount": 5000}, {"name": "안데스트레샬소금", "amount": 778}, {"name": "탈지분유", "amount": 1111}, {"name": "세미드라이이스트 골드", "amount": 667}, {"name": "휘핑크림", "amount": 6667}, {"name": "아카시아청", "amount": 1444}, {"name": "고메버터(플로리)", "amount": 2222}, {"name": "멀티그레인", "amount": 5556}]}, "3": {"weight": 95167, "ingredients": [{"name": "제빵용고급밀가루", "amount": 60000}, {"name": "하얀설탕", "amount": 7500}, {"name": "안데스트레샬소금", "amount": 1167}, {"name": "탈지분유", "amount": 1667}, {"name": "세미드라이이스트 골드", "amount": 1000}, {"name": "휘핑크림", "amount": 10000}, {"name": "아카시아청", "amount": 2167}, {"name": "고메버터(플로리)", "amount": 3333}, {"name": "멀티그레인", "amount": 8333}]}}}, "P003": {"name": "공주밤빵", "code": "P003", "batches": {"1": {"weight": 48485, "ingredients": [{"name": "제빵용밀가루", "amount": 22637}, {"name": "다목적박력분", "amount": 4939}, {"name": "하얀설탕", "amount": 5762}, {"name": "안데스트레샬소금", "amount": 604}, {"name": "에스500키모", "amount": 412}, {"name": "탈지분유", "amount": 823}, {"name": "세미드라이이스트 골드", "amount": 823}, {"name": "전란액", "amount": 5488}, {"name": "몰트액기스", "amount": 137}, {"name": "우유", "amount": 2744}, {"name": "그랜드500프리", "amount": 4116}]}, "2": {"weight": 96965, "ingredients": [{"name": "제빵용밀가루", "amount": 45273}, {"name": "다목적박력분", "amount": 9878}, {"name": "하얀설탕", "amount": 11524}, {"name": "안데스트레샬소금", "amount": 1207}, {"name": "에스500키모", "amount": 823}, {"name": "탈지분유", "amount": 1646}, {"name": "세미드라이이스트 골드", "amount": 1646}, {"name": "전란액", "amount": 10975}, {"name": "몰트액기스", "amount": 274}, {"name": "우유", "amount": 5488}, {"name": "그랜드500프리", "amount": 8231}]}, "3": null}}, "P004": {"name": "공주밤빵 아몬드크림", "code": "P004", "batches": {"1": {"weight": 8800, "ingredients": [{"name": "그랜드500프리", "amount": 2200}, {"name": "하얀설탕", "amount": 2200}, {"name": "전란액", "amount": 2200}, {"name": "아몬드분말", "amount": 2200}]}, "2": {"weight": 16800, "ingredients": [{"name": "그랜드500프리", "amount": 4200}, {"name": "하얀설탕", "amount": 4200}, {"name": "전란액", "amount": 4200}, {"name": "아몬드분말", "amount": 4200}]}, "3": null}}, "P005": {"name": "공주밤빵 토핑", "code": "P005", "batches": {"1": {"weight": 6000, "ingredients": [{"name": "밤다이스", "amount": 5000}, {"name": "전란액", "amount": 1000}]}, "2": {"weight": 12000, "ingredients": [{"name": "밤다이스", "amount": 10000}, {"name": "전란액", "amount": 2000}]}, "3": null}}, "P006": {"name": "뉴욕 감자 베이글", "code": "P006", "batches": {"1": {"weight": 73872, "ingredients": [{"name": "제빵용밀가루", "amount": 56160}, {"name": "하얀설탕", "amount": 5184}, {"name": "안데스트레샬소금", "amount": 1368}, {"name": "세미드라이이스트 골드", "amount": 792}, {"name": "에스500키모", "amount": 864}, {"name": "오버나이트", "amount": 864}, {"name": "플레인요거트", "amount": 4752}, {"name": "버터", "amount": 3888}]}, "2": {"weight": 44322, "ingredients": [{"name": "제빵용밀가루", "amount": 33696}, {"name": "하얀설탕", "amount": 3110}, {"name": "안데스트레샬소금", "amount": 821}, {"name": "세미드라이이스트 골드", "amount": 475}, {"name": "에스500키모", "amount": 518}, {"name": "오버나이트", "amount": 518}, {"name": "플레인요거트", "amount": 2851}, {"name": "버터", "amount": 2333}]}, "3": {"weight": 61560, "ingredients": [{"name": "제빵용밀가루", "amount": 46800}, {"name": "하얀설탕", "amount": 4320}, {"name": "안데스트레샬소금", "amount": 1140}, {"name": "세미드라이이스트 골드", "amount": 660}, {"name": "에스500키모", "amount": 720}, {"name": "오버나이트", "amount": 720}, {"name": "플레인요거트", "amount": 3960}, {"name": "버터", "amount": 3240}]}}}, "P007": {"name": "뉴욕 감자 베이글 속", "code": "P007", "batches": {"1": {"weight": 7994, "ingredients": [{"name": "포테이토샐러드", "amount": 7267}, {"name": "빵가루", "amount": 727}]}, "2": {"weight": 15400, "ingredients": [{"name": "포테이토샐러드", "amount": 14000}, {"name": "빵가루", "amount": 1400}]}, "3": {"weight": 33000, "ingredients": [{"name": "포테이토샐러드", "amount": 30000}, {"name": "빵가루", "amount": 3000}]}}}, "P008": {"name": "뉴욕 바질토마토 베이글", "code": "P008", "batches": {"1": {"weight": 72884, "ingredients": [{"name": "제빵용밀가루", "amount": 50000}, {"name": "하얀설탕", "amount": 4615}, {"name": "안데스트레샬소금", "amount": 1218}, {"name": "세미드라이이스트 골드", "amount": 705}, {"name": "에스500키모", "amount": 769}, {"name": "오버나이트", "amount": 769}, {"name": "플레인요거트(무가당)", "amount": 4231}, {"name": "버터", "amount": 3462}, {"name": "바질 페스토", "amount": 1346}, {"name": "마리네이드 토마토", "amount": 5769}]}, "2": {"weight": 58306, "ingredients": [{"name": "제빵용밀가루", "amount": 40000}, {"name": "하얀설탕", "amount": 3692}, {"name": "안데스트레샬소금", "amount": 974}, {"name": "세미드라이이스트 골드", "amount": 564}, {"name": "에스500키모", "amount": 615}, {"name": "오버나이트", "amount": 615}, {"name": "플레인요거트(무가당)", "amount": 3385}, {"name": "버터", "amount": 2769}, {"name": "바질 페스토", "amount": 1077}, {"name": "마리네이드 토마토", "amount": 4615}]}, "3": {"weight": 44343, "ingredients": [{"name": "제빵용밀가루", "amount": 30420}, {"name": "하얀설탕", "amount": 2808}, {"name": "안데스트레샬소금", "amount": 741}, {"name": "세미드라이이스트 골드", "amount": 429}, {"name": "에스500키모", "amount": 468}, {"name": "오버나이트", "amount": 468}, {"name": "플레인요거트(무가당)", "amount": 2574}, {"name": "버터", "amount": 2106}, {"name": "바질 페스토", "amount": 819}, {"name": "마리네이드 토마토", "amount": 3510}]}}}, "P009": {"name": "뉴욕 양파 베이글", "code": "P009", "batches": {"1": {"weight": 71538, "ingredients": [{"name": "제빵용밀가루", "amount": 50000}, {"name": "하얀설탕", "amount": 4615}, {"name": "안데스트레샬소금", "amount": 1218}, {"name": "세미드라이이스트 골드", "amount": 705}, {"name": "에스500키모", "amount": 769}, {"name": "오버나이트", "amount": 769}, {"name": "플레인요거트", "amount": 4231}, {"name": "버터", "amount": 3462}, {"name": "양파", "amount": 5769}]}, "2": {"weight": 33480, "ingredients": [{"name": "제빵용밀가루", "amount": 23400}, {"name": "하얀설탕", "amount": 2160}, {"name": "안데스트레샬소금", "amount": 570}, {"name": "세미드라이이스트 골드", "amount": 330}, {"name": "에스500키모", "amount": 360}, {"name": "오버나이트", "amount": 360}, {"name": "플레인요거트", "amount": 1980}, {"name": "버터", "amount": 1620}, {"name": "양파", "amount": 2700}]}, "3": {"weight": 43524, "ingredients": [{"name": "제빵용밀가루", "amount": 30420}, {"name": "하얀설탕", "amount": 2808}, {"name": "안데스트레샬소금", "amount": 741}, {"name": "세미드라이이스트 골드", "amount": 429}, {"name": "에스500키모", "amount": 468}, {"name": "오버나이트", "amount": 468}, {"name": "플레인요거트", "amount": 2574}, {"name": "버터", "amount": 2106}, {"name": "양파", "amount": 3510}]}}}, "P010": {"name": "뉴욕 올리브 베이글", "code": "P010", "batches": {"1": {"weight": 78205, "ingredients": [{"name": "제빵용밀가루", "amount": 50000}, {"name": "하얀설탕", "amount": 4615}, {"name": "안데스트레샬소금", "amount": 1218}, {"name": "세미드라이이스트 골드", "amount": 705}, {"name": "에스500키모", "amount": 769}, {"name": "오버나이트", "amount": 769}, {"name": "플레인요거트", "amount": 4231}, {"name": "버터", "amount": 3462}, {"name": "블랙올리브", "amount": 6667}, {"name": "베이킹롤치즈", "amount": 5769}]}, "2": {"weight": 62562, "ingredients": [{"name": "제빵용밀가루", "amount": 40000}, {"name": "하얀설탕", "amount": 3692}, {"name": "안데스트레샬소금", "amount": 974}, {"name": "세미드라이이스트 골드", "amount": 564}, {"name": "에스500키모", "amount": 615}, {"name": "오버나이트", "amount": 615}, {"name": "플레인요거트", "amount": 3385}, {"name": "버터", "amount": 2769}, {"name": "블랙올리브", "amount": 5333}, {"name": "베이킹롤치즈", "amount": 4615}]}, "3": {"weight": 47580, "ingredients": [{"name": "제빵용밀가루", "amount": 30420}, {"name": "하얀설탕", "amount": 2808}, {"name": "안데스트레샬소금", "amount": 741}, {"name": "세미드라이이스트 골드", "amount": 429}, {"name": "에스500키모", "amount": 468}, {"name": "오버나이트", "amount": 468}, {"name": "플레인요거트", "amount": 2574}, {"name": "버터", "amount": 2106}, {"name": "블랙올리브", "amount": 4056}, {"name": "베이킹롤치즈", "amount": 3510}]}}}, "P011": {"name": "뉴욕 치즈 베이글", "code": "P011", "batches": {"1": {"weight": 16290, "ingredients": [{"name": "제빵용밀가루", "amount": 11700}, {"name": "하얀설탕", "amount": 1080}, {"name": "안데스트레샬소금", "amount": 285}, {"name": "세미드라이이스트 골드", "amount": 165}, {"name": "에스500키모", "amount": 180}, {"name": "오버나이트", "amount": 180}, {"name": "플레인요거트(무가당)", "amount": 990}, {"name": "버터", "amount": 810}, {"name": "콜비잭치즈", "amount": 900}]}, "2": {"weight": 32580, "ingredients": [{"name": "제빵용밀가루", "amount": 23400}, {"name": "하얀설탕", "amount": 2160}, {"name": "안데스트레샬소금", "amount": 570}, {"name": "세미드라이이스트 골드", "amount": 330}, {"name": "에스500키모", "amount": 360}, {"name": "오버나이트", "amount": 360}, {"name": "플레인요거트(무가당)", "amount": 1980}, {"name": "버터", "amount": 1620}, {"name": "콜비잭치즈", "amount": 1800}]}, "3": {"weight": 65160, "ingredients": [{"name": "제빵용밀가루", "amount": 46800}, {"name": "하얀설탕", "amount": 4320}, {"name": "안데스트레샬소금", "amount": 1140}, {"name": "세미드라이이스트 골드", "amount": 660}, {"name": "에스500키모", "amount": 720}, {"name": "오버나이트", "amount": 720}, {"name": "플레인요거트(무가당)", "amount": 3960}, {"name": "버터", "amount": 3240}, {"name": "콜비잭치즈", "amount": 3600}]}}}, "P012": {"name": "뉴욕 페퍼로니칠리 베이글", "code": "P012", "batches": {"1": {"weight": 75384, "ingredients": [{"name": "제빵용밀가루", "amount": 50000}, {"name": "하얀설탕", "amount": 4615}, {"name": "안데스트레샬소금", "amount": 1218}, {"name": "세미드라이이스트 골드", "amount": 705}, {"name": "에스500키모", "amount": 769}, {"name": "오버나이트", "amount": 769}, {"name": "플레인요거트(무가당)", "amount": 4231}, {"name": "버터", "amount": 3462}, {"name": "할라피뇨", "amount": 3205}, {"name": "페페로니", "amount": 6410}]}, "2": {"weight": 60306, "ingredients": [{"name": "제빵용밀가루", "amount": 40000}, {"name": "하얀설탕", "amount": 3692}, {"name": "안데스트레샬소금", "amount": 974}, {"name": "세미드라이이스트 골드", "amount": 564}, {"name": "에스500키모", "amount": 615}, {"name": "오버나이트", "amount": 615}, {"name": "플레인요거트(무가당)", "amount": 3385}, {"name": "버터", "amount": 2769}, {"name": "할라피뇨", "amount": 2564}, {"name": "페페로니", "amount": 5128}]}, "3": {"weight": 45864, "ingredients": [{"name": "제빵용밀가루", "amount": 30420}, {"name": "하얀설탕", "amount": 2808}, {"name": "안데스트레샬소금", "amount": 741}, {"name": "세미드라이이스트 골드", "amount": 429}, {"name": "에스500키모", "amount": 468}, {"name": "오버나이트", "amount": 468}, {"name": "플레인요거트(무가당)", "amount": 2574}, {"name": "버터", "amount": 2106}, {"name": "할라피뇨", "amount": 1950}, {"name": "페페로니", "amount": 3900}]}}}, "P013": {"name": "뉴욕 플레인 베이글", "code": "P013", "batches": {"1": {"weight": 73872, "ingredients": [{"name": "제빵용밀가루", "amount": 56160}, {"name": "하얀설탕", "amount": 5184}, {"name": "안데스트레샬소금", "amount": 1368}, {"name": "세미드라이이스트 골드", "amount": 792}, {"name": "에스500키모", "amount": 864}, {"name": "오버나이트", "amount": 864}, {"name": "플레인요거트", "amount": 4752}, {"name": "버터", "amount": 3888}]}, "2": {"weight": 24624, "ingredients": [{"name": "제빵용밀가루", "amount": 18720}, {"name": "하얀설탕", "amount": 1728}, {"name": "안데스트레샬소금", "amount": 456}, {"name": "세미드라이이스트 골드", "amount": 264}, {"name": "에스500키모", "amount": 288}, {"name": "오버나이트", "amount": 288}, {"name": "플레인요거트", "amount": 1584}, {"name": "버터", "amount": 1296}]}, "3": {"weight": 61560, "ingredients": [{"name": "제빵용밀가루", "amount": 46800}, {"name": "하얀설탕", "amount": 4320}, {"name": "안데스트레샬소금", "amount": 1140}, {"name": "세미드라이이스트 골드", "amount": 660}, {"name": "에스500키모", "amount": 720}, {"name": "오버나이트", "amount": 720}, {"name": "플레인요거트", "amount": 3960}, {"name": "버터", "amount": 3240}]}}}, "P014": {"name": "단과자생지", "code": "P014", "batches": {"1": {"weight": 126980, "ingredients": [{"name": "유기농강력분", "amount": 60000}, {"name": "유기농박력분", "amount": 12800}, {"name": "하얀설탕", "amount": 14930}, {"name": "안데스트레샬소금", "amount": 1570}, {"name": "에스500키모", "amount": 1070}, {"name": "탈지분유", "amount": 2130}, {"name": "세미드라이이스트 골드", "amount": 2130}, {"name": "전란액", "amount": 14220}, {"name": "몰트액기스", "amount": 360}, {"name": "우유", "amount": 7110}, {"name": "버터", "amount": 10660}]}, "2": {"weight": 63490, "ingredients": [{"name": "유기농강력분", "amount": 30000}, {"name": "유기농박력분", "amount": 6400}, {"name": "하얀설탕", "amount": 7465}, {"name": "안데스트레샬소금", "amount": 785}, {"name": "에스500키모", "amount": 535}, {"name": "탈지분유", "amount": 1065}, {"name": "세미드라이이스트 골드", "amount": 1065}, {"name": "전란액", "amount": 7110}, {"name": "몰트액기스", "amount": 180}, {"name": "우유", "amount": 3555}, {"name": "버터", "amount": 5330}]}, "3": null}}, "P015": {"name": "달리는소금빵성형생지", "code": "P015", "batches": {"1": {"weight": 57525, "ingredients": [{"name": "제빵용밀가루", "amount": 30000}, {"name": "다목적박력분", "amount": 10540}, {"name": "안데스트레샬소금", "amount": 811}, {"name": "세미드라이이스트 레드", "amount": 1216}, {"name": "하얀설탕", "amount": 3568}, {"name": "밀크웨이분말", "amount": 973}, {"name": "에스500키모", "amount": 689}, {"name": "마가린(노블)", "amount": 3851}, {"name": "버터", "amount": 202}, {"name": "우유", "amount": 5675}]}, "2": {"weight": 82295, "ingredients": [{"name": "제빵용밀가루", "amount": 40000}, {"name": "다목적박력분", "amount": 14054}, {"name": "안데스트레샬소금", "amount": 865}, {"name": "세미드라이이스트 레드", "amount": 1622}, {"name": "하얀설탕", "amount": 4757}, {"name": "밀크웨이분말", "amount": 1297}, {"name": "에스500키모", "amount": 919}, {"name": "마가린(노블)", "amount": 5405}, {"name": "버터", "amount": 5405}, {"name": "우유", "amount": 7971}]}, "3": {"weight": 122836, "ingredients": [{"name": "제빵용밀가루", "amount": 60000}, {"name": "다목적박력분", "amount": 21081}, {"name": "안데스트레샬소금", "amount": 1297}, {"name": "세미드라이이스트 레드", "amount": 2432}, {"name": "하얀설탕", "amount": 7135}, {"name": "밀크웨이분말", "amount": 1946}, {"name": "에스500키모", "amount": 1378}, {"name": "마가린(노블)", "amount": 8108}, {"name": "버터", "amount": 8108}, {"name": "우유", "amount": 11351}]}}}, "P016": {"name": "딥초코베이글TATAS", "code": "P016", "batches": {"1": {"weight": 54678, "ingredients": [{"name": "제빵용고급밀가루", "amount": 30000}, {"name": "하얀설탕", "amount": 3750}, {"name": "안데스트레샬소금", "amount": 583}, {"name": "탈지분유", "amount": 833}, {"name": "세미드라이이스트 골드", "amount": 500}, {"name": "휘핑크림", "amount": 5000}, {"name": "아카시아청", "amount": 833}, {"name": "고메버터(플로리)", "amount": 1667}, {"name": "코코아파우더", "amount": 1667}, {"name": "초코믹스", "amount": 833}, {"name": "다크초코칩", "amount": 9012}]}, "2": {"weight": 78913, "ingredients": [{"name": "제빵용고급밀가루", "amount": 40000}, {"name": "하얀설탕", "amount": 5000}, {"name": "안데스트레샬소금", "amount": 778}, {"name": "탈지분유", "amount": 1111}, {"name": "세미드라이이스트 골드", "amount": 667}, {"name": "휘핑크림", "amount": 6667}, {"name": "아카시아청", "amount": 1111}, {"name": "고메버터(플로리)", "amount": 2222}, {"name": "코코아파우더", "amount": 2222}, {"name": "초코믹스", "amount": 1111}, {"name": "다크초코칩", "amount": 18024}]}, "3": {"weight": 118370, "ingredients": [{"name": "제빵용고급밀가루", "amount": 60000}, {"name": "하얀설탕", "amount": 7500}, {"name": "안데스트레샬소금", "amount": 1167}, {"name": "탈지분유", "amount": 1667}, {"name": "세미드라이이스트 골드", "amount": 1000}, {"name": "휘핑크림", "amount": 10000}, {"name": "아카시아청", "amount": 1667}, {"name": "고메버터(플로리)", "amount": 3333}, {"name": "코코아파우더", "amount": 3333}, {"name": "초코믹스", "amount": 1667}, {"name": "다크초코칩", "amount": 27036}]}}}, "P017": {"name": "무화과베이글TATAS", "code": "P017", "batches": {"1": {"weight": 48080, "ingredients": [{"name": "제빵용고급밀가루", "amount": 30000}, {"name": "하얀설탕", "amount": 3648}, {"name": "안데스트레샬소금", "amount": 568}, {"name": "탈지분유", "amount": 811}, {"name": "세미드라이이스트 골드", "amount": 486}, {"name": "휘핑크림", "amount": 4864}, {"name": "아카시아청", "amount": 811}, {"name": "고메버터(플로리)", "amount": 1622}, {"name": "반건조무화과다이스", "amount": 5270}]}, "2": {"weight": 32051, "ingredients": [{"name": "제빵용고급밀가루", "amount": 20000}, {"name": "하얀설탕", "amount": 2432}, {"name": "안데스트레샬소금", "amount": 378}, {"name": "탈지분유", "amount": 540}, {"name": "세미드라이이스트 골드", "amount": 324}, {"name": "휘핑크림", "amount": 3243}, {"name": "아카시아청", "amount": 540}, {"name": "고메버터(플로리)", "amount": 1081}, {"name": "반건조무화과다이스", "amount": 3513}]}, "3": {"weight": 96161, "ingredients": [{"name": "제빵용고급밀가루", "amount": 60000}, {"name": "하얀설탕", "amount": 7297}, {"name": "안데스트레샬소금", "amount": 1135}, {"name": "탈지분유", "amount": 1622}, {"name": "세미드라이이스트 골드", "amount": 973}, {"name": "휘핑크림", "amount": 9729}, {"name": "아카시아청", "amount": 1622}, {"name": "고메버터(플로리)", "amount": 3243}, {"name": "반건조무화과다이스", "amount": 10540}]}}}, "P018": {"name": "박뚜기 소금빵냉동생지", "code": "P018", "batches": {"1": {"weight": 25632, "ingredients": [{"name": "제빵용밀가루", "amount": 11520}, {"name": "다목적박력분", "amount": 7200}, {"name": "하얀설탕", "amount": 1512}, {"name": "안데스트레샬소금", "amount": 384}, {"name": "에스500키모", "amount": 168}, {"name": "세미드라이이스트 레드", "amount": 360}, {"name": "밀크웨이분말", "amount": 480}, {"name": "세몰리나", "amount": 576}, {"name": "우유버터화이트", "amount": 1512}, {"name": "우유", "amount": 1920}]}, "2": {"weight": 38938, "ingredients": [{"name": "제빵용밀가루", "amount": 17500}, {"name": "다목적박력분", "amount": 10938}, {"name": "하얀설탕", "amount": 2297}, {"name": "안데스트레샬소금", "amount": 583}, {"name": "에스500키모", "amount": 255}, {"name": "세미드라이이스트 레드", "amount": 547}, {"name": "밀크웨이분말", "amount": 729}, {"name": "세몰리나", "amount": 875}, {"name": "우유버터화이트", "amount": 2297}, {"name": "우유", "amount": 2917}]}, "3": {"weight": 77875, "ingredients": [{"name": "제빵용밀가루", "amount": 35000}, {"name": "다목적박력분", "amount": 21875}, {"name": "하얀설탕", "amount": 4594}, {"name": "안데스트레샬소금", "amount": 1167}, {"name": "에스500키모", "amount": 510}, {"name": "세미드라이이스트 레드", "amount": 1094}, {"name": "밀크웨이분말", "amount": 1458}, {"name": "세몰리나", "amount": 1750}, {"name": "우유버터화이트", "amount": 4594}, {"name": "우유", "amount": 5833}]}}}, "P019": {"name": "백두랑이마들렌초코", "code": "P019", "batches": {"1": {"weight": 18525, "ingredients": [{"name": "전란액", "amount": 4500}, {"name": "하얀설탕", "amount": 4275}, {"name": "그랜드500프리", "amount": 4500}, {"name": "제빵용밀가루", "amount": 2025}, {"name": "다목적박력분", "amount": 2025}, {"name": "베이킹파우더", "amount": 75}, {"name": "코코아분말", "amount": 450}, {"name": "화미고백당", "amount": 675}]}, "2": {"weight": 24700, "ingredients": [{"name": "전란액", "amount": 6000}, {"name": "하얀설탕", "amount": 5700}, {"name": "그랜드500프리", "amount": 6000}, {"name": "제빵용밀가루", "amount": 2700}, {"name": "다목적박력분", "amount": 2700}, {"name": "베이킹파우더", "amount": 100}, {"name": "코코아분말", "amount": 600}, {"name": "화미고백당", "amount": 900}]}, "3": null}}, "P020": {"name": "백두랑이마들렌황치즈", "code": "P020", "batches": {"1": {"weight": 12350, "ingredients": [{"name": "전란액", "amount": 3000}, {"name": "하얀설탕", "amount": 2850}, {"name": "그랜드500프리", "amount": 3000}, {"name": "제빵용밀가루", "amount": 1350}, {"name": "다목적박력분", "amount": 1350}, {"name": "베이킹파우더", "amount": 50}, {"name": "황치즈분말", "amount": 300}, {"name": "화미고백당", "amount": 450}]}, "2": {"weight": 24700, "ingredients": [{"name": "전란액", "amount": 6000}, {"name": "하얀설탕", "amount": 5700}, {"name": "그랜드500프리", "amount": 6000}, {"name": "제빵용밀가루", "amount": 2700}, {"name": "다목적박력분", "amount": 2700}, {"name": "베이킹파우더", "amount": 100}, {"name": "황치즈분말", "amount": 600}, {"name": "화미고백당", "amount": 900}]}, "3": null}}, "P021": {"name": "버터떡", "code": "P021", "batches": {"1": {"weight": 20099, "ingredients": [{"name": "우유", "amount": 7500}, {"name": "버터", "amount": 1312}, {"name": "전란액", "amount": 1875}, {"name": "하얀설탕", "amount": 2250}, {"name": "가당연유", "amount": 750}, {"name": "안데스트레샬소금", "amount": 112}, {"name": "바닐프로T", "amount": 300}, {"name": "가루찹쌀", "amount": 4500}, {"name": "왁시브레드KC", "amount": 1500}]}, "2": {"weight": 40200, "ingredients": [{"name": "우유", "amount": 15000}, {"name": "버터", "amount": 2625}, {"name": "전란액", "amount": 3750}, {"name": "하얀설탕", "amount": 4500}, {"name": "가당연유", "amount": 1500}, {"name": "안데스트레샬소금", "amount": 225}, {"name": "바닐프로T", "amount": 600}, {"name": "가루찹쌀", "amount": 9000}, {"name": "왁시브레드KC", "amount": 3000}]}, "3": {"weight": 53600, "ingredients": [{"name": "우유", "amount": 20000}, {"name": "버터", "amount": 3500}, {"name": "전란액", "amount": 5000}, {"name": "하얀설탕", "amount": 6000}, {"name": "가당연유", "amount": 2000}, {"name": "안데스트레샬소금", "amount": 300}, {"name": "바닐프로T", "amount": 800}, {"name": "가루찹쌀", "amount": 12000}, {"name": "왁시브레드KC", "amount": 4000}]}}}, "P022": {"name": "블루베리베이글TATAS", "code": "P022", "batches": {"1": {"weight": 32684, "ingredients": [{"name": "제빵용고급밀가루", "amount": 20000}, {"name": "하얀설탕", "amount": 2369}, {"name": "안데스트레샬소금", "amount": 368}, {"name": "탈지분유", "amount": 526}, {"name": "세미드라이이스트 골드", "amount": 316}, {"name": "휘핑크림", "amount": 2105}, {"name": "아카시아청", "amount": 684}, {"name": "고메버터(플로리)", "amount": 1053}, {"name": "건조 블루베리", "amount": 2105}, {"name": "냉동 블루베리", "amount": 3158}]}, "2": {"weight": 48397, "ingredients": [{"name": "제빵용고급밀가루", "amount": 30000}, {"name": "하얀설탕", "amount": 3553}, {"name": "안데스트레샬소금", "amount": 553}, {"name": "탈지분유", "amount": 790}, {"name": "세미드라이이스트 골드", "amount": 474}, {"name": "휘핑크림", "amount": 3158}, {"name": "아카시아청", "amount": 1026}, {"name": "고메버터(플로리)", "amount": 1579}, {"name": "건조 블루베리", "amount": 3158}, {"name": "냉동 블루베리", "amount": 4106}]}, "3": {"weight": 96791, "ingredients": [{"name": "제빵용고급밀가루", "amount": 60000}, {"name": "하얀설탕", "amount": 7106}, {"name": "안데스트레샬소금", "amount": 1105}, {"name": "탈지분유", "amount": 1579}, {"name": "세미드라이이스트 골드", "amount": 947}, {"name": "휘핑크림", "amount": 6316}, {"name": "아카시아청", "amount": 2053}, {"name": "고메버터(플로리)", "amount": 3158}, {"name": "건조 블루베리", "amount": 6316}, {"name": "냉동 블루베리", "amount": 8211}]}}}, "P023": {"name": "사각피자 반죽", "code": "P023", "batches": {"1": {"weight": 141360, "ingredients": [{"name": "제빵용강력분", "amount": 66000}, {"name": "다목적박력분", "amount": 14400}, {"name": "하얀설탕", "amount": 16800}, {"name": "안데스트레샬소금", "amount": 1760}, {"name": "에스500키모", "amount": 1200}, {"name": "탈지분유", "amount": 2400}, {"name": "세미드라이이스트 골드", "amount": 2400}, {"name": "전란액", "amount": 16000}, {"name": "몰트엑기스", "amount": 400}, {"name": "우유", "amount": 8000}, {"name": "그랜드500프리", "amount": 12000}]}, "2": {"weight": 85673, "ingredients": [{"name": "제빵용강력분", "amount": 40000}, {"name": "다목적박력분", "amount": 8727}, {"name": "하얀설탕", "amount": 10182}, {"name": "안데스트레샬소금", "amount": 1067}, {"name": "에스500키모", "amount": 727}, {"name": "탈지분유", "amount": 1455}, {"name": "세미드라이이스트 골드", "amount": 1455}, {"name": "전란액", "amount": 9697}, {"name": "몰트엑기스", "amount": 242}, {"name": "우유", "amount": 4848}, {"name": "그랜드500프리", "amount": 7273}]}, "3": {"weight": 107090, "ingredients": [{"name": "제빵용강력분", "amount": 50000}, {"name": "다목적박력분", "amount": 10909}, {"name": "하얀설탕", "amount": 12727}, {"name": "안데스트레샬소금", "amount": 1333}, {"name": "에스500키모", "amount": 909}, {"name": "탈지분유", "amount": 1818}, {"name": "세미드라이이스트 골드", "amount": 1818}, {"name": "전란액", "amount": 12121}, {"name": "몰트엑기스", "amount": 303}, {"name": "우유", "amount": 6061}, {"name": "그랜드500프리", "amount": 9091}]}}}, "P024": {"name": "소금버터식빵", "code": "P024", "batches": {"1": {"weight": 24900, "ingredients": [{"name": "제빵용밀가루", "amount": 20000}, {"name": "안데스트레샬소금", "amount": 400}, {"name": "에스500키모", "amount": 200}, {"name": "세미드라이이스트 레드", "amount": 300}, {"name": "우유", "amount": 2000}, {"name": "가당연유", "amount": 1000}, {"name": "버터", "amount": 1000}]}, "2": {"weight": 74700, "ingredients": [{"name": "제빵용밀가루", "amount": 60000}, {"name": "안데스트레샬소금", "amount": 1200}, {"name": "에스500키모", "amount": 600}, {"name": "세미드라이이스트 레드", "amount": 900}, {"name": "우유", "amount": 6000}, {"name": "가당연유", "amount": 3000}, {"name": "버터", "amount": 3000}]}, "3": null}}, "P025": {"name": "고메버터 소금빵", "code": "P025", "batches": {"1": {"weight": 49800, "ingredients": [{"name": "제빵용밀가루", "amount": 40000}, {"name": "안데스트레샬소금", "amount": 800}, {"name": "에스500키모", "amount": 400}, {"name": "세미드라이이스트 레드", "amount": 600}, {"name": "우유", "amount": 4000}, {"name": "가당연유", "amount": 2000}, {"name": "버터", "amount": 2000}]}, "2": {"weight": 74700, "ingredients": [{"name": "제빵용밀가루", "amount": 60000}, {"name": "안데스트레샬소금", "amount": 1200}, {"name": "에스500키모", "amount": 600}, {"name": "세미드라이이스트 레드", "amount": 900}, {"name": "우유", "amount": 6000}, {"name": "가당연유", "amount": 3000}, {"name": "버터", "amount": 3000}]}, "3": {"weight": 99600, "ingredients": [{"name": "제빵용밀가루", "amount": 80000}, {"name": "안데스트레샬소금", "amount": 1600}, {"name": "에스500키모", "amount": 800}, {"name": "세미드라이이스트 레드", "amount": 1200}, {"name": "우유", "amount": 8000}, {"name": "가당연유", "amount": 4000}, {"name": "버터", "amount": 4000}]}}}, "P026": {"name": "소금빵(완)", "code": "P026", "batches": {"1": {"weight": 32200, "ingredients": [{"name": "제빵용밀가루", "amount": 22400}, {"name": "안데스트레샬소금", "amount": 800}, {"name": "에스500키모", "amount": 400}, {"name": "세미드라이이스트 레드", "amount": 600}, {"name": "우유", "amount": 4000}, {"name": "가당연유", "amount": 2000}, {"name": "버터", "amount": 2000}]}, "2": {"weight": 99600, "ingredients": [{"name": "제빵용밀가루", "amount": 80000}, {"name": "안데스트레샬소금", "amount": 1600}, {"name": "에스500키모", "amount": 800}, {"name": "세미드라이이스트 레드", "amount": 1200}, {"name": "우유", "amount": 8000}, {"name": "가당연유", "amount": 4000}, {"name": "버터", "amount": 4000}]}, "3": {"weight": 74700, "ingredients": [{"name": "제빵용밀가루", "amount": 60000}, {"name": "안데스트레샬소금", "amount": 1200}, {"name": "에스500키모", "amount": 600}, {"name": "세미드라이이스트 레드", "amount": 900}, {"name": "우유", "amount": 6000}, {"name": "가당연유", "amount": 3000}, {"name": "버터", "amount": 3000}]}}}, "P027": {"name": "수제감자빵(오아시스)", "code": "P027", "batches": {"1": {"weight": 65856, "ingredients": [{"name": "파인소프트 T", "amount": 26250}, {"name": "파인소프트202", "amount": 5565}, {"name": "파인소프트 C", "amount": 5565}, {"name": "강력쌀가루", "amount": 2100}, {"name": "안데스트레샬소금", "amount": 735}, {"name": "화미고백당", "amount": 7476}, {"name": "버터", "amount": 9188}, {"name": "식용유", "amount": 4725}, {"name": "전란액", "amount": 4252}]}, "2": {"weight": 131712, "ingredients": [{"name": "파인소프트 T", "amount": 52500}, {"name": "파인소프트202", "amount": 11130}, {"name": "파인소프트 C", "amount": 11130}, {"name": "강력쌀가루", "amount": 4200}, {"name": "안데스트레샬소금", "amount": 1470}, {"name": "화미고백당", "amount": 14952}, {"name": "버터", "amount": 18375}, {"name": "식용유", "amount": 9450}, {"name": "전란액", "amount": 8505}]}, "3": null}}, "P028": {"name": "수제감자빵(오아시스) 분말", "code": "P028", "batches": {"1": {"weight": 16000, "ingredients": [{"name": "콩가루", "amount": 10000}, {"name": "볶은검정깨분말", "amount": 3000}, {"name": "분당", "amount": 3000}]}, "2": null, "3": null}}, "P029": {"name": "수제감자빵(오아시스) 속", "code": "P029", "batches": {"1": {"weight": 58365, "ingredients": [{"name": "으깬삶은감자", "amount": 45000}, {"name": "마요네즈(롯데)", "amount": 6660}, {"name": "모짜렐라치즈", "amount": 6495}, {"name": "안데스트레샬소금", "amount": 210}]}, "2": {"weight": 155680, "ingredients": [{"name": "으깬삶은감자", "amount": 120000}, {"name": "마요네즈(롯데)", "amount": 17800}, {"name": "모짜렐라치즈", "amount": 17300}, {"name": "안데스트레샬소금", "amount": 580}]}, "3": null}}, "P030": {"name": "앵커버터 소금빵 반생지", "code": "P030", "batches": {"1": {"weight": 75300, "ingredients": [{"name": "제빵용밀가루", "amount": 60000}, {"name": "안데스트레샬소금", "amount": 1200}, {"name": "에스500키모", "amount": 900}, {"name": "세미드라이이스트 레드", "amount": 1200}, {"name": "우유", "amount": 6000}, {"name": "가당연유", "amount": 3000}, {"name": "버터", "amount": 3000}]}, "2": {"weight": 37650, "ingredients": [{"name": "제빵용밀가루", "amount": 30000}, {"name": "안데스트레샬소금", "amount": 600}, {"name": "에스500키모", "amount": 450}, {"name": "세미드라이이스트 레드", "amount": 600}, {"name": "우유", "amount": 3000}, {"name": "가당연유", "amount": 1500}, {"name": "버터", "amount": 1500}]}, "3": {"weight": 50200, "ingredients": [{"name": "제빵용밀가루", "amount": 40000}, {"name": "안데스트레샬소금", "amount": 800}, {"name": "에스500키모", "amount": 600}, {"name": "세미드라이이스트 레드", "amount": 800}, {"name": "우유", "amount": 4000}, {"name": "가당연유", "amount": 2000}, {"name": "버터", "amount": 2000}]}}}, "P031": {"name": "올리브베이글TATAS", "code": "P031", "batches": {"1": {"weight": 33052, "ingredients": [{"name": "제빵용고급밀가루", "amount": 20000}, {"name": "하얀설탕", "amount": 2368}, {"name": "안데스트레샬소금", "amount": 368}, {"name": "탈지분유", "amount": 526}, {"name": "세미드라이이스트 골드", "amount": 316}, {"name": "휘핑크림", "amount": 3158}, {"name": "아카시아청", "amount": 263}, {"name": "고메버터(플로리)", "amount": 526}, {"name": "올리브유", "amount": 632}, {"name": "블랙올리브 슬라이스", "amount": 4895}]}, "2": {"weight": 82632, "ingredients": [{"name": "제빵용고급밀가루", "amount": 50000}, {"name": "하얀설탕", "amount": 5921}, {"name": "안데스트레샬소금", "amount": 921}, {"name": "탈지분유", "amount": 1316}, {"name": "세미드라이이스트 골드", "amount": 789}, {"name": "휘핑크림", "amount": 7895}, {"name": "아카시아청", "amount": 658}, {"name": "고메버터(플로리)", "amount": 1316}, {"name": "올리브유", "amount": 1579}, {"name": "블랙올리브 슬라이스", "amount": 12237}]}, "3": {"weight": 99157, "ingredients": [{"name": "제빵용고급밀가루", "amount": 60000}, {"name": "하얀설탕", "amount": 7105}, {"name": "안데스트레샬소금", "amount": 1105}, {"name": "탈지분유", "amount": 1579}, {"name": "세미드라이이스트 골드", "amount": 947}, {"name": "휘핑크림", "amount": 9474}, {"name": "아카시아청", "amount": 789}, {"name": "고메버터(플로리)", "amount": 1579}, {"name": "올리브유", "amount": 1895}, {"name": "블랙올리브 슬라이스", "amount": 14684}]}}}, "P032": {"name": "쫀득감자빵, 리얼감자빵", "code": "P032", "batches": {"1": {"weight": 52685, "ingredients": [{"name": "파인소프트T", "amount": 21000}, {"name": "파인소프트202", "amount": 4452}, {"name": "파인소프트C", "amount": 4452}, {"name": "강력쌀가루", "amount": 1680}, {"name": "안데스트레샬소금", "amount": 588}, {"name": "화미고백당", "amount": 5981}, {"name": "버터", "amount": 7350}, {"name": "식용유", "amount": 3780}, {"name": "전란액", "amount": 3402}]}, "2": {"weight": 65856, "ingredients": [{"name": "파인소프트T", "amount": 26250}, {"name": "파인소프트202", "amount": 5565}, {"name": "파인소프트C", "amount": 5565}, {"name": "강력쌀가루", "amount": 2100}, {"name": "안데스트레샬소금", "amount": 735}, {"name": "화미고백당", "amount": 7476}, {"name": "버터", "amount": 9188}, {"name": "식용유", "amount": 4725}, {"name": "전란액", "amount": 4252}]}, "3": {"weight": 131712, "ingredients": [{"name": "파인소프트T", "amount": 52500}, {"name": "파인소프트202", "amount": 11130}, {"name": "파인소프트C", "amount": 11130}, {"name": "강력쌀가루", "amount": 4200}, {"name": "안데스트레샬소금", "amount": 1470}, {"name": "화미고백당", "amount": 14952}, {"name": "버터", "amount": 18375}, {"name": "식용유", "amount": 9450}, {"name": "전란액", "amount": 8505}]}}}, "P033": {"name": "쫀득감자빵, 리얼감자빵 분말", "code": "P033", "batches": {"1": {"weight": 16000, "ingredients": [{"name": "콩고물", "amount": 10000}, {"name": "검정깨분말", "amount": 3000}, {"name": "분당", "amount": 3000}]}, "2": null, "3": null}}, "P034": {"name": "쫀득감자빵, 리얼감자빵 속", "code": "P034", "batches": {"1": {"weight": 58365, "ingredients": [{"name": "으깬삶은감자", "amount": 45000}, {"name": "마요네즈(골드)", "amount": 6660}, {"name": "모짜렐라치즈", "amount": 6495}, {"name": "안데스트레샬소금", "amount": 210}]}, "2": {"weight": 77840, "ingredients": [{"name": "으깬삶은감자", "amount": 60000}, {"name": "마요네즈(골드)", "amount": 8900}, {"name": "모짜렐라치즈", "amount": 8650}, {"name": "안데스트레샬소금", "amount": 290}]}, "3": {"weight": 155680, "ingredients": [{"name": "으깬삶은감자", "amount": 120000}, {"name": "마요네즈(골드)", "amount": 17800}, {"name": "모짜렐라치즈", "amount": 17300}, {"name": "안데스트레샬소금", "amount": 580}]}}}, "P035": {"name": "쫀득고구마빵,리얼고구마빵", "code": "P035", "batches": {"1": {"weight": 43904, "ingredients": [{"name": "파인소프트T", "amount": 17500}, {"name": "파인소프트202", "amount": 3710}, {"name": "파인소프트C", "amount": 3710}, {"name": "강력쌀가루", "amount": 1400}, {"name": "안데스트레샬소금", "amount": 490}, {"name": "화미고백당", "amount": 4984}, {"name": "버터", "amount": 6125}, {"name": "식용유", "amount": 3150}, {"name": "전란액", "amount": 2835}]}, "2": {"weight": 65856, "ingredients": [{"name": "파인소프트T", "amount": 26250}, {"name": "파인소프트202", "amount": 5565}, {"name": "파인소프트C", "amount": 5565}, {"name": "강력쌀가루", "amount": 2100}, {"name": "안데스트레샬소금", "amount": 735}, {"name": "화미고백당", "amount": 7476}, {"name": "버터", "amount": 9188}, {"name": "식용유", "amount": 4725}, {"name": "전란액", "amount": 4252}]}, "3": {"weight": 131712, "ingredients": [{"name": "파인소프트T", "amount": 52500}, {"name": "파인소프트202", "amount": 11130}, {"name": "파인소프트C", "amount": 11130}, {"name": "강력쌀가루", "amount": 4200}, {"name": "안데스트레샬소금", "amount": 1470}, {"name": "화미고백당", "amount": 14952}, {"name": "버터", "amount": 18375}, {"name": "식용유", "amount": 9450}, {"name": "전란액", "amount": 8505}]}}}, "P036": {"name": "쫀득고구마빵,리얼고구마빵 속배합", "code": "P036", "batches": {"1": {"weight": 56832, "ingredients": [{"name": "버터", "amount": 3600}, {"name": "하얀설탕", "amount": 3312}, {"name": "안데스트레샬소금", "amount": 120}, {"name": "황등앙금", "amount": 8400}, {"name": "으깬삶은고구마", "amount": 30000}, {"name": "난황액", "amount": 2880}, {"name": "럼", "amount": 1200}, {"name": "바닐프로", "amount": 120}, {"name": "크리미비트", "amount": 7200}]}, "2": {"weight": 85248, "ingredients": [{"name": "버터", "amount": 5400}, {"name": "하얀설탕", "amount": 4968}, {"name": "안데스트레샬소금", "amount": 180}, {"name": "황등앙금", "amount": 12600}, {"name": "으깬삶은고구마", "amount": 45000}, {"name": "난황액", "amount": 4320}, {"name": "럼", "amount": 1800}, {"name": "바닐프로", "amount": 180}, {"name": "크리미비트", "amount": 10800}]}, "3": {"weight": 170496, "ingredients": [{"name": "버터", "amount": 10800}, {"name": "하얀설탕", "amount": 9936}, {"name": "안데스트레샬소금", "amount": 360}, {"name": "황등앙금", "amount": 25200}, {"name": "으깬삶은고구마", "amount": 90000}, {"name": "난황액", "amount": 8640}, {"name": "럼", "amount": 3600}, {"name": "바닐프로", "amount": 360}, {"name": "크리미비트", "amount": 21600}]}}}, "P037": {"name": "크랜베리호두베이글TATAS", "code": "P037", "batches": {"1": {"weight": 47577, "ingredients": [{"name": "제빵용고급밀가루", "amount": 30000}, {"name": "하얀설탕", "amount": 3645}, {"name": "안데스트레샬소금", "amount": 567}, {"name": "탈지분유", "amount": 810}, {"name": "세미드라이이스트 골드", "amount": 486}, {"name": "휘핑크림", "amount": 4860}, {"name": "아카시아청", "amount": 810}, {"name": "고메버터(플로리)", "amount": 1620}, {"name": "크랜베리", "amount": 2754}, {"name": "호두분태", "amount": 2025}]}, "2": {"weight": 63436, "ingredients": [{"name": "제빵용고급밀가루", "amount": 40000}, {"name": "하얀설탕", "amount": 4860}, {"name": "안데스트레샬소금", "amount": 756}, {"name": "탈지분유", "amount": 1080}, {"name": "세미드라이이스트 골드", "amount": 648}, {"name": "휘핑크림", "amount": 6480}, {"name": "아카시아청", "amount": 1080}, {"name": "고메버터(플로리)", "amount": 2160}, {"name": "크랜베리", "amount": 3672}, {"name": "호두분태", "amount": 2700}]}, "3": {"weight": 95154, "ingredients": [{"name": "제빵용고급밀가루", "amount": 60000}, {"name": "하얀설탕", "amount": 7290}, {"name": "안데스트레샬소금", "amount": 1134}, {"name": "탈지분유", "amount": 1620}, {"name": "세미드라이이스트 골드", "amount": 972}, {"name": "휘핑크림", "amount": 9720}, {"name": "아카시아청", "amount": 1620}, {"name": "고메버터(플로리)", "amount": 3240}, {"name": "크랜베리", "amount": 5508}, {"name": "호두분태", "amount": 4050}]}}}, "P038": {"name": "티요프레즐", "code": "P038", "batches": {"1": {"weight": 36312, "ingredients": [{"name": "제빵용밀가루", "amount": 25000}, {"name": "다목적박력분", "amount": 4412}, {"name": "로즈버드크리머", "amount": 1025}, {"name": "하얀설탕", "amount": 3012}, {"name": "안데스트레샬소금", "amount": 438}, {"name": "세미드라이이스트 골드", "amount": 512}, {"name": "에스500키모", "amount": 888}, {"name": "전란분말", "amount": 1025}]}, "2": {"weight": 72625, "ingredients": [{"name": "제빵용밀가루", "amount": 50000}, {"name": "다목적박력분", "amount": 8825}, {"name": "로즈버드크리머", "amount": 2050}, {"name": "하얀설탕", "amount": 6025}, {"name": "안데스트레샬소금", "amount": 875}, {"name": "세미드라이이스트 골드", "amount": 1025}, {"name": "에스500키모", "amount": 1775}, {"name": "전란분말", "amount": 2050}]}, "3": null}}, "P039": {"name": "파스마 소금빵냉동생지", "code": "P039", "batches": {"1": {"weight": 42450, "ingredients": [{"name": "제빵용밀가루", "amount": 22200}, {"name": "다목적박력분", "amount": 7800}, {"name": "안데스트레샬소금", "amount": 480}, {"name": "세미드라이이스트 레드", "amount": 900}, {"name": "하얀설탕", "amount": 2640}, {"name": "탈지분유", "amount": 720}, {"name": "에스50키모", "amount": 510}, {"name": "마가린(노블)", "amount": 3000}, {"name": "우유", "amount": 4200}]}, "2": {"weight": 70750, "ingredients": [{"name": "제빵용밀가루", "amount": 37000}, {"name": "다목적박력분", "amount": 13000}, {"name": "안데스트레샬소금", "amount": 800}, {"name": "세미드라이이스트 레드", "amount": 1500}, {"name": "하얀설탕", "amount": 4400}, {"name": "탈지분유", "amount": 1200}, {"name": "에스50키모", "amount": 850}, {"name": "마가린(노블)", "amount": 5000}, {"name": "우유", "amount": 7000}]}, "3": {"weight": 84900, "ingredients": [{"name": "제빵용밀가루", "amount": 44400}, {"name": "다목적박력분", "amount": 15600}, {"name": "안데스트레샬소금", "amount": 960}, {"name": "세미드라이이스트 레드", "amount": 1800}, {"name": "하얀설탕", "amount": 5280}, {"name": "탈지분유", "amount": 1440}, {"name": "에스50키모", "amount": 1020}, {"name": "마가린(노블)", "amount": 6000}, {"name": "우유", "amount": 8400}]}}}, "P040": {"name": "플레인베이글TATAS", "code": "P040", "batches": {"1": {"weight": 43416, "ingredients": [{"name": "제빵용고급밀가루", "amount": 30000}, {"name": "하얀설탕", "amount": 3750}, {"name": "안데스트레샬소금", "amount": 583}, {"name": "탈지분유", "amount": 833}, {"name": "세미드라이이스트 골드", "amount": 500}, {"name": "휘핑크림", "amount": 5000}, {"name": "아카시아청", "amount": 1083}, {"name": "고메버터(플로리)", "amount": 1667}]}, "2": {"weight": 115777, "ingredients": [{"name": "제빵용고급밀가루", "amount": 80000}, {"name": "하얀설탕", "amount": 10000}, {"name": "안데스트레샬소금", "amount": 1556}, {"name": "탈지분유", "amount": 2222}, {"name": "세미드라이이스트 골드", "amount": 1333}, {"name": "휘핑크림", "amount": 13333}, {"name": "아카시아청", "amount": 2889}, {"name": "고메버터(플로리)", "amount": 4444}]}, "3": {"weight": 86834, "ingredients": [{"name": "제빵용고급밀가루", "amount": 60000}, {"name": "하얀설탕", "amount": 7500}, {"name": "안데스트레샬소금", "amount": 1167}, {"name": "탈지분유", "amount": 1667}, {"name": "세미드라이이스트 골드", "amount": 1000}, {"name": "휘핑크림", "amount": 10000}, {"name": "아카시아청", "amount": 2167}, {"name": "고메버터(플로리)", "amount": 3333}]}}}, "P041": {"name": "플레인베이글생지TATAS", "code": "P041", "batches": {"1": {"weight": 44000, "ingredients": [{"name": "제빵용고급밀가루", "amount": 30000}, {"name": "하얀설탕", "amount": 3750}, {"name": "안데스트레샬소금", "amount": 583}, {"name": "탈지분유", "amount": 833}, {"name": "에스500키모", "amount": 417}, {"name": "세미드라이이스트 골드", "amount": 667}, {"name": "휘핑크림", "amount": 5000}, {"name": "아카시아청", "amount": 1083}, {"name": "고메버터(플로리)", "amount": 1667}]}, "2": {"weight": 58667, "ingredients": [{"name": "제빵용고급밀가루", "amount": 40000}, {"name": "하얀설탕", "amount": 5000}, {"name": "안데스트레샬소금", "amount": 778}, {"name": "탈지분유", "amount": 1111}, {"name": "에스500키모", "amount": 556}, {"name": "세미드라이이스트 골드", "amount": 889}, {"name": "휘핑크림", "amount": 6667}, {"name": "아카시아청", "amount": 1444}, {"name": "고메버터(플로리)", "amount": 2222}]}, "3": {"weight": 73334, "ingredients": [{"name": "제빵용고급밀가루", "amount": 50000}, {"name": "하얀설탕", "amount": 6250}, {"name": "안데스트레샬소금", "amount": 972}, {"name": "탈지분유", "amount": 1389}, {"name": "에스500키모", "amount": 695}, {"name": "세미드라이이스트 골드", "amount": 1111}, {"name": "휘핑크림", "amount": 8333}, {"name": "아카시아청", "amount": 1806}, {"name": "고메버터(플로리)", "amount": 2778}]}}}, "P042": {"name": "한컵브런치 맛감자", "code": "P042", "batches": {"1": {"weight": 31723, "ingredients": [{"name": "해쉬브라운", "amount": 31000}, {"name": "안데스소금", "amount": 723}]}, "2": {"weight": 52148, "ingredients": [{"name": "해쉬브라운", "amount": 50959}, {"name": "안데스소금", "amount": 1189}]}, "3": {"weight": 63447, "ingredients": [{"name": "해쉬브라운", "amount": 62000}, {"name": "안데스소금", "amount": 1447}]}}}, "P043": {"name": "한컵브런치 반죽", "code": "P043", "batches": {"1": {"weight": 70689, "ingredients": [{"name": "핫케이크가루", "amount": 36500}, {"name": "우유", "amount": 12167}, {"name": "전란액", "amount": 12167}, {"name": "하얀설탕", "amount": 9125}, {"name": "안데스트레샬소금", "amount": 365}, {"name": "메이플시럽", "amount": 365}]}, "2": {"weight": 116200, "ingredients": [{"name": "핫케이크가루", "amount": 60000}, {"name": "우유", "amount": 20000}, {"name": "전란액", "amount": 20000}, {"name": "하얀설탕", "amount": 15000}, {"name": "안데스트레샬소금", "amount": 600}, {"name": "메이플시럽", "amount": 600}]}, "3": {"weight": 141376, "ingredients": [{"name": "핫케이크가루", "amount": 73000}, {"name": "우유", "amount": 24333}, {"name": "전란액", "amount": 24333}, {"name": "하얀설탕", "amount": 18250}, {"name": "안데스트레샬소금", "amount": 730}, {"name": "메이플시럽", "amount": 730}]}}}, "P044": {"name": "발효종", "code": "P044", "batches": {"1": {"weight": 33708, "ingredients": [{"name": "제빵용밀가루", "amount": 33532}, {"name": "샤브르방LV", "amount": 176}]}, "2": {"weight": 41312, "ingredients": [{"name": "제빵용밀가루", "amount": 40944}, {"name": "샤브르방LV", "amount": 368}]}, "3": null}}, "P045": {"name": "우유식빵생지", "code": "P045", "batches": {"1": {"weight": 48692, "ingredients": [{"name": "제빵용탕종분", "amount": 25000}, {"name": "유기농강력분", "amount": 9200}, {"name": "하얀설탕", "amount": 2500}, {"name": "안데스트레샬소금", "amount": 625}, {"name": "에스500키모", "amount": 312}, {"name": "화미고백당", "amount": 1550}, {"name": "탈지분유", "amount": 780}, {"name": "전란액", "amount": 3125}, {"name": "세미드라이이스트 골드", "amount": 950}, {"name": "버터", "amount": 3100}, {"name": "우유", "amount": 1550}]}, "2": {"weight": 97385, "ingredients": [{"name": "제빵용탕종분", "amount": 50000}, {"name": "유기농강력분", "amount": 18400}, {"name": "하얀설탕", "amount": 5000}, {"name": "안데스트레샬소금", "amount": 1250}, {"name": "에스500키모", "amount": 625}, {"name": "화미고백당", "amount": 3100}, {"name": "탈지분유", "amount": 1560}, {"name": "전란액", "amount": 6250}, {"name": "세미드라이이스트 골드", "amount": 1900}, {"name": "버터", "amount": 6200}, {"name": "우유", "amount": 3100}]}, "3": null}}, "P046": {"name": "소금빵생지", "code": "P046", "batches": {"1": {"weight": 74970, "ingredients": [{"name": "아바론밀가루", "amount": 30000}, {"name": "제빵용밀가루", "amount": 30000}, {"name": "안데스트레샬소금", "amount": 1200}, {"name": "에스500키모", "amount": 520}, {"name": "세미드라이이스트 레드", "amount": 1250}, {"name": "우유", "amount": 6000}, {"name": "가당연유", "amount": 3000}, {"name": "버터", "amount": 3000}]}, "2": null, "3": null}}, "P047": {"name": "잣러스크 크림", "code": "P047", "batches": {"1": {"weight": 25540, "ingredients": [{"name": "그랜드500프리", "amount": 11500}, {"name": "하얀설탕", "amount": 10000}, {"name": "크리미 땅콩버터", "amount": 3000}, {"name": "화미고백당", "amount": 500}, {"name": "잣분말", "amount": 250}, {"name": "검은깨분말", "amount": 250}, {"name": "버터향", "amount": 20}, {"name": "치자황색소", "amount": 20}]}, "2": null, "3": null}}, "P048": {"name": "감자베이글TATAS", "code": "P048", "batches": {"1": {"weight": 43416, "ingredients": [{"name": "제빵용고급밀가루", "amount": 30000}, {"name": "하얀설탕", "amount": 3750}, {"name": "안데스트레샬소금", "amount": 583}, {"name": "탈지분유", "amount": 833}, {"name": "세미드라이이스트 골드", "amount": 500}, {"name": "휘핑크림", "amount": 5000}, {"name": "아카시아청", "amount": 1083}, {"name": "고메버터(플로리)", "amount": 1667}]}, "2": {"weight": 86834, "ingredients": [{"name": "제빵용고급밀가루", "amount": 60000}, {"name": "하얀설탕", "amount": 7500}, {"name": "안데스트레샬소금", "amount": 1167}, {"name": "탈지분유", "amount": 1667}, {"name": "세미드라이이스트 골드", "amount": 1000}, {"name": "휘핑크림", "amount": 10000}, {"name": "아카시아청", "amount": 2167}, {"name": "고메버터(플로리)", "amount": 3333}]}, "3": {"weight": 115777, "ingredients": [{"name": "제빵용고급밀가루", "amount": 80000}, {"name": "하얀설탕", "amount": 10000}, {"name": "안데스트레샬소금", "amount": 1556}, {"name": "탈지분유", "amount": 2222}, {"name": "세미드라이이스트 골드", "amount": 1333}, {"name": "휘핑크림", "amount": 13333}, {"name": "아카시아청", "amount": 2889}, {"name": "고메버터(플로리)", "amount": 4444}]}}}, "P049": {"name": "어니언베이글TATAS", "code": "P049", "batches": {"1": {"weight": 61112, "ingredients": [{"name": "제빵용고급밀가루", "amount": 40000}, {"name": "하얀설탕", "amount": 5000}, {"name": "안데스트레샬소금", "amount": 778}, {"name": "탈지분유", "amount": 1111}, {"name": "세미드라이이스트 골드", "amount": 667}, {"name": "휘핑크림", "amount": 6667}, {"name": "아카시아청", "amount": 889}, {"name": "고메버터(플로리)", "amount": 2222}, {"name": "마늘분말", "amount": 222}, {"name": "양파분태", "amount": 3556}]}, "2": {"weight": 86834, "ingredients": [{"name": "제빵용고급밀가루", "amount": 60000}, {"name": "하얀설탕", "amount": 7500}, {"name": "안데스트레샬소금", "amount": 1167}, {"name": "탈지분유", "amount": 1667}, {"name": "세미드라이이스트 골드", "amount": 1000}, {"name": "휘핑크림", "amount": 10000}, {"name": "아카시아청", "amount": 2167}, {"name": "고메버터(플로리)", "amount": 3333}]}, "3": {"weight": 115777, "ingredients": [{"name": "제빵용고급밀가루", "amount": 80000}, {"name": "하얀설탕", "amount": 10000}, {"name": "안데스트레샬소금", "amount": 1556}, {"name": "탈지분유", "amount": 2222}, {"name": "세미드라이이스트 골드", "amount": 1333}, {"name": "휘핑크림", "amount": 13333}, {"name": "아카시아청", "amount": 2889}, {"name": "고메버터(플로리)", "amount": 4444}]}}}}
+;
+
+// 설비 세팅 (제품별 - 나중에 관리자화면에서 등록)
+const DEVICE_SETTINGS = {
+  default: { sealing: '-', sealer: '-' }
+};
+
+const SELECTED_DEVICES = {sealing:false, sealer:false};
+function toggleDevice(id){
+  SELECTED_DEVICES[id]=!SELECTED_DEVICES[id];
+  const btn=document.getElementById('dev-'+id);
+  const check=document.getElementById('check-'+id);
+  btn.classList.toggle('active', SELECTED_DEVICES[id]);
+  check.textContent=SELECTED_DEVICES[id]?'●':'○';
+}
+
+let S = {
+  page:'main', history:[],
+  product:null, mfgDate:'',
+  todayRecords:[], expiryMonths:null
+};
+
+// 날짜
+function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
+function getTodayKey(){ const d=new Date(); return String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
+function getNow(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function fmtDate(input){
+  const d=input.value.replace(/\D/g,'').slice(0,6);
+  if(d.length<=2) input.value=d;
+  else if(d.length<=4) input.value=d.slice(0,2)+'.'+d.slice(2);
+  else input.value=d.slice(0,2)+'.'+d.slice(2,4)+'.'+d.slice(4);
+}
+
+// 설정
+function loadSettings(){ return JSON.parse(localStorage.getItem('batchSettings')||'{"workerName":"이광훈"}'); }
+
+// 로컬 저장
+function saveLocal(){ localStorage.setItem('packRecords_'+getTodayKey(),JSON.stringify(S.todayRecords)); updateStats(); }
+function loadLocal(){
+  const d=localStorage.getItem('packRecords_'+getTodayKey());
+  if(d) S.todayRecords=JSON.parse(d);
+  updateStats(); renderTodayList();
+}
+
+// 페이지 전환
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  S.history.push(S.page); S.page=id;
+  document.getElementById('backBtn').style.display=id==='main'?'none':'';
+  window.scrollTo(0,0);
+}
+function goBack(){
+  const prev=S.history.pop();
+  if(!prev||prev==='main'){ goHome(); return; }
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+prev).classList.add('active');
+  S.page=prev;
+  document.getElementById('backBtn').style.display=prev==='main'?'none':'';
+}
+function goHome(){
+  S.history=[]; S.product=null; S.expiryMonths=null;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-main').classList.add('active');
+  S.page='main';
+  document.getElementById('backBtn').style.display='none';
+  document.getElementById('tbTitle').textContent='포장일지';
+  document.getElementById('tbSub').textContent='';
+  loadLocal();
+}
+
+// 메인
+function initMain(){
+  const s=loadSettings();
+  document.getElementById('mainDate').textContent=getToday();
+  document.getElementById('mainWorker').textContent=s.workerName+' 작업자';
+  renderProductList(Object.keys(RECIPE_DB));
+  loadLocal();
+}
+function filterProducts(){
+  const q=document.getElementById('searchInput').value.trim().toLowerCase();
+  renderProductList(Object.keys(RECIPE_DB).filter(c=>RECIPE_DB[c].name.toLowerCase().includes(q)||c.toLowerCase().includes(q)));
+}
+function renderProductList(codes){
+  document.getElementById('productList').innerHTML=codes.map(code=>`
+    <div class="product-item" onclick="selectProduct('${code}')">
+      <div><div class="product-name">${RECIPE_DB[code].name}</div><div class="product-code">${code}</div></div>
+      <div style="color:var(--text3);font-size:20px">›</div>
+    </div>`).join('');
+}
+function updateStats(){
+  const total=S.todayRecords.reduce((s,r)=>s+(r.qtyPcs||0),0);
+  document.getElementById('statDone').textContent=S.todayRecords.length+'건';
+  document.getElementById('statTotal').textContent=total.toLocaleString()+'개';
+}
+function renderTodayList(){
+  const el=document.getElementById('todayList');
+  if(!S.todayRecords.length){ el.innerHTML='<div class="tc txs" style="padding:16px 0">오늘 완료된 포장이 없습니다</div>'; return; }
+  el.innerHTML=S.todayRecords.slice().reverse().map((r,i)=>{
+    const idx=S.todayRecords.length-1-i;
+    return `<div class="accordion-item">
+      <div class="accordion-hd" onclick="toggleAcc(${idx})">
+        <div>
+          <div class="accordion-lot">${r.lot}</div>
+          <div class="accordion-sub">${r.product} · ${r.qtyPcs}개 · ${r.time}</div>
+        </div>
+        <div class="accordion-arrow" id="arr-${idx}">▼</div>
+      </div>
+      <div class="accordion-body" id="acc-${idx}">
+        <table class="acc-table">
+          <tr><th>항목</th><th>내용</th></tr>
+          <tr><td>소비기한</td><td>${r.expiryDate}</td></tr>
+          <tr><td>생산수량</td><td>${r.qtyPcs}개 / ${r.qtyBoxes}박스</td></tr>
+          <tr><td>잔량</td><td>${r.remaining}개</td></tr>
+          <tr><td>작업인원</td><td>${r.workers}명</td></tr>
+          <tr><td>작업시간</td><td>${r.startTime}~${r.endTime}</td></tr>
+          <tr><td>필름포장지</td><td>${r.filmQty} (입고일: ${r.filmDate})</td></tr>
+          <tr><td>벌크비닐</td><td>${r.bulkQty} (입고일: ${r.bulkDate})</td></tr>
+          <tr><td>박스</td><td>${r.boxQty}개</td></tr>
+        </table>
+        <button class="acc-print-btn" onclick="printRecord(${idx})">🖨️ PDF 출력</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleAcc(idx){
+  const body=document.getElementById('acc-'+idx);
+  const arrow=document.getElementById('arr-'+idx);
+  body.classList.toggle('open'); arrow.classList.toggle('open');
+}
+
+// 제품 선택
+function selectProduct(code){
+  S.product=code; S.expiryMonths=null;
+  const p=RECIPE_DB[code];
+  const today=getTodayKey();
+  S.mfgDate=today;
+
+  // 포장로트 생성
+  const existCount=S.todayRecords.filter(r=>r.productCode===code).length;
+  const lot=`포장-${code}-${today}-${String(existCount+1).padStart(3,'0')}`;
+  document.getElementById('packLot').textContent=lot;
+
+  // 설비 세팅
+  const setting=DEVICE_SETTINGS[code]||DEVICE_SETTINGS.default;
+  const sealingEl=document.getElementById('temp-sealing'); if(sealingEl) sealingEl.textContent='접합온도: '+setting.sealing+'℃';
+  const sealerEl=document.getElementById('temp-sealer'); if(sealerEl) sealerEl.textContent='접합온도: '+setting.sealer+'℃';
+
+  // 상단바
+  document.getElementById('tbTitle').textContent=p.name;
+  document.getElementById('tbSub').textContent=code;
+
+  // 소비기한 초기화
+  document.getElementById('expiryDate').value='';
+  document.querySelectorAll('.month-btn').forEach(b=>b.classList.remove('active'));
+
+  // 입력 초기화
+  ['workers','perBox','startTime','endTime','qtyPcs','remaining','filmQty','filmDate','bulkQty','bulkDate','boxQty'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.value='';
+  });
+  document.getElementById('qtyBoxes').value='';
+  document.getElementById('startTime').value=getNow();
+
+  showPage('form');
+}
+
+// 소비기한 계산
+function setExpiry(months){
+  S.expiryMonths=months;
+  document.querySelectorAll('.month-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  const today=getTodayKey();
+  const yy=parseInt('20'+today.slice(0,2));
+  const mm=parseInt(today.slice(2,4))-1;
+  const dd=parseInt(today.slice(4,6));
+  const exp=new Date(yy,mm+months,dd);
+  const ey=exp.getFullYear();
+  const em=String(exp.getMonth()+1).padStart(2,'0');
+  const ed=String(exp.getDate()).padStart(2,'0');
+  document.getElementById('expiryDate').value=`${ey}.${em}.${ed}`;
+}
+
+// 박스 자동계산
+function calcBoxes(){
+  const pcs=parseInt(document.getElementById('qtyPcs').value)||0;
+  const per=parseInt(document.getElementById('perBox').value)||0;
+  if(pcs&&per) document.getElementById('qtyBoxes').value=Math.floor(pcs/per);
+  else document.getElementById('qtyBoxes').value='';
+}
+
+
+
+// PDF 생성
+function genPrint(r){
+  const s=loadSettings();
+  const setting=DEVICE_SETTINGS[r.productCode]||DEVICE_SETTINGS.default;
+  const usedDevices=[SELECTED_DEVICES.sealing?'자동삼면포장기':'',SELECTED_DEVICES.sealer?'실링기':''].filter(Boolean).join(', ')||'-';
+  document.getElementById('printArea').innerHTML=`<div style="padding:20px;font-size:11px;font-family:sans-serif;">
+    <h2 style="font-size:18px;margin:0 0 16px;color:#c0386b;border-bottom:2px solid #c0386b;padding-bottom:8px">포장일지</h2>
+    <table style="border-collapse:collapse;width:100%;margin-bottom:10px;font-size:10px;">
+      <tr>
+        <td style="border:1px solid #ddd;padding:8px;background:#f0f0f0;color:#333;font-weight:700;width:15%;text-align:center">제품명</td>
+        <td style="border:1px solid #ddd;padding:8px;width:35%;font-weight:700;text-align:center">${r.product}</td>
+        <td style="border:1px solid #ddd;padding:8px;background:#f0f0f0;color:#333;font-weight:700;width:15%;text-align:center">작업일자</td>
+        <td style="border:1px solid #ddd;padding:8px;width:35%;text-align:center">20${r.date.slice(0,2)}.${r.date.slice(2,4)}.${r.date.slice(4,6)}</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ddd;padding:8px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">포장로트</td>
+        <td style="border:1px solid #ddd;padding:8px;font-weight:700;color:#333;text-align:center">${r.lot}</td>
+        <td style="border:1px solid #ddd;padding:8px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">작성자</td>
+        <td style="border:1px solid #ddd;padding:8px;text-align:center">${s.workerName}</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ddd;padding:8px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">서명</td>
+        <td style="border:1px solid #ddd;padding:8px;height:50px;text-align:center" colspan="3">${r.signImg?`<img src="${r.signImg}" style="height:40px">`:''}</td>
+      </tr>
+    </table>
+    <table style="border-collapse:collapse;width:100%;margin-bottom:10px;font-size:10px;">
+      <tr style="background:#f0f0f0">
+        <th style="border:1px solid #ddd;padding:6px;color:#333;text-align:center" colspan="4">설비 세팅값</th>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;width:25%;text-align:center">사용 설비</td>
+        <td style="border:1px solid #ddd;padding:7px;text-align:center" colspan="3">${usedDevices}</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">자동삼면포장기 접합온도</td>
+        <td style="border:1px solid #ddd;padding:7px;width:25%;text-align:center">${setting.sealing}℃</td>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;width:25%;text-align:center">실링기 접합온도</td>
+        <td style="border:1px solid #ddd;padding:7px;width:25%;text-align:center">${setting.sealer}℃</td>
+      </tr>
+    </table>
+    <table style="border-collapse:collapse;width:100%;margin-bottom:10px;font-size:10px;">
+      <tr style="background:#f0f0f0">
+        <th style="border:1px solid #ddd;padding:6px;color:#333;text-align:center" colspan="4">내포장</th>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;width:15%;text-align:center">작업인원</td>
+        <td style="border:1px solid #ddd;padding:7px;width:35%;text-align:center">${r.workers}명</td>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;width:15%;text-align:center">작업시간</td>
+        <td style="border:1px solid #ddd;padding:7px;width:35%;text-align:center">${r.startTime} ~ ${r.endTime}</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">입수량</td>
+        <td style="border:1px solid #ddd;padding:7px;text-align:center">${r.perBox}개/박스</td>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">소비기한</td>
+        <td style="border:1px solid #ddd;padding:7px;font-weight:700;color:#333;text-align:center">${r.expiryDate}</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">생산수량</td>
+        <td style="border:1px solid #ddd;padding:7px;text-align:center">${r.qtyPcs.toLocaleString()}개 / ${r.qtyBoxes}박스</td>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">잔량</td>
+        <td style="border:1px solid #ddd;padding:7px;text-align:center">${r.remaining}개</td>
+      </tr>
+    </table>
+    <table style="border-collapse:collapse;width:100%;font-size:10px;">
+      <tr style="background:#f0f0f0">
+        <th style="border:1px solid #ddd;padding:6px;color:#333;text-align:center" colspan="4">외포장</th>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;width:15%;text-align:center">필름포장지 사용량</td>
+        <td style="border:1px solid #ddd;padding:7px;width:35%;text-align:center">${r.filmQty}</td>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;width:15%;text-align:center">필름포장지 입고일</td>
+        <td style="border:1px solid #ddd;padding:7px;width:35%;text-align:center">${r.filmDate}</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">벌크비닐 사용량</td>
+        <td style="border:1px solid #ddd;padding:7px;text-align:center">${r.bulkQty}</td>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">벌크비닐 입고일</td>
+        <td style="border:1px solid #ddd;padding:7px;text-align:center">${r.bulkDate}</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">박스 사용량</td>
+        <td style="border:1px solid #ddd;padding:7px;text-align:center" colspan="3">${r.boxQty}개</td>
+      </tr>
+    </table>
+  </div>`;
+}
+function printReport(){
+  const r=S.todayRecords[S.todayRecords.length-1];
+  genPrint(r); window.print();
+}
+function printRecord(idx){
+  genPrint(S.todayRecords[idx]); window.print();
+}
+
+
+// 시간 포맷 (0830 → 오전 08:30)
+function fmtTime(input){
+  const v=input.value.replace(/\D/g,'').slice(0,4);
+  input.value=v;
+  if(v.length===4){
+    const h=parseInt(v.slice(0,2));
+    const m=v.slice(2,4);
+    if(h>=0&&h<=23&&parseInt(m)>=0&&parseInt(m)<=59){
+      const ampm=h<12?'오전':'오후';
+      const h12=h===0?12:h>12?h-12:h;
+      input.dataset.formatted=`${ampm} ${String(h12).padStart(2,'0')}:${m}`;
+      input.style.color='var(--primary)';
+      input.style.fontWeight='700';
+    }
+  }
+}
+function getTimeVal(id){
+  const el=document.getElementById(id);
+  return el.dataset.formatted||el.value||'-';
+}
+
+// 서명 캔버스
+let signCtx=null, signing=false, hasSign=false;
+
+function initCanvas(){
+  const canvas=document.getElementById('signCanvas');
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*window.devicePixelRatio;
+  canvas.height=rect.height*window.devicePixelRatio;
+  canvas.style.width=rect.width+'px';
+  canvas.style.height=rect.height+'px';
+  signCtx=canvas.getContext('2d');
+  signCtx.scale(window.devicePixelRatio,window.devicePixelRatio);
+  signCtx.strokeStyle='#1a1d23';
+  signCtx.lineWidth=2.5;
+  signCtx.lineCap='round';
+  signCtx.lineJoin='round';
+  hasSign=false;
+
+  canvas.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    signing=true; hasSign=true;
+    const t=e.touches[0];
+    const r=canvas.getBoundingClientRect();
+    signCtx.beginPath();
+    signCtx.moveTo(t.clientX-r.left,t.clientY-r.top);
+  },{passive:false});
+  canvas.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    if(!signing)return;
+    const t=e.touches[0];
+    const r=canvas.getBoundingClientRect();
+    signCtx.lineTo(t.clientX-r.left,t.clientY-r.top);
+    signCtx.stroke();
+  },{passive:false});
+  canvas.addEventListener('touchend',()=>{ signing=false; });
+  canvas.addEventListener('mousedown',e=>{
+    signing=true; hasSign=true;
+    const r=canvas.getBoundingClientRect();
+    signCtx.beginPath();
+    signCtx.moveTo(e.clientX-r.left,e.clientY-r.top);
+  });
+  canvas.addEventListener('mousemove',e=>{
+    if(!signing)return;
+    const r=canvas.getBoundingClientRect();
+    signCtx.lineTo(e.clientX-r.left,e.clientY-r.top);
+    signCtx.stroke();
+  });
+  canvas.addEventListener('mouseup',()=>{ signing=false; });
+}
+
+function clearSign(){
+  const canvas=document.getElementById('signCanvas');
+  signCtx.clearRect(0,0,canvas.width,canvas.height);
+  hasSign=false;
+}
+
+function goSign(){
+  showPage('sign');
+  setTimeout(initCanvas,100);
+}
+
+function completeWithSign(){
+  const canvas=document.getElementById('signCanvas');
+  const signImg=hasSign?canvas.toDataURL('image/png'):'';
+  completePackaging(signImg);
+}
+
+// 포장 완료
+function completePackaging(signImg=''){
+  const code=S.product;
+  const p=RECIPE_DB[code];
+  const today=getTodayKey();
+  const existCount=S.todayRecords.filter(r=>r.productCode===code).length;
+  const lot=`포장-${code}-${today}-${String(existCount+1).padStart(3,'0')}`;
+
+  const record={
+    lot, productCode:code, product:p.name,
+    date:today, time:getNow(),
+    workers:document.getElementById('workers').value||'-',
+    startTime:getTimeVal('startTime'),
+    endTime:getTimeVal('endTime'),
+    perBox:document.getElementById('perBox').value||0,
+    qtyPcs:parseInt(document.getElementById('qtyPcs').value)||0,
+    qtyBoxes:document.getElementById('qtyBoxes').value||0,
+    remaining:document.getElementById('remaining').value||0,
+    expiryDate:document.getElementById('expiryDate').value||'-',
+    filmQty:document.getElementById('filmQty').value||0,
+    filmDate:document.getElementById('filmDate').value||'-',
+    bulkQty:document.getElementById('bulkQty').value||0,
+    bulkDate:document.getElementById('bulkDate').value||'-',
+    boxQty:document.getElementById('boxQty').value||0,
+    signImg
+  };
+
+  S.todayRecords.push(record);
+  saveLocal();
+
+  document.getElementById('doneTitle').textContent=p.name+' 포장 완료!';
+  document.getElementById('doneSub').textContent=`포장로트: ${lot}`;
+  document.getElementById('doneResult').innerHTML=`
+    <table class="result-table">
+      <tr><th>항목</th><th>내용</th></tr>
+      <tr><td>소비기한</td><td>${record.expiryDate}</td></tr>
+      <tr><td>생산수량</td><td>${record.qtyPcs.toLocaleString()}개 / ${record.qtyBoxes}박스</td></tr>
+      <tr><td>잔량</td><td>${record.remaining}개</td></tr>
+      <tr><td>작업인원</td><td>${record.workers}명</td></tr>
+      <tr><td>작업시간</td><td>${record.startTime} ~ ${record.endTime}</td></tr>
+    </table>`;
+
+  genPrint(record);
+  showPage('done');
+}
+
+initMain();
+
+// ===== 동기화 =====
+async function syncToServer(){
+  const btn = document.getElementById('syncBtn');
+  btn.textContent = '⏳ 동기화 중...';
+  btn.disabled = true;
+  try {
+    const keys=Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
+    let recs=[]; keys.forEach(k=>{recs=recs.concat(JSON.parse(localStorage.getItem(k)||'[]'));});
+    if(!recs.length){btn.textContent='⚠️ 데이터 없음';setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000);return;}
+    const db=window._db; let count=0;
+    for(const r of recs){await db.collection('packRecords').doc(r.lot||String(Date.now()+count)).set({...r,_syncedAt:new Date().toISOString()});count++;}
+    btn.textContent='✅ '+count+'건 완료';
+    setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2500);
+  } catch(e) {
+    btn.textContent = '❌ 실패';
+    setTimeout(()=>{ btn.textContent='🔄 동기화'; btn.disabled=false; }, 2000);
+  }
+}
+</script>
+</body>
+</html>
