@@ -121,7 +121,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 .device-check{font-size:22px;color:var(--border);font-weight:700;flex-shrink:0;}
 .device-btn.active .device-check{color:var(--primary);}
 .print-area{display:none;}
-@media print{body *{display:none!important;}.print-area{display:block!important;}.print-area *{display:revert!important;}@page{margin:10mm;size:A4;}}
+@media print{body *{display:none!important;}.print-area{display:block!important;}.print-area *{display:revert!important;}@page{margin:10mm;size:A4 portrait;}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -153,7 +153,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
   <div class="page active" id="page-main">
     <div class="main-hd">
       <div class="main-date" id="mainDate"></div>
-      <div class="main-worker" id="mainWorker"></div>
+      <div class="main-worker" id="mainWorker" onclick="showPage('settings')" style="cursor:pointer;"></div>
       <div class="main-stats">
         <div class="stat-box"><div class="stat-lbl">오늘 완료 포장</div><div class="stat-val" id="statDone">0건</div></div>
         <div class="stat-box"><div class="stat-lbl">총 생산수량</div><div class="stat-val" id="statTotal">0개</div></div>
@@ -169,6 +169,59 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
       <input class="search-input" placeholder="제품명 검색..." id="searchInput" oninput="filterProducts()">
     </div>
     <div class="product-list" id="productList"></div>
+  </div>
+
+  <!-- 설정 페이지 -->
+  <div class="page" id="page-settings">
+    <!-- 작업자 관리 -->
+    <div class="card">
+      <div class="card-hd">👤 작업자 관리</div>
+      <div class="card-bd">
+        <label class="field-label">작업자 선택</label>
+        <select class="field-input" id="workerSelect" onchange="onWorkerSelect()" style="margin-bottom:10px;"></select>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input class="field-input" id="workerNewInput" placeholder="새 작업자 이름 입력" style="flex:1;margin-bottom:0;">
+          <button onclick="addWorker()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">추가</button>
+        </div>
+        <button onclick="deleteWorker()" style="background:var(--danger-light);color:var(--danger);border:1px solid #fcc;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">작업자 삭제</button>
+      </div>
+    </div>
+
+    <!-- 설비세팅값 -->
+    <div class="card">
+      <div class="card-hd">⚙ 설비 세팅값 등록</div>
+      <div class="card-bd">
+        <div style="margin-bottom:10px;">
+          <label class="field-label">제품 선택</label>
+          <select class="field-input" id="devProductSel" style="margin-bottom:10px;" onchange="loadDeviceForProduct()">
+            <option value="">-- 제품 선택 --</option>
+          </select>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">🔧 자동삼면포장기</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div><label class="field-label">센터온도 전(℃)</label><input class="field-input" id="dSealingC1" type="number" placeholder="0"></div>
+          <div><label class="field-label">센터온도 후(℃)</label><input class="field-input" id="dSealingC2" type="number" placeholder="0"></div>
+          <div><label class="field-label">캇타온도 상(℃)</label><input class="field-input" id="dSealingK1" type="number" placeholder="0"></div>
+          <div><label class="field-label">캇타온도 하(℃)</label><input class="field-input" id="dSealingK2" type="number" placeholder="0"></div>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">🔧 실링기</div>
+        <div style="margin-bottom:12px;">
+          <label class="field-label">실링 온도(℃)</label>
+          <input class="field-input" id="dSealerTemp" type="number" placeholder="0">
+        </div>
+        <button onclick="saveDeviceSetting()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;width:100%;">💾 세팅값 저장</button>
+        <div id="deviceSettingsList" style="margin-top:10px;font-size:12px;"></div>
+      </div>
+    </div>
+
+    <!-- 부자재 연동 -->
+    <div class="card">
+      <div class="card-hd">📦 부자재 연동 (부자재수불 연동)</div>
+      <div class="card-bd">
+        <div id="packagingDBStatus" style="font-size:13px;color:var(--text2);text-align:center;padding:16px;">부자재입고검사일지의 부자재 목록을 연동합니다</div>
+        <button onclick="loadPackagingDB()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;width:100%;margin-top:8px;">🔄 부자재 목록 불러오기</button>
+      </div>
+    </div>
   </div>
 
   <!-- 포장 입력 -->
@@ -188,7 +241,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <div>
                 <div class="device-name">자동삼면포장기</div>
-                <div class="device-temp" id="temp-sealing">접합온도: -℃</div>
+                <div class="device-temp" id="temp-sealing-detail" style="font-size:11px;color:var(--text3);margin-top:2px;">-</div>
               </div>
               <div class="device-check" id="check-sealing">○</div>
             </div>
@@ -197,7 +250,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <div>
                 <div class="device-name">실링기</div>
-                <div class="device-temp" id="temp-sealer">접합온도: -℃</div>
+                <div class="device-temp" id="temp-sealer-detail" style="font-size:11px;color:var(--text3);margin-top:2px;">-</div>
               </div>
               <div class="device-check" id="check-sealer">○</div>
             </div>
@@ -357,8 +410,157 @@ function fmtDate(input){
   else input.value=d.slice(0,2)+'.'+d.slice(2,4)+'.'+d.slice(4);
 }
 
-// 설정
-function loadSettings(){ return JSON.parse(localStorage.getItem('batchSettings')||'{"workerName":""}'); }
+// 작업자 관리
+function loadWorkers(){ return JSON.parse(localStorage.getItem('workerList')||'[]'); }
+function saveWorkers(list){ localStorage.setItem('workerList', JSON.stringify(list)); }
+function renderWorkerSelect(){
+  const workers=loadWorkers();
+  const cur=loadSettings().workerName;
+  const sel=document.getElementById('workerSelect');
+  if(!sel) return;
+  if(!workers.length){
+    sel.innerHTML='<option value="">작업자를 추가해주세요</option>';
+  } else {
+    sel.innerHTML='<option value="">작업자 선택</option>'+
+      workers.map(w=>`<option value="${w}" ${w===cur?'selected':''}>${w}</option>`).join('');
+  }
+}
+function onWorkerSelect(){
+  const sel=document.getElementById('workerSelect');
+  const name=sel.value;
+  if(!name) return;
+  const s=loadSettings();
+  s.workerName=name;
+  savePackSettings(s);
+  document.getElementById('mainWorker').textContent=name+' 작업자';
+}
+function addWorker(){
+  const name=document.getElementById('workerNewInput').value.trim();
+  if(!name){ alert('이름을 입력해주세요'); return; }
+  const workers=loadWorkers();
+  if(workers.includes(name)){ alert('이미 등록된 작업자입니다'); return; }
+  workers.push(name);
+  saveWorkers(workers);
+  document.getElementById('workerNewInput').value='';
+  renderWorkerSelect();
+  // 자동 선택
+  const sel=document.getElementById('workerSelect');
+  sel.value=name;
+  onWorkerSelect();
+}
+function deleteWorker(){
+  const workers=loadWorkers();
+  if(!workers.length){ alert('등록된 작업자가 없습니다'); return; }
+  const target=prompt('삭제할 작업자: '+workers.join(', '));
+  if(target&&workers.includes(target)){
+    saveWorkers(workers.filter(w=>w!==target));
+    renderWorkerSelect();
+    alert(target+' 삭제 완료');
+  }
+}
+
+// 설비세팅값 저장 (포장일지에서 직접 입력 → deviceSettings)
+function saveDeviceSetting(){
+  const code=document.getElementById('devProductSel').value;
+  if(!code){ alert('제품을 선택해주세요'); return; }
+  const sealingC1=parseFloat(document.getElementById('dSealingC1').value)||0;
+  const sealingC2=parseFloat(document.getElementById('dSealingC2').value)||0;
+  const sealingK1=parseFloat(document.getElementById('dSealingK1').value)||0;
+  const sealingK2=parseFloat(document.getElementById('dSealingK2').value)||0;
+  const sealerTemp=parseFloat(document.getElementById('dSealerTemp').value)||0;
+  let settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
+  const idx=settings.findIndex(d=>d.code===code);
+  const setting={code,sealingC1,sealingC2,sealingK1,sealingK2,sealerTemp};
+  if(idx>=0) settings[idx]=setting; else settings.push(setting);
+  localStorage.setItem('deviceSettings',JSON.stringify(settings));
+  // PACK_DEVICE_SETTINGS도 갱신
+  PACK_DEVICE_SETTINGS[code]=setting;
+  alert('저장 완료!');
+  renderDeviceSettingsList();
+  applyDeviceSetting(S.product);
+}
+
+function loadDeviceForProduct(){
+  const code=document.getElementById('devProductSel').value;
+  if(!code) return;
+  const settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
+  const s=settings.find(d=>d.code===code)||{};
+  document.getElementById('dSealingC1').value=s.sealingC1||'';
+  document.getElementById('dSealingC2').value=s.sealingC2||'';
+  document.getElementById('dSealingK1').value=s.sealingK1||'';
+  document.getElementById('dSealingK2').value=s.sealingK2||'';
+  document.getElementById('dSealerTemp').value=s.sealerTemp||'';
+}
+
+function renderDeviceSettingsList(){
+  const settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
+  const el=document.getElementById('deviceSettingsList');
+  if(!settings.length){ el.innerHTML='<div style="color:var(--text3);text-align:center;padding:8px;">등록된 세팅값 없음</div>'; return; }
+  el.innerHTML='<div style="font-weight:700;margin-bottom:4px;color:var(--text2);">등록된 세팅값</div>'+
+    settings.map(d=>`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;">
+      <span style="font-weight:700;color:var(--primary)">${d.code}</span>
+      <span style="margin-left:6px;">삼면: ${d.sealingC1}/${d.sealingC2}/${d.sealingK1}/${d.sealingK2}℃</span>
+      <span style="margin-left:6px;">실링: ${d.sealerTemp}℃</span>
+    </div>`).join('');
+}
+
+function loadDeviceSettings(){
+  // 기존 통합관리 연동 (호환용)
+  const settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
+  settings.forEach(d=>{ PACK_DEVICE_SETTINGS[d.code]={sealingC1:d.sealingC1||0,sealingC2:d.sealingC2||0,sealingK1:d.sealingK1||0,sealingK2:d.sealingK2||0,sealerTemp:d.sealerTemp||0}; });
+  renderDeviceSettingsList();
+}
+
+// 부자재 불러오기 (sub_packagingDB 연동)
+function loadPackagingDB(){
+  const db=JSON.parse(localStorage.getItem('sub_packagingDB')||'null');
+  const el=document.getElementById('packagingDBStatus');
+  if(!db){
+    el.innerHTML='<div style="color:var(--text3)">부자재 목록이 없습니다.<br>부자재입고검사일지에서 먼저 등록해주세요.</div>';
+    return;
+  }
+  const categories=Object.keys(db);
+  const total=categories.reduce((s,c)=>s+(db[c]||[]).length,0);
+  el.innerHTML=categories.map(cat=>`
+    <div style="padding:6px 0;font-size:12px;border-bottom:1px solid var(--border);">
+      <span style="font-weight:700">${cat}</span>:
+      ${(db[cat]||[]).map(i=>`<span style="color:var(--primary);margin-left:4px">${i.code||''} ${i.name||i}</span>`).join(', ')}
+    </div>`).join('');
+  alert(`부자재 ${total}개 항목 로드 완료`);
+}
+
+// 설비세팅 제품별 적용
+const PACK_DEVICE_SETTINGS = {};
+function applyDeviceSetting(code){
+  const s=PACK_DEVICE_SETTINGS[code];
+  const sealingEl=document.getElementById('temp-sealing-detail');
+  const sealerEl=document.getElementById('temp-sealer-detail');
+  if(s){
+    if(sealingEl) sealingEl.textContent=`센터온도 전:${s.sealingC1}℃ 후:${s.sealingC2}℃ / 캇타 상:${s.sealingK1}℃ 하:${s.sealingK2}℃`;
+    if(sealerEl) sealerEl.textContent=`실링온도: ${s.sealerTemp}℃`;
+  } else {
+    if(sealingEl) sealingEl.textContent='세팅값 없음 (통합관리에서 등록)';
+    if(sealerEl) sealerEl.textContent='세팅값 없음';
+  }
+}
+
+// 설정 페이지 초기화
+function initSettings(){
+  renderWorkerSelect();
+  loadDeviceSettings();
+  renderDeviceSettingsList();
+  // 제품 셀렉트 채우기
+  const sel=document.getElementById('devProductSel');
+  if(sel){
+    sel.innerHTML='<option value="">-- 제품 선택 --</option>'+
+      Object.keys(RECIPE_DB).map(c=>`<option value="${c}">${RECIPE_DB[c].name} (${c})</option>`).join('');
+  }
+  loadPackagingDB();
+}
+
+// 설정 로드 - 포장일지 전용 (배합일지와 별도)
+function loadSettings(){ return JSON.parse(localStorage.getItem('packSettings')||'{"workerName":""}'); }
+function savePackSettings(s){ localStorage.setItem('packSettings', JSON.stringify(s)); }
 
 // 로컬 저장
 function saveLocal(){ localStorage.setItem('packRecords_'+getTodayKey(),JSON.stringify(S.todayRecords)); updateStats(); }
@@ -375,6 +577,7 @@ function showPage(id){
   S.history.push(S.page); S.page=id;
   document.getElementById('backBtn').style.display=id==='main'?'none':'';
   window.scrollTo(0,0);
+  if(id==='settings') initSettings();
 }
 function goBack(){
   const prev=S.history.pop();
@@ -399,7 +602,9 @@ function goHome(){
 function initMain(){
   const s=loadSettings();
   document.getElementById('mainDate').textContent=getToday();
-  document.getElementById('mainWorker').textContent=s.workerName ? s.workerName+' 작업자' : '작업자 미설정';
+  document.getElementById('mainWorker').textContent=s.workerName ? s.workerName+' 작업자' : '👤 작업자 설정 (탭하세요)';
+  // 설비세팅 미리 로드
+  loadDeviceSettings();
   renderProductList(Object.keys(RECIPE_DB));
   loadLocal();
 }
@@ -468,9 +673,7 @@ function selectProduct(code){
   document.getElementById('packLot').textContent=lot;
 
   // 설비 세팅
-  const setting=DEVICE_SETTINGS[code]||DEVICE_SETTINGS.default;
-  const sealingEl=document.getElementById('temp-sealing'); if(sealingEl) sealingEl.textContent='접합온도: '+setting.sealing+'℃';
-  const sealerEl=document.getElementById('temp-sealer'); if(sealerEl) sealerEl.textContent='접합온도: '+setting.sealer+'℃';
+  applyDeviceSetting(code);
 
   // 상단바
   document.getElementById('tbTitle').textContent=p.name;
@@ -520,85 +723,97 @@ function calcBoxes(){
 // PDF 생성
 function genPrint(r){
   const s=loadSettings();
-  const setting=DEVICE_SETTINGS[r.productCode]||DEVICE_SETTINGS.default;
+  const devSet=PACK_DEVICE_SETTINGS[r.productCode]||{};
   const usedDevices=[SELECTED_DEVICES.sealing?'자동삼면포장기':'',SELECTED_DEVICES.sealer?'실링기':''].filter(Boolean).join(', ')||'-';
-  document.getElementById('printArea').innerHTML=`<div style="padding:20px;font-size:11px;font-family:sans-serif;">
-    <h2 style="font-size:18px;margin:0 0 16px;color:#c0386b;border-bottom:2px solid #c0386b;padding-bottom:8px">포장일지</h2>
-    <table style="border-collapse:collapse;width:100%;margin-bottom:10px;font-size:10px;">
+  const sealingStr=devSet.sealingC1!==undefined?`C1:${devSet.sealingC1}℃ C2:${devSet.sealingC2}℃ K1:${devSet.sealingK1}℃ K2:${devSet.sealingK2}℃`:'-';
+  const sealerStr=devSet.sealerTemp!==undefined?`${devSet.sealerTemp}℃`:'-';
+  document.getElementById('printArea').innerHTML=`<div style="padding:16px;font-size:11px;font-family:'Noto Sans KR',sans-serif;max-width:100%;">
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:10px;">포장일지</h2>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px;width:100%;">
+      <div style="margin-left:auto;">
+      <table style="border-collapse:collapse;border:1px solid #bbb;table-layout:fixed;width:auto;">
+        <thead>
+          <tr>
+            <th rowspan="2" style="width:30px;border:1px solid #bbb;background:#f0f0f0;font-size:9px;font-weight:700;writing-mode:vertical-rl;letter-spacing:3px;text-align:center;vertical-align:middle;padding:5px 3px;">결재</th>
+            <th style="width:90px;border:1px solid #bbb;background:#f0f0f0;font-size:9px;font-weight:700;text-align:center;padding:2px;">작성</th>
+            <th style="width:90px;border:1px solid #bbb;background:#f0f0f0;font-size:9px;font-weight:700;text-align:center;padding:2px;">승인</th>
+          </tr>
+          <tr>
+            <td style="border:1px solid #bbb;padding:0;width:90px;"><div style="height:44px;position:relative;">${r.signImg?`<img src="${r.signImg}" style="width:100%;height:100%;object-fit:contain;">`:''}</div></td>
+            <td style="border:1px solid #bbb;padding:0;width:90px;"><div style="height:44px;position:relative;"></div></td>
+          </tr>
+        </thead>
+      </table>
+    </div>
+    <!-- 기본정보 -->
+    <table style="border-collapse:collapse;width:100%;margin-bottom:8px;font-size:10px;">
       <tr>
-        <td style="border:1px solid #ddd;padding:8px;background:#f0f0f0;color:#333;font-weight:700;width:15%;text-align:center">제품명</td>
-        <td style="border:1px solid #ddd;padding:8px;width:35%;font-weight:700;text-align:center">${r.product}</td>
-        <td style="border:1px solid #ddd;padding:8px;background:#f0f0f0;color:#333;font-weight:700;width:15%;text-align:center">작업일자</td>
-        <td style="border:1px solid #ddd;padding:8px;width:35%;text-align:center">20${r.date.slice(0,2)}.${r.date.slice(2,4)}.${r.date.slice(4,6)}</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:12%">제품명</td>
+        <td style="border:1px solid #999;padding:4px 8px;width:38%;font-weight:700">${r.product}</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:12%">작업일자</td>
+        <td style="border:1px solid #999;padding:4px 8px">20${r.date.slice(0,2)}.${r.date.slice(2,4)}.${r.date.slice(4,6)}</td>
       </tr>
       <tr>
-        <td style="border:1px solid #ddd;padding:8px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">포장로트</td>
-        <td style="border:1px solid #ddd;padding:8px;font-weight:700;color:#333;text-align:center">${r.lot}</td>
-        <td style="border:1px solid #ddd;padding:8px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">작성자</td>
-        <td style="border:1px solid #ddd;padding:8px;text-align:center">${s.workerName}</td>
-      </tr>
-      <tr>
-        <td style="border:1px solid #ddd;padding:8px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">서명</td>
-        <td style="border:1px solid #ddd;padding:8px;height:50px;text-align:center" colspan="3">${r.signImg?`<img src="${r.signImg}" style="height:40px">`:''}</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">포장로트</td>
+        <td style="border:1px solid #999;padding:4px 8px;font-weight:700">${r.lot}</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">작성자</td>
+        <td style="border:1px solid #999;padding:4px 8px">${s.workerName||'-'}</td>
       </tr>
     </table>
-    <table style="border-collapse:collapse;width:100%;margin-bottom:10px;font-size:10px;">
-      <tr style="background:#f0f0f0">
-        <th style="border:1px solid #ddd;padding:6px;color:#333;text-align:center" colspan="4">설비 세팅값</th>
+    <!-- 설비세팅 -->
+    <table style="border-collapse:collapse;width:100%;margin-bottom:8px;font-size:10px;">
+      <tr style="background:#e8f0fb"><th style="border:1px solid #999;padding:4px;text-align:center" colspan="4">설비 세팅값</th></tr>
+      <tr>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:15%">사용 설비</td>
+        <td style="border:1px solid #999;padding:4px 8px" colspan="3">${usedDevices}</td>
       </tr>
       <tr>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;width:25%;text-align:center">사용 설비</td>
-        <td style="border:1px solid #ddd;padding:7px;text-align:center" colspan="3">${usedDevices}</td>
-      </tr>
-      <tr>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">자동삼면포장기 접합온도</td>
-        <td style="border:1px solid #ddd;padding:7px;width:25%;text-align:center">${setting.sealing}℃</td>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;width:25%;text-align:center">실링기 접합온도</td>
-        <td style="border:1px solid #ddd;padding:7px;width:25%;text-align:center">${setting.sealer}℃</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">자동삼면포장기</td>
+        <td style="border:1px solid #999;padding:4px 8px">${sealingStr}</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:10%">실링기</td>
+        <td style="border:1px solid #999;padding:4px 8px">${sealerStr}</td>
       </tr>
     </table>
-    <table style="border-collapse:collapse;width:100%;margin-bottom:10px;font-size:10px;">
-      <tr style="background:#f0f0f0">
-        <th style="border:1px solid #ddd;padding:6px;color:#333;text-align:center" colspan="4">내포장</th>
+    <!-- 내포장 -->
+    <table style="border-collapse:collapse;width:100%;margin-bottom:8px;font-size:10px;">
+      <tr style="background:#e8f0fb"><th style="border:1px solid #999;padding:4px;text-align:center" colspan="4">내포장</th></tr>
+      <tr>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:15%">작업인원</td>
+        <td style="border:1px solid #999;padding:4px 8px;width:35%">${r.workers}명</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:15%">작업시간</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.startTime} ~ ${r.endTime}</td>
       </tr>
       <tr>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;width:15%;text-align:center">작업인원</td>
-        <td style="border:1px solid #ddd;padding:7px;width:35%;text-align:center">${r.workers}명</td>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;width:15%;text-align:center">작업시간</td>
-        <td style="border:1px solid #ddd;padding:7px;width:35%;text-align:center">${r.startTime} ~ ${r.endTime}</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">입수량</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.perBox}개/박스</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">소비기한</td>
+        <td style="border:1px solid #999;padding:4px 8px;font-weight:700">${r.expiryDate}</td>
       </tr>
       <tr>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">입수량</td>
-        <td style="border:1px solid #ddd;padding:7px;text-align:center">${r.perBox}개/박스</td>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">소비기한</td>
-        <td style="border:1px solid #ddd;padding:7px;font-weight:700;color:#333;text-align:center">${r.expiryDate}</td>
-      </tr>
-      <tr>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">생산수량</td>
-        <td style="border:1px solid #ddd;padding:7px;text-align:center">${r.qtyPcs.toLocaleString()}개 / ${r.qtyBoxes}박스</td>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">잔량</td>
-        <td style="border:1px solid #ddd;padding:7px;text-align:center">${r.remaining}개</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">생산수량</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.qtyPcs.toLocaleString()}개 / ${r.qtyBoxes}박스</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">잔량</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.remaining}개</td>
       </tr>
     </table>
+    <!-- 외포장 -->
     <table style="border-collapse:collapse;width:100%;font-size:10px;">
-      <tr style="background:#f0f0f0">
-        <th style="border:1px solid #ddd;padding:6px;color:#333;text-align:center" colspan="4">외포장</th>
+      <tr style="background:#e8f0fb"><th style="border:1px solid #999;padding:4px;text-align:center" colspan="4">외포장</th></tr>
+      <tr>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:15%">필름포장지 사용량</td>
+        <td style="border:1px solid #999;padding:4px 8px;width:35%">${r.filmQty}</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:15%">필름포장지 입고일</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.filmDate}</td>
       </tr>
       <tr>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;width:15%;text-align:center">필름포장지 사용량</td>
-        <td style="border:1px solid #ddd;padding:7px;width:35%;text-align:center">${r.filmQty}</td>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;width:15%;text-align:center">필름포장지 입고일</td>
-        <td style="border:1px solid #ddd;padding:7px;width:35%;text-align:center">${r.filmDate}</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">벌크비닐 사용량</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.bulkQty}</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">벌크비닐 입고일</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.bulkDate}</td>
       </tr>
       <tr>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">벌크비닐 사용량</td>
-        <td style="border:1px solid #ddd;padding:7px;text-align:center">${r.bulkQty}</td>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">벌크비닐 입고일</td>
-        <td style="border:1px solid #ddd;padding:7px;text-align:center">${r.bulkDate}</td>
-      </tr>
-      <tr>
-        <td style="border:1px solid #ddd;padding:7px;background:#f0f0f0;color:#333;font-weight:700;text-align:center">박스 사용량</td>
-        <td style="border:1px solid #ddd;padding:7px;text-align:center" colspan="3">${r.boxQty}개</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">박스 사용량</td>
+        <td style="border:1px solid #999;padding:4px 8px" colspan="3">${r.boxQty}개</td>
       </tr>
     </table>
   </div>`;
@@ -630,7 +845,18 @@ function fmtTime(input){
 }
 function getTimeVal(id){
   const el=document.getElementById(id);
-  return el.dataset.formatted||el.value||'-';
+  if(el.dataset.formatted) return el.dataset.formatted;
+  const v=(el.value||'').replace(/\D/g,'').slice(0,4);
+  if(v.length===4){
+    const h=parseInt(v.slice(0,2));
+    const m=v.slice(2,4);
+    if(h>=0&&h<=23&&parseInt(m)>=0&&parseInt(m)<=59){
+      const ampm=h<12?'오전':'오후';
+      const h12=h===0?12:h>12?h-12:h;
+      return `${ampm} ${String(h12).padStart(2,'0')}:${m}`;
+    }
+  }
+  return el.value||'-';
 }
 
 // 서명 캔버스
