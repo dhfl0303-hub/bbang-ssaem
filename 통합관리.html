@@ -1399,6 +1399,31 @@ let ledgerRecords = []; // {date, name, code, qty, exp, type:'in'|'out'}
 
 function initLedger(){
   ledgerRecords = JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
+  // 입고검사일지 → ledgerRecords 자동 동기화
+  try{
+    const recs=JSON.parse(localStorage.getItem('incomingRecords')||'[]');
+    recs.forEach(rec=>{
+      (rec.rows||[]).forEach(row=>{
+        if(!row.product||!row.qty) return;
+        const uniqueKey='in_'+(row.lot||'')+row.product+(rec.date||'');
+        const exists=ledgerRecords.find(r=>r._key===uniqueKey);
+        if(!exists){
+          const ing=getIngByName(row.product);
+          ledgerRecords.push({
+            date:rec.date||getTodayISO2(),
+            name:row.product,
+            code:ing?ing.code:row.lot?.split('-')[0]||'',
+            qty:parseFloat(row.qty)||0,
+            exp:row.exp||'',
+            lot:row.lot||'',
+            type:'in',
+            _key:uniqueKey
+          });
+        }
+      });
+    });
+    localStorage.setItem('ledgerRecords',JSON.stringify(ledgerRecords));
+  }catch(e){}
 }
 function saveLedger(){ localStorage.setItem('ledgerRecords', JSON.stringify(ledgerRecords)); }
 
@@ -1493,15 +1518,20 @@ function renderLedger(){
   if(!ings.length){ tbody.innerHTML='<tr><td colspan="9" class="tc" style="padding:24px;color:var(--text3)">검색 결과가 없습니다</td></tr>'; return; }
 
   tbody.innerHTML=ings.map(ing=>{
-    // 전월재고: 이번달 시작일 이전 모든 입출고 합산
-    const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='in'||r.type==='init')&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
-    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
-    const prevStock=Math.max(0,prevIn-prevOut);
+    // 전월재고: init 타입만 (초기재고)
+    const prevStock=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init'&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
 
-    // 당월 입고/출고 (선택날짜까지)
-    const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='in'||r.type==='init')&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
+    // 당월 입고: in 타입만 (입고검사일지 동기화)
+    const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
+
+    // 당월 출고: out 타입 (배합일지 동기화)
     const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
-    const closing=Math.max(0,prevStock+monthIn-monthOut);
+
+    // 마감재고: 초기재고 + 당월입고 - 당월출고
+    const initTotal=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
+    const allIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
+    const allOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
+    const closing=Math.max(0,initTotal+allIn-allOut);
 
     // 스토리지 뱃지
     const stor=ing.storage||'';
