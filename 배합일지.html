@@ -745,15 +745,12 @@ function renderIngredients(ings){
     const total=Math.round(ing.amount);
     const prev=S.prevData[ing.name]||[{lot:'',exp:'',amount:''}];
     const block=document.createElement('div'); block.className='ing-block';
-    block.dataset.name=ing.name; block.dataset.total=total; block.dataset.ingCode=code;
     const lots=getIngLots(ing.name);
-    const lotOptions=lots.length
-      ? lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}">${l.label}</option>`).join('')
-      : '<option value="">입고 기록 없음</option>';
     const ingDB=JSON.parse(localStorage.getItem('customIngredients')||'[]');
     const found=ingDB.find(i=>i.name===ing.name)||{code:''};
     const code=found.code||INGREDIENT_DB_STATIC[ing.name]||'';
     const codeStr=code?` <span style="font-size:12px;color:var(--text3);font-weight:400">(${code})</span>`:'';
+    block.dataset.name=ing.name; block.dataset.total=total; block.dataset.ingCode=code;
     block.innerHTML=`
       <div class="ing-hd">
         <span class="ing-name">${ing.name}${codeStr}</span>
@@ -787,12 +784,12 @@ function addExpRowEl(container,lotVal,amtVal,total,rowIdx,totalRows,lots,ingCode
         <option value="">-- LOT 선택 --</option>
         ${lotOptions}
       </select>
-      <div class="lot-manual-wrap" style="display:none;align-items:center;gap:4px;">
-        <span class="exp-input" style="background:#f0f4ff;color:var(--primary);font-weight:700;padding:8px;border-radius:8px;font-size:13px;white-space:nowrap;" id="lot-code-fixed-${rowIdx}">${ingCode}</span>
-        <span style="color:var(--text2);font-weight:700;">-</span>
-        <input class="exp-input lot-manual-date" placeholder="입고일(YYMMDD)" maxlength="6" inputmode="numeric" style="flex:1;" oninput="updateManualLot(this)">
-        <span style="color:var(--text2);font-weight:700;">-</span>
-        <input class="exp-input lot-manual-exp" placeholder="소비기한(YYMMDD)" maxlength="6" inputmode="numeric" style="flex:1;" oninput="updateManualLot(this)">
+      <div class="lot-manual-wrap" style="display:none;align-items:center;gap:4px;width:100%;">
+        <span class="exp-input" style="background:#f0f4ff;color:var(--primary);font-weight:700;padding:8px;border-radius:8px;font-size:13px;white-space:nowrap;flex:0 0 auto;" id="lot-code-fixed-${rowIdx}">${ingCode}</span>
+        <span style="color:var(--text2);font-weight:700;flex:0 0 auto;">-</span>
+        <input class="exp-input lot-manual-date" placeholder="입고일" maxlength="6" inputmode="numeric" style="flex:1;min-width:0;" oninput="updateManualLot(this)">
+        <span style="color:var(--text2);font-weight:700;flex:0 0 auto;">-</span>
+        <input class="exp-input lot-manual-exp" placeholder="소비기한" maxlength="6" inputmode="numeric" style="flex:1;min-width:0;" oninput="updateManualLot(this)">
         <input class="lot-manual-full" type="hidden">
       </div>
       <div style="font-size:10px;color:var(--primary);cursor:pointer;padding:2px 4px;" onclick="toggleLotInput(this)">✏️ 직접입력 / 선택으로 전환</div>
@@ -870,12 +867,12 @@ function addExpRow(btn){
         <option value="">-- LOT 선택 --</option>
         ${lotOptions}
       </select>
-      <div class="lot-manual-wrap" style="display:none;align-items:center;gap:4px;">
-        <span class="exp-input" style="background:#f0f4ff;color:var(--primary);font-weight:700;padding:8px;border-radius:8px;font-size:13px;white-space:nowrap;">${ingCode}</span>
-        <span style="color:var(--text2);font-weight:700;">-</span>
-        <input class="exp-input lot-manual-date" placeholder="입고일(YYMMDD)" maxlength="6" inputmode="numeric" style="flex:1;" oninput="updateManualLot(this)">
-        <span style="color:var(--text2);font-weight:700;">-</span>
-        <input class="exp-input lot-manual-exp" placeholder="소비기한(YYMMDD)" maxlength="6" inputmode="numeric" style="flex:1;" oninput="updateManualLot(this)">
+      <div class="lot-manual-wrap" style="display:none;align-items:center;gap:4px;width:100%;">
+        <span class="exp-input" style="background:#f0f4ff;color:var(--primary);font-weight:700;padding:8px;border-radius:8px;font-size:13px;white-space:nowrap;flex:0 0 auto;">${ingCode}</span>
+        <span style="color:var(--text2);font-weight:700;flex:0 0 auto;">-</span>
+        <input class="exp-input lot-manual-date" placeholder="입고일" maxlength="6" inputmode="numeric" style="flex:1;min-width:0;" oninput="updateManualLot(this)">
+        <span style="color:var(--text2);font-weight:700;flex:0 0 auto;">-</span>
+        <input class="exp-input lot-manual-exp" placeholder="소비기한" maxlength="6" inputmode="numeric" style="flex:1;min-width:0;" oninput="updateManualLot(this)">
         <input class="lot-manual-full" type="hidden">
       </div>
       <div style="font-size:10px;color:var(--primary);cursor:pointer;padding:2px 4px;" onclick="toggleLotInput(this)">✏️ 직접입력 / 선택으로 전환</div>
