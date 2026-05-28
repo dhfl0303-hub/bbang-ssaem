@@ -558,23 +558,22 @@ function printSingleRecord(idx){
   if(!r){ alert('기록을 찾을 수 없습니다'); return; }
   const s=loadSettings();
   const totals={};
-  if(r.batchRecords){
-    r.batchRecords.forEach(br=>br.ingredients.forEach(ing=>{
+  const records=r.batchRecords||r.ingredients?[r]:[r];
+  (r.batchRecords||[r]).forEach(br=>{
+    (br.ingredients||[]).forEach(ing=>{
       if(!totals[ing.name])totals[ing.name]={};
-      ing.exps.forEach(e=>{ if(!e.exp)return; if(!totals[ing.name][e.exp])totals[ing.name][e.exp]=0; totals[ing.name][e.exp]+=e.amount; });
-    }));
-  }
-  const sortedRows=Object.entries(totals)
-    .map(([name,exps])=>({name,exps,sum:Object.values(exps).reduce((a,b)=>a+b,0)}))
-    .sort((a,b)=>b.sum-a.sum)
-    .flatMap(({name,exps})=>Object.entries(exps).map(([exp,amt])=>({name,exp,amt})));
-  // 배합로트 4개씩 줄바꿈
-  const lots=r.batchRecords?r.batchRecords.map(br=>br.lot):[];
-  const lotRows=[];
-  for(let i=0;i<lots.length;i+=4) lotRows.push(lots.slice(i,i+4).join(' / '));
-  const lotHtml=lotRows.map(row=>`<div>${row}</div>`).join('');
-  // 총 배합 총량
-  const grandTotal=sortedRows.reduce((sum,{amt})=>sum+amt,0);
+      ing.exps.forEach(e=>{
+        const key=e.lot||e.exp||'';
+        if(!key) return;
+        if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||'',exp:e.exp||'',amt:0};
+        totals[ing.name][key].amt+=e.amount||0;
+      });
+    });
+  });
+  const lots=(r.batchRecords||[]).map(br=>br.lot);
+  const lotRange=lots.length===1?lots[0]:lots.length>1?`${lots[0]}~${lots[lots.length-1].split('-').pop()}`:'';
+  const grandTotal=Object.values(totals).reduce((s,keys)=>s+Object.values(keys).reduce((a,v)=>a+v.amt,0),0);
+  const ingDB=JSON.parse(localStorage.getItem('customIngredients')||'[]');
   document.getElementById('printArea').innerHTML=`<div style="padding:16px;font-size:11px;font-family:'Noto Sans KR',sans-serif;max-width:100%;">
     <div style="position:relative;margin-bottom:8px;min-height:80px;"><div style="font-size:18px;font-weight:900;letter-spacing:1px;padding-top:8px;">생산 배합일지</div><div style="position:absolute;top:0;right:0;"><table style="border-collapse:collapse;border:1px solid #bbb;table-layout:fixed;width:auto;"><tr><th rowspan="2" style="width:38px;border:1px solid #bbb;background:#f0f0f0;font-size:10px;font-weight:700;writing-mode:vertical-rl;letter-spacing:3px;text-align:center;vertical-align:middle;padding:6px 4px;">결재</th><th style="width:113px;border:1px solid #bbb;background:#f0f0f0;font-size:10px;font-weight:700;text-align:center;padding:3px;">작성</th><th style="width:113px;border:1px solid #bbb;background:#f0f0f0;font-size:10px;font-weight:700;text-align:center;padding:3px;">승인</th></tr><tr><td style="border:1px solid #bbb;padding:0;width:113px;"><div style="height:55px;position:relative;"></div></td><td style="border:1px solid #bbb;padding:0;width:113px;"><div style="height:55px;position:relative;"></div></td></tr></table></div></div>
     <table style="border-collapse:collapse;width:100%;margin-bottom:8px;font-size:10px;">
@@ -588,22 +587,34 @@ function printSingleRecord(idx){
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">작성자</td>
         <td style="border:1px solid #999;padding:4px 8px">${s.workerName||'-'}</td>
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">총 배합수</td>
-        <td style="border:1px solid #999;padding:4px 8px">${r.totalBatches}배합 (${r.startTime}~${r.endTime})</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.totalBatches||'-'}배합</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">배합로트</td>
+        <td style="border:1px solid #999;padding:4px 8px;font-weight:700" colspan="3">${lotRange||'-'}</td>
       </tr>
     </table>
     <table style="border-collapse:collapse;width:100%;font-size:10px;">
       <tr style="background:#e8f0fb">
-        <th style="border:1px solid #999;padding:4px;text-align:left">원료명</th>
-        <th style="border:1px solid #999;padding:4px;text-align:center">소비기한</th>
-        <th style="border:1px solid #999;padding:4px;text-align:right">총 사용량(g)</th>
+        <th style="border:1px solid #999;padding:4px;text-align:center;width:8%">원료코드</th>
+        <th style="border:1px solid #999;padding:4px;text-align:left;width:20%">원료명</th>
+        <th style="border:1px solid #999;padding:4px;text-align:center;width:42%">LOT</th>
+        <th style="border:1px solid #999;padding:4px;text-align:center;width:15%">소비기한</th>
+        <th style="border:1px solid #999;padding:4px;text-align:right;width:15%">총 사용량(g)</th>
       </tr>
-      ${sortedRows.map(({name,exp,amt})=>`<tr>
-        <td style="border:1px solid #999;padding:4px 5px">${name}</td>
-        <td style="border:1px solid #999;padding:4px 5px;text-align:center">${exp}</td>
-        <td style="border:1px solid #999;padding:4px 5px;text-align:right">${Math.round(amt).toLocaleString()}</td>
-      </tr>`).join('')}
+      ${Object.entries(totals).map(([n,keys])=>{
+        const found=ingDB.find(i=>i.name===n)||{code:''};
+        const code=found.code||INGREDIENT_DB_STATIC[n]||'';
+        return Object.entries(keys).map(([k,v])=>`<tr>
+          <td style="border:1px solid #999;padding:4px;text-align:center;color:#1a5fa8;font-weight:700">${code}</td>
+          <td style="border:1px solid #999;padding:4px">${n}</td>
+          <td style="border:1px solid #999;padding:4px;text-align:center">${v.lot||k||'-'}</td>
+          <td style="border:1px solid #999;padding:4px;text-align:center">${fmtExp(v.exp)}</td>
+          <td style="border:1px solid #999;padding:4px;text-align:right">${Math.round(v.amt).toLocaleString()}</td>
+        </tr>`).join('');
+      }).join('')}
       <tr style="background:#f5f5f5;font-weight:700;">
-        <td style="border:1px solid #999;padding:5px" colspan="2">총 배합 총량</td>
+        <td style="border:1px solid #999;padding:5px" colspan="4">총 배합 총량</td>
         <td style="border:1px solid #999;padding:5px;text-align:right">${Math.round(grandTotal).toLocaleString()}</td>
       </tr>
     </table>
@@ -715,8 +726,8 @@ function getIngLots(ingName){
         if(recName===ingN||recName.includes(ingN)||ingN.includes(recName)){
           if(row.lot) lots.push({
             lot:row.lot,
-            label:`${row.lot} (입고:${rec.date||''} 소비:${row.exp||''})`,
-            exp:row.expVal||row.exp||'',
+            label:`${row.lot} (입고:${rec.date||''} 소비:${fmtExp(row.expVal||row.exp||'')})`,
+            exp:fmtExp(row.expVal||row.exp||''),
             date:rec.date||''
           });
         }
@@ -782,7 +793,12 @@ function addExpRowEl(container,lotVal,amtVal,total,rowIdx,totalRows,lots){
     <input class="exp-input${isLast?' readonly':''}" placeholder="${isLast&&totalRows>1?'자동계산':''}" value="${amtVal||''}" ${isLast&&totalRows>1?'readonly':''} type="${isLast?'text':'number'}" oninput="updateAutoCalc(this.closest('.ing-block'))">
     <div class="del-btn" onclick="delExpRow(this)">×</div>`;
   const sel=row.querySelector('select');
-  if(lotVal) sel.value=lotVal;
+  if(lotVal){
+    sel.value=lotVal;
+    // 초기 exp 세팅
+    const opt=sel.options[sel.selectedIndex];
+    if(opt) sel.dataset.exp=opt.dataset.exp||'';
+  }
   container.appendChild(row);
 }
 
@@ -797,6 +813,14 @@ function toggleLotInput(btn){
     sel.style.display='none'; manual.style.display='block';
     btn.textContent='📋 LOT 선택으로 전환';
   }
+}
+
+// 소비기한 형식 통일 YY.MM.DD
+function fmtExp(exp){
+  if(!exp||exp==='-') return '-';
+  const s=exp.replace(/\./g,'').replace(/-/g,'').trim();
+  if(s.length===6) return `${s.slice(0,2)}.${s.slice(2,4)}.${s.slice(4,6)}`;
+  return exp;
 }
 
 function onLotSelect(sel){
@@ -920,19 +944,24 @@ function showComplete(){
   const totals={};
   S.batchRecords.forEach(r=>r.ingredients.forEach(ing=>{
     if(!totals[ing.name])totals[ing.name]={};
-    ing.exps.forEach(e=>{ if(!e.exp)return; if(!totals[ing.name][e.exp])totals[ing.name][e.exp]=0; totals[ing.name][e.exp]+=e.amount; });
+    ing.exps.forEach(e=>{
+      const key=e.lot||e.exp||'';
+      if(!key) return;
+      if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||'',exp:e.exp||'',amt:0};
+      totals[ing.name][key].amt+=e.amount||0;
+    });
   }));
+  const ingDB=JSON.parse(localStorage.getItem('customIngredients')||'[]');
   const sortedRows=Object.entries(totals)
-    .map(([name,exps])=>({name,exps,sum:Object.values(exps).reduce((a,b)=>a+b,0)}))
-    .sort((a,b)=>b.sum-a.sum)
-    .flatMap(({name,exps})=>Object.entries(exps).map(([exp,amt])=>({name,exp,amt})));
+    .flatMap(([name,keys])=>Object.entries(keys).map(([k,v])=>({name,lot:v.lot||k,exp:v.exp,amt:v.amt})))
+    .sort((a,b)=>b.amt-a.amt);
   document.getElementById('doneResult').innerHTML=`
     <div class="sec" style="margin-top:0">생성된 배합로트</div>
     ${S.batchRecords.map(r=>`<div class="done-item"><div><div class="done-lot">${r.lot}</div><div class="done-time">배합${r.machine} · ${r.time}</div></div><div class="done-badge">완료</div></div>`).join('')}
     <div class="sec">원료별 총 사용량</div>
     <table class="result-table">
-      <tr><th>원료명</th><th>소비기한</th><th>사용량(g)</th></tr>
-      ${sortedRows.map(({name:n,exp:e,amt:a})=>`<tr><td>${n}</td><td>${e}</td><td>${Math.round(a).toLocaleString()}</td></tr>`).join('')}
+      <tr><th>원료명</th><th>LOT</th><th>소비기한</th><th>사용량(g)</th></tr>
+      ${sortedRows.map(({name:n,lot:l,exp:e,amt:a})=>`<tr><td>${n}</td><td style="font-size:11px">${l||'-'}</td><td>${fmtExp(e)}</td><td>${Math.round(a).toLocaleString()}</td></tr>`).join('')}
     </table>`;
   genPrint(); showPage('done');
 }
@@ -1001,7 +1030,7 @@ function genPrint(){
           <td style="border:1px solid #999;padding:4px;text-align:center;color:#1a5fa8;font-weight:700">${code}</td>
           <td style="border:1px solid #999;padding:4px">${n}</td>
           <td style="border:1px solid #999;padding:4px;text-align:center">${v.lot||k||'-'}</td>
-          <td style="border:1px solid #999;padding:4px;text-align:center">${v.exp||'-'}</td>
+          <td style="border:1px solid #999;padding:4px;text-align:center">${fmtExp(v.exp)}</td>
           <td style="border:1px solid #999;padding:4px;text-align:right">${Math.round(v.amt).toLocaleString()}</td>
         </tr>`).join('');
       }).join('')}
