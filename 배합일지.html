@@ -89,7 +89,8 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 .ing-total{font-size:15px;font-weight:700;color:var(--primary);}
 .ing-col-hd{display:grid;grid-template-columns:1fr 1fr 36px;gap:6px;padding:5px 14px;border-top:1px solid var(--border);}
 .col-lbl{font-size:13px;color:var(--text3);font-weight:500;}
-.exp-row{display:grid;grid-template-columns:1fr 1fr 36px;gap:6px;padding:10px 14px;border-top:1px solid var(--border);align-items:center;}
+.exp-row{display:grid;grid-template-columns:2fr 1fr 36px;gap:6px;padding:6px 14px;border-top:1px solid var(--border);align-items:stretch;}
+.exp-row .del-btn{display:flex;align-items:center;justify-content:center;}
 .exp-row.auto-row{background:var(--success-light);}
 .exp-input{background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:12px 10px;font-size:16px;font-family:"Noto Sans KR",sans-serif;color:var(--text);outline:none;width:100%;}
 .exp-input:focus{border-color:var(--primary);}
@@ -784,17 +785,17 @@ function addExpRowEl(container,lotVal,amtVal,total,rowIdx,totalRows,lots,ingCode
         <option value="">-- LOT 선택 --</option>
         ${lotOptions}
       </select>
-      <div class="lot-manual-wrap" style="display:none;align-items:center;gap:4px;width:100%;">
-        <span class="exp-input" style="background:#f0f4ff;color:var(--primary);font-weight:700;padding:8px;border-radius:8px;font-size:13px;white-space:nowrap;flex:0 0 auto;" id="lot-code-fixed-${rowIdx}">${ingCode}</span>
+      <div class="lot-manual-wrap" style="display:none;align-items:center;gap:4px;height:42px;box-sizing:border-box;">
+        <span style="background:#f0f4ff;color:var(--primary);font-weight:700;padding:8px 10px;border-radius:8px;font-size:12px;white-space:nowrap;height:100%;box-sizing:border-box;" id="lot-code-fixed-${rowIdx}">${ingCode}</span>
         <span style="color:var(--text2);font-weight:700;flex:0 0 auto;">-</span>
-        <input class="exp-input lot-manual-date" placeholder="입고일" maxlength="6" inputmode="numeric" style="flex:1;min-width:0;" oninput="updateManualLot(this)">
+        <input class="exp-input lot-manual-date" placeholder="입고일" maxlength="6" inputmode="numeric" style="flex:1;min-width:0;margin:0;height:100%;box-sizing:border-box;align-self:stretch;" oninput="updateManualLot(this)">
         <span style="color:var(--text2);font-weight:700;flex:0 0 auto;">-</span>
-        <input class="exp-input lot-manual-exp" placeholder="소비기한" maxlength="6" inputmode="numeric" style="flex:1;min-width:0;" oninput="updateManualLot(this)">
+        <input class="exp-input lot-manual-exp" placeholder="소비기한" maxlength="6" inputmode="numeric" style="flex:1;min-width:0;margin:0;height:100%;box-sizing:border-box;align-self:stretch;" oninput="updateManualLot(this)">
         <input class="lot-manual-full" type="hidden">
       </div>
       <div style="font-size:10px;color:var(--primary);cursor:pointer;padding:2px 4px;" onclick="toggleLotInput(this)">✏️ 직접입력 / 선택으로 전환</div>
     </div>
-    <input class="exp-input${isLast?' readonly':''}" placeholder="${isLast&&totalRows>1?'자동계산':''}" value="${amtVal||''}" ${isLast&&totalRows>1?'readonly':''} type="${isLast?'text':'number'}" oninput="updateAutoCalc(this.closest('.ing-block'))">
+    <input class="exp-input${isLast?' readonly':''}" style="height:100%;box-sizing:border-box;margin:0;" placeholder="${isLast&&totalRows>1?'자동계산':''}" value="${amtVal||''}" ${isLast&&totalRows>1?'readonly':''} type="${isLast?'text':'number'}" oninput="updateAutoCalc(this.closest('.ing-block'))">
     <div class="del-btn" onclick="delExpRow(this)">×</div>`;
   const sel=row.querySelector('select');
   if(lotVal){
@@ -811,10 +812,12 @@ function toggleLotInput(btn){
   const sel=row.querySelector('.lot-select');
   const manualWrap=row.querySelector('.lot-manual-wrap');
   if(sel.style.display==='none'){
-    sel.style.display='block'; manualWrap.style.display='none';
+    sel.style.display='block';
+    manualWrap.style.display='none';
     btn.textContent='✏️ 직접입력 / 선택으로 전환';
   } else {
-    sel.style.display='none'; manualWrap.style.display='flex';
+    sel.style.display='none';
+    manualWrap.style.display='flex';
     btn.textContent='📋 LOT 선택으로 전환';
   }
 }
@@ -867,12 +870,12 @@ function addExpRow(btn){
         <option value="">-- LOT 선택 --</option>
         ${lotOptions}
       </select>
-      <div class="lot-manual-wrap" style="display:none;align-items:center;gap:4px;width:100%;">
-        <span class="exp-input" style="background:#f0f4ff;color:var(--primary);font-weight:700;padding:8px;border-radius:8px;font-size:13px;white-space:nowrap;flex:0 0 auto;">${ingCode}</span>
+      <div class="lot-manual-wrap" style="display:none;align-items:center;gap:4px;height:42px;box-sizing:border-box;">
+        <span style="background:#f0f4ff;color:var(--primary);font-weight:700;padding:8px 10px;border-radius:8px;font-size:12px;white-space:nowrap;height:100%;box-sizing:border-box;">${ingCode}</span>
         <span style="color:var(--text2);font-weight:700;flex:0 0 auto;">-</span>
-        <input class="exp-input lot-manual-date" placeholder="입고일" maxlength="6" inputmode="numeric" style="flex:1;min-width:0;" oninput="updateManualLot(this)">
+        <input class="exp-input lot-manual-date" placeholder="입고일" maxlength="6" inputmode="numeric" style="flex:1;min-width:0;margin:0;height:100%;box-sizing:border-box;align-self:stretch;" oninput="updateManualLot(this)">
         <span style="color:var(--text2);font-weight:700;flex:0 0 auto;">-</span>
-        <input class="exp-input lot-manual-exp" placeholder="소비기한" maxlength="6" inputmode="numeric" style="flex:1;min-width:0;" oninput="updateManualLot(this)">
+        <input class="exp-input lot-manual-exp" placeholder="소비기한" maxlength="6" inputmode="numeric" style="flex:1;min-width:0;margin:0;height:100%;box-sizing:border-box;align-self:stretch;" oninput="updateManualLot(this)">
         <input class="lot-manual-full" type="hidden">
       </div>
       <div style="font-size:10px;color:var(--primary);cursor:pointer;padding:2px 4px;" onclick="toggleLotInput(this)">✏️ 직접입력 / 선택으로 전환</div>
