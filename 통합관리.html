@@ -179,7 +179,7 @@ tr:hover td{background:var(--bg);}
   </div>
   <div class="accordion-body" id="acc-production" style="max-height:420px;overflow-y:auto;">
     <div class="nav-sub-section">원료관리</div>
-    <div class="nav-item" onclick="showPanel('material-ledger')">
+    <div class="nav-item active" onclick="showPanel('material-ledger')">
       <span class="nav-icon">📒</span>원료수불부
     </div>
     <div class="nav-item" onclick="showPanel('ingredient-stock')">
@@ -193,7 +193,7 @@ tr:hover td{background:var(--bg);}
     </div>
 
     <div class="nav-sub-section">생산관리</div>
-    <div class="nav-item active" onclick="showPanel('recipe')">
+    <div class="nav-item" onclick="showPanel('recipe')">
       <span class="nav-icon">📋</span>배합비 관리
     </div>
     <div class="nav-item" onclick="showPanel('device')">
@@ -273,7 +273,7 @@ tr:hover td{background:var(--bg);}
     </div>
 
     <!-- ⓪ 원료수불부 -->
-    <div class="panel" id="panel-material-ledger">
+    <div class="panel active" id="panel-material-ledger">
       <div class="filter-row">
         <div>
           <label style="font-size:12px;font-weight:700;color:var(--text2);margin-right:6px">조회 날짜</label>
@@ -604,7 +604,7 @@ tr:hover td{background:var(--bg);}
     </div>
 
     <!-- ① 배합비 관리 -->
-    <div class="panel active" id="panel-recipe">
+    <div class="panel" id="panel-recipe">
       <div class="filter-row">
         <input class="search-input" placeholder="제품명 검색..." id="recipeSearch" oninput="filterRecipe()">
         <button class="btn btn-primary" onclick="event.stopPropagation();openAddRecipe()">+ 신규 등록</button>
@@ -1666,12 +1666,15 @@ function addInitRow(){
   const name=document.getElementById('initIngName').value.trim();
   const qty=parseFloat(document.getElementById('initQty').value)||0;
   const exp=getInitDateVal('initExp');
-  const date=getInitDateVal('initDate');
+  const dateRaw=getInitDateVal('initDate');
   if(!name){ alert('원료명을 입력해주세요'); return; }
   if(!qty){ alert('재고량을 입력해주세요'); return; }
-  if(!date){ alert('기준 날짜를 입력해주세요 (YYMMDD)'); return; }
+  if(!dateRaw){ alert('기준 날짜를 입력해주세요 (YYMMDD)'); return; }
+  // YY.MM.DD → YYYY-MM-DD ISO 변환
+  const dateParts=dateRaw.replace(/\./g,'-').split('-');
+  const dateISO=dateParts.length===3?`20${dateParts[0]}-${dateParts[1]}-${dateParts[2]}`:dateRaw;
   const ing=getIngByName(name);
-  const row={date, name, code:ing?ing.code:'', qty, exp:exp||'-', type:'init'};
+  const row={date:dateISO, name, code:ing?ing.code:'', qty, exp:exp||'-', type:'init'};
   initRows.push(row);
   renderInitRows();
   document.getElementById('initIngName').value='';
@@ -2076,13 +2079,16 @@ function renderEiInitRows(){
 function addEiInitRow(){
   const code=document.getElementById('ei-code').value;
   const name=document.getElementById('ei-name').value;
-  const date=getInitDateVal('ei-init-date');
+  const dateRaw=getInitDateVal('ei-init-date'); // YY.MM.DD
   const qty=parseFloat(document.getElementById('ei-init-qty').value)||0;
   const exp=getInitDateVal('ei-init-exp');
-  if(!date){ alert('기준날짜를 입력해주세요 (YYMMDD)'); return; }
+  if(!dateRaw){ alert('기준날짜를 입력해주세요 (YYMMDD)'); return; }
   if(!qty){ alert('재고량을 입력해주세요'); return; }
-  const _initKey=name+date+qty;
-  ledgerRecords.push({date,name,code,qty,exp:exp||'-',type:'init',_initKey});
+  // YY.MM.DD → YYYY-MM-DD ISO 변환
+  const dateParts=dateRaw.replace(/\./g,'-').split('-');
+  const dateISO=dateParts.length===3?`20${dateParts[0]}-${dateParts[1]}-${dateParts[2]}`:dateRaw;
+  const _initKey=name+dateISO+qty;
+  ledgerRecords.push({date:dateISO,name,code,qty,exp:exp||'-',type:'init',_initKey});
   saveLedger();
   renderEiInitRows();
   renderLedger();
@@ -2091,7 +2097,7 @@ function addEiInitRow(){
   document.getElementById('ei-init-exp').value='';
   ['ei-init-date','ei-init-exp'].forEach(id=>{
     const el=document.getElementById(id);
-    el.dataset.formatted=''; el.style.color='';
+    if(el){ el.dataset.formatted=''; el.style.color=''; el.style.fontWeight=''; }
   });
   alert('전일재고 추가 완료');
 }
@@ -2755,7 +2761,8 @@ function showPanel(id){
   };
   document.getElementById('topbarTitle').textContent=titles[id]||'';
   if(id==='material-ledger') renderLedger();
-  if(id==='recipe') renderRecipe();
+  if(id==='recipe') renderLedger();
+renderRecipe();
   if(id==='ingredient-stock') renderIngStock();
   if(id==='device') renderDevice();
   if(id==='lot-mapping') renderMapping();
@@ -3539,7 +3546,7 @@ function flSyncFromPack(){
     });
   });
   flSave();
-  alert(`동기화 완료: ${count}건 추가`);
+  // alert(`동기화 완료: ${count}건 추가`); // 자동동기화는 알림 제거
   flRenderStock(); flRefreshOutboundCombos();
 }
 
