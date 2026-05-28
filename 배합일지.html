@@ -886,19 +886,46 @@ function addExpRow(btn){
 }
 
 function delExpRow(btn){
-  const block=btn.closest('.ing-block'); const expRows=block.querySelector('.exp-rows'); const rows=expRows.querySelectorAll('.exp-row');
-  if(rows.length<=1)return; btn.closest('.exp-row').remove();
-  const newRows=expRows.querySelectorAll('.exp-row'); const last=newRows[newRows.length-1];
+  const block=btn.closest('.ing-block');
+  const expRows=block.querySelector('.exp-rows');
+  const rows=expRows.querySelectorAll('.exp-row');
+  if(rows.length<=1) return;
+  btn.closest('.exp-row').remove();
+  const newRows=expRows.querySelectorAll('.exp-row');
+  const last=newRows[newRows.length-1];
   last.classList.add('auto-row');
-  const ai=last.querySelectorAll('input')[1]; ai.setAttribute('readonly',''); ai.placeholder='자동계산'; ai.classList.add('readonly'); ai.type='text';
+  const lastAmt=Array.from(last.querySelectorAll('input')).find(inp=>
+    !inp.classList.contains('lot-manual-date')&&
+    !inp.classList.contains('lot-manual-exp')&&
+    !inp.classList.contains('lot-manual-full')
+  );
+  if(lastAmt){ lastAmt.setAttribute('readonly',''); lastAmt.placeholder='자동계산'; lastAmt.classList.add('readonly'); lastAmt.type='text'; }
   updateAutoCalc(block);
 }
 
 function updateAutoCalc(block){
-  const total=parseInt(block.dataset.total); const rows=block.querySelector('.exp-rows').querySelectorAll('.exp-row');
-  if(rows.length<=1)return;
-  let used=0; rows.forEach((r,i)=>{ if(i<rows.length-1) used+=parseFloat(r.querySelectorAll('input')[1].value)||0; });
-  rows[rows.length-1].querySelectorAll('input')[1].value=Math.max(0,Math.round(total-used));
+  const total=parseInt(block.dataset.total);
+  const rows=block.querySelector('.exp-rows').querySelectorAll('.exp-row');
+  if(rows.length<=1) return;
+  let used=0;
+  rows.forEach((r,i)=>{
+    if(i<rows.length-1){
+      const amtInput=Array.from(r.querySelectorAll('input')).find(inp=>
+        !inp.classList.contains('lot-manual-date')&&
+        !inp.classList.contains('lot-manual-exp')&&
+        !inp.classList.contains('lot-manual-full')&&
+        inp.type==='number'
+      );
+      used+=parseFloat(amtInput?.value)||0;
+    }
+  });
+  const lastRow=rows[rows.length-1];
+  const lastAmt=Array.from(lastRow.querySelectorAll('input')).find(inp=>
+    !inp.classList.contains('lot-manual-date')&&
+    !inp.classList.contains('lot-manual-exp')&&
+    !inp.classList.contains('lot-manual-full')
+  );
+  if(lastAmt) lastAmt.value=Math.max(0,Math.round(total-used));
 }
 
 function completeBatch(){
@@ -909,7 +936,11 @@ function completeBatch(){
     rows.forEach(row=>{
       const sel=row.querySelector('select.lot-select');
       const manual=row.querySelector('.lot-manual-wrap');
-      const amtInput=row.querySelectorAll('input').length>1?row.querySelectorAll('input')[row.querySelectorAll('input').length-1]:row.querySelector('input');
+      const amtInput=Array.from(row.querySelectorAll('input')).find(inp=>
+        !inp.classList.contains('lot-manual-date')&&
+        !inp.classList.contains('lot-manual-exp')&&
+        !inp.classList.contains('lot-manual-full')
+      );
       let lotVal='', expVal='';
       if(manual&&manual.style.display==='flex'){
         const hidden=row.querySelector('.lot-manual-full');
