@@ -308,7 +308,7 @@ tr:hover td{background:var(--bg);}
                   <th>원산지</th>
                   <th>보관기준</th>
                   <th>단위</th>
-                  <th>전월재고</th>
+                  <th>전일재고</th>
                   <th>입고</th>
                   <th>출고</th>
                   <th>마감재고</th>
@@ -770,7 +770,7 @@ tr:hover td{background:var(--bg);}
                   <th>거래처</th>
                   <th>규격</th>
                   <th>단위</th>
-                  <th>전월재고</th>
+                  <th>전일재고</th>
                   <th>입고</th>
                   <th>출고</th>
                   <th>마감재고</th>
@@ -1518,20 +1518,20 @@ function renderLedger(){
   if(!ings.length){ tbody.innerHTML='<tr><td colspan="9" class="tc" style="padding:24px;color:var(--text3)">검색 결과가 없습니다</td></tr>'; return; }
 
   tbody.innerHTML=ings.map(ing=>{
-    // 전월재고: init 타입만 (초기재고)
-    const prevStock=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init'&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
+    // 전일재고: 조회날짜 전날까지 누적 (초기재고 + 입고 - 출고)
+    const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+    const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+    const prevStock=Math.max(0,prevInit+prevIn-prevOut);
 
-    // 당월 입고: in 타입만 (입고검사일지 동기화)
-    const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
+    // 당일 입고
+    const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
 
-    // 당월 출고: out 타입 (배합일지 동기화)
-    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
+    // 당일 출고
+    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
 
-    // 마감재고: 초기재고 + 당월입고 - 당월출고
-    const initTotal=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
-    const allIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
-    const allOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
-    const closing=Math.max(0,initTotal+allIn-allOut);
+    // 마감재고: 전일재고 + 당일입고 - 당일출고
+    const closing=Math.max(0,prevStock+monthIn-monthOut);
 
     // 스토리지 뱃지
     const stor=ing.storage||'';
@@ -1580,9 +1580,36 @@ function openInitStock(e){
   if(initQty) initQty.value='';
   const initExp=document.getElementById('initExp');
   if(initExp) initExp.value='';
+  // 기존 전일재고 목록 렌더
+  renderSavedInitStock();
   const modal=document.getElementById('initStockModal');
   if(modal) modal.classList.add('open');
   else alert('모달을 찾을 수 없습니다. 페이지를 새로고침해주세요.');
+}
+
+function renderSavedInitStock(){
+  const tbody=document.getElementById('savedInitStockTbody');
+  if(!tbody) return;
+  const saved=ledgerRecords.filter(r=>r.type==='init');
+  if(!saved.length){ tbody.innerHTML='<tr><td colspan="6" class="tc" style="padding:12px;color:var(--text3)">등록된 전일재고 없음</td></tr>'; return; }
+  tbody.innerHTML=saved.map((r,i)=>`<tr>
+    <td style="font-weight:600">${r.name}</td>
+    <td><span class="badge badge-blue" style="font-size:10px">${r.code||'-'}</span></td>
+    <td class="tc">${r.qty}</td>
+    <td class="tc">${r.exp||'-'}</td>
+    <td class="tc">${r.date}</td>
+    <td style="white-space:nowrap;">
+      <button class="btn btn-sm btn-danger" onclick="deleteSavedInitRow('${r._initKey||r.name+r.date}')">삭제</button>
+    </td>
+  </tr>`).join('');
+}
+
+function deleteSavedInitRow(key){
+  if(!confirm('삭제하시겠습니까?')) return;
+  ledgerRecords=ledgerRecords.filter(r=>!(r.type==='init'&&(r._initKey===key||r.name+r.date===key)));
+  saveLedger();
+  renderSavedInitStock();
+  renderLedger();
 }
 function addInitRow(){
   const name = document.getElementById('initIngName').value.trim();
@@ -1612,21 +1639,19 @@ function renderInitRows(){
 function removeInitRow(i){ initRows.splice(i,1); renderInitRows(); }
 function saveInitStock(){
   if(!initRows.length){ alert('등록할 재고가 없습니다'); return; }
-  // init 타입으로 ledgerRecords에 추가
-  ledgerRecords = ledgerRecords.filter(r=>r.type!=='init');
-  initRows.forEach(r=>ledgerRecords.push(r));
-  saveLedger();
-  // ingStock에도 자동 반영
   initRows.forEach(r=>{
-    const exists = ingStock.find(s=>s.name===r.name && s.expiry===r.exp);
-    if(!exists){
-      ingStock.push({name:r.name, code:r.code||'', qty:r.qty*1000, expiry:r.exp});
-    }
+    r._initKey=r.name+r.date;
+    ledgerRecords.push(r);
   });
-  saveData('ingStock', ingStock);
+  saveLedger();
+  initRows.forEach(r=>{
+    const exists=ingStock.find(s=>s.name===r.name&&s.expiry===r.exp);
+    if(!exists) ingStock.push({name:r.name,code:r.code||'',qty:r.qty*1000,expiry:r.exp});
+  });
+  saveData('ingStock',ingStock);
   closeModal('initStockModal');
   renderLedger();
-  alert(`초기재고 ${initRows.length}건 저장 완료`);
+  alert(`전일재고 ${initRows.length}건 저장 완료`);
 }
 
 function printLedger(){
@@ -1651,7 +1676,7 @@ function printLedger(){
   <table>
     <thead><tr>
       <th>코드</th><th>품목명</th><th>원산지</th><th>보관기준</th><th>단위</th>
-      <th>전월재고</th><th>입고</th><th>출고</th><th>마감재고</th>
+      <th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>
@@ -1685,7 +1710,7 @@ function printLedger(){
   <table>
     <thead><tr>
       <th>코드</th><th>품목명</th><th>원산지</th><th>보관기준</th><th>단위</th>
-      <th>전월재고</th><th>입고</th><th>출고</th><th>마감재고</th>
+      <th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>
@@ -1694,18 +1719,18 @@ function printLedger(){
 
 <!-- 초기재고 등록 모달 -->
 <div class="modal-overlay" id="initStockModal" onclick="closeModalOutside(event,'initStockModal')">
-  <div class="modal" style="width:680px">
+  <div class="modal" style="width:720px">
     <div class="modal-hd">
-      <div class="modal-title">📋 초기 재고 등록</div>
+      <div class="modal-title">📋 전일재고 등록</div>
       <button class="modal-close" onclick="closeModal('initStockModal')">×</button>
     </div>
     <div class="modal-bd">
       <div style="background:var(--warning-light);border:1px solid #f0c080;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--warning)">
-        ⚠️ 최초 1회만 입력하세요. 이후 입고/출고는 입고검사일지·배합일지에서 자동 반영됩니다.
+        ⚠️ 전일 마감재고를 전일재고로 입력하세요. 이후 입고/출고는 입고검사일지·배합일지에서 자동 반영됩니다.
       </div>
       <div class="form-grid" style="margin-bottom:12px">
         <div class="form-row">
-          <label class="form-label">기준 날짜 (전월말일)</label>
+          <label class="form-label">기준 날짜 (전일)</label>
           <input class="form-input" id="initDate" type="date">
         </div>
         <div class="form-row">
@@ -1716,6 +1741,37 @@ function printLedger(){
             <div class="autocomplete-list" id="ac-initIngName"></div>
           </div>
         </div>
+        <div class="form-row">
+          <label class="form-label">재고량 (kg)</label>
+          <input class="form-input" id="initQty" type="number" placeholder="0" step="0.001">
+        </div>
+        <div class="form-row">
+          <label class="form-label">소비기한</label>
+          <input class="form-input" id="initExp" type="date">
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="event.stopPropagation();addInitRow()">+ 추가</button>
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">신규 추가</div>
+      <div class="table-wrap" style="margin-bottom:16px;">
+        <table>
+          <thead><tr><th>원료명</th><th>코드</th><th>재고량(kg)</th><th>소비기한</th><th>기준일</th><th></th></tr></thead>
+          <tbody id="initStockTbody"></tbody>
+        </table>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">기존 전일재고 목록</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>원료명</th><th>코드</th><th>재고량(kg)</th><th>소비기한</th><th>기준일</th><th>관리</th></tr></thead>
+          <tbody id="savedInitStockTbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-outline" onclick="closeModal('initStockModal')">취소</button>
+      <button class="btn btn-primary" onclick="event.stopPropagation();saveInitStock()">전체 저장</button>
+    </div>
+  </div>
+</div>
         <div class="form-row">
           <label class="form-label">재고량 (kg)</label>
           <input class="form-input" id="initQty" type="number" placeholder="0" step="0.001">
@@ -3279,7 +3335,7 @@ function printSubLedger(){
   <table>
     <thead><tr>
       <th>코드</th><th>품목명</th><th>거래처</th><th>규격</th><th>단위</th>
-      <th>전월재고</th><th>입고</th><th>출고</th><th>마감재고</th>
+      <th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th>
     </tr></thead>
     <tbody>${bodyHtml}</tbody>
   </table>
@@ -3630,18 +3686,18 @@ renderRecipe();
 
 <!-- 초기재고 등록 모달 -->
 <div class="modal-overlay" id="initStockModal" onclick="closeModalOutside(event,'initStockModal')">
-  <div class="modal" style="width:680px">
+  <div class="modal" style="width:720px">
     <div class="modal-hd">
-      <div class="modal-title">📋 초기 재고 등록</div>
+      <div class="modal-title">📋 전일재고 등록</div>
       <button class="modal-close" onclick="closeModal('initStockModal')">×</button>
     </div>
     <div class="modal-bd">
       <div style="background:var(--warning-light);border:1px solid #f0c080;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--warning)">
-        ⚠️ 최초 1회만 입력하세요. 이후 입고/출고는 입고검사일지·배합일지에서 자동 반영됩니다.
+        ⚠️ 전일 마감재고를 전일재고로 입력하세요. 이후 입고/출고는 입고검사일지·배합일지에서 자동 반영됩니다.
       </div>
       <div class="form-grid" style="margin-bottom:12px">
         <div class="form-row">
-          <label class="form-label">기준 날짜 (전월말일)</label>
+          <label class="form-label">기준 날짜 (전일)</label>
           <input class="form-input" id="initDate" type="date">
         </div>
         <div class="form-row">
@@ -3652,6 +3708,37 @@ renderRecipe();
             <div class="autocomplete-list" id="ac-initIngName"></div>
           </div>
         </div>
+        <div class="form-row">
+          <label class="form-label">재고량 (kg)</label>
+          <input class="form-input" id="initQty" type="number" placeholder="0" step="0.001">
+        </div>
+        <div class="form-row">
+          <label class="form-label">소비기한</label>
+          <input class="form-input" id="initExp" type="date">
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="event.stopPropagation();addInitRow()">+ 추가</button>
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">신규 추가</div>
+      <div class="table-wrap" style="margin-bottom:16px;">
+        <table>
+          <thead><tr><th>원료명</th><th>코드</th><th>재고량(kg)</th><th>소비기한</th><th>기준일</th><th></th></tr></thead>
+          <tbody id="initStockTbody"></tbody>
+        </table>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">기존 전일재고 목록</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>원료명</th><th>코드</th><th>재고량(kg)</th><th>소비기한</th><th>기준일</th><th>관리</th></tr></thead>
+          <tbody id="savedInitStockTbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-outline" onclick="closeModal('initStockModal')">취소</button>
+      <button class="btn btn-primary" onclick="event.stopPropagation();saveInitStock()">전체 저장</button>
+    </div>
+  </div>
+</div>
         <div class="form-row">
           <label class="form-label">재고량 (kg)</label>
           <input class="form-input" id="initQty" type="number" placeholder="0" step="0.001">
