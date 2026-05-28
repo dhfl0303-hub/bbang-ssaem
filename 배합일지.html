@@ -739,9 +739,13 @@ function renderIngredients(ings){
     const lotOptions=lots.length
       ? lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}">${l.label}</option>`).join('')
       : '<option value="">입고 기록 없음</option>';
+    const ingDB=JSON.parse(localStorage.getItem('customIngredients')||'[]');
+    const found=ingDB.find(i=>i.name===ing.name)||{code:''};
+    const code=found.code||INGREDIENT_DB_STATIC[ing.name]||'';
+    const codeStr=code?` <span style="font-size:12px;color:var(--text3);font-weight:400">(${code})</span>`:'';
     block.innerHTML=`
       <div class="ing-hd">
-        <span class="ing-name">${ing.name}</span>
+        <span class="ing-name">${ing.name}${codeStr}</span>
         <span class="ing-total">총 ${Number(total).toLocaleString()}g</span>
       </div>
       <div class="ing-col-hd">
