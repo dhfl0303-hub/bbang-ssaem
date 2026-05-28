@@ -745,7 +745,7 @@ function renderIngredients(ings){
     const total=Math.round(ing.amount);
     const prev=S.prevData[ing.name]||[{lot:'',exp:'',amount:''}];
     const block=document.createElement('div'); block.className='ing-block';
-    block.dataset.name=ing.name; block.dataset.total=total;
+    block.dataset.name=ing.name; block.dataset.total=total; block.dataset.ingCode=code;
     const lots=getIngLots(ing.name);
     const lotOptions=lots.length
       ? lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}">${l.label}</option>`).join('')
@@ -769,13 +769,13 @@ function renderIngredients(ings){
     // lot 옵션을 dataset에 저장
     block.dataset.lotOptions=JSON.stringify(lots);
     const expRows=block.querySelector('.exp-rows');
-    prev.forEach((pe,ri)=>addExpRowEl(expRows,pe.lot||pe.exp,pe.amount,total,ri,prev.length,lots));
+    prev.forEach((pe,ri)=>addExpRowEl(expRows,pe.lot||pe.exp,pe.amount,total,ri,prev.length,lots,code));
     updateAutoCalc(block);
     list.appendChild(block);
   });
 }
 
-function addExpRowEl(container,lotVal,amtVal,total,rowIdx,totalRows,lots){
+function addExpRowEl(container,lotVal,amtVal,total,rowIdx,totalRows,lots,ingCode=''){
   const isLast=rowIdx===totalRows-1&&totalRows>1;
   const row=document.createElement('div'); row.className='exp-row'+(isLast?' auto-row':'');
   const lotOptions=(lots||[]).length
@@ -787,7 +787,14 @@ function addExpRowEl(container,lotVal,amtVal,total,rowIdx,totalRows,lots){
         <option value="">-- LOT 선택 --</option>
         ${lotOptions}
       </select>
-      <input class="exp-input lot-manual" placeholder="직접입력 (코드-입고일-소비기한)" style="display:none;" value="${lotVal||''}">
+      <div class="lot-manual-wrap" style="display:none;align-items:center;gap:4px;">
+        <span class="exp-input" style="background:#f0f4ff;color:var(--primary);font-weight:700;padding:8px;border-radius:8px;font-size:13px;white-space:nowrap;" id="lot-code-fixed-${rowIdx}">${ingCode}</span>
+        <span style="color:var(--text2);font-weight:700;">-</span>
+        <input class="exp-input lot-manual-date" placeholder="입고일(YYMMDD)" maxlength="6" inputmode="numeric" style="flex:1;" oninput="updateManualLot(this)">
+        <span style="color:var(--text2);font-weight:700;">-</span>
+        <input class="exp-input lot-manual-exp" placeholder="소비기한(YYMMDD)" maxlength="6" inputmode="numeric" style="flex:1;" oninput="updateManualLot(this)">
+        <input class="lot-manual-full" type="hidden">
+      </div>
       <div style="font-size:10px;color:var(--primary);cursor:pointer;padding:2px 4px;" onclick="toggleLotInput(this)">✏️ 직접입력 / 선택으로 전환</div>
     </div>
     <input class="exp-input${isLast?' readonly':''}" placeholder="${isLast&&totalRows>1?'자동계산':''}" value="${amtVal||''}" ${isLast&&totalRows>1?'readonly':''} type="${isLast?'text':'number'}" oninput="updateAutoCalc(this.closest('.ing-block'))">
@@ -805,14 +812,29 @@ function addExpRowEl(container,lotVal,amtVal,total,rowIdx,totalRows,lots){
 function toggleLotInput(btn){
   const row=btn.closest('.exp-row');
   const sel=row.querySelector('.lot-select');
-  const manual=row.querySelector('.lot-manual');
+  const manualWrap=row.querySelector('.lot-manual-wrap');
   if(sel.style.display==='none'){
-    sel.style.display='block'; manual.style.display='none';
+    sel.style.display='block'; manualWrap.style.display='none';
     btn.textContent='✏️ 직접입력 / 선택으로 전환';
   } else {
-    sel.style.display='none'; manual.style.display='block';
+    sel.style.display='none'; manualWrap.style.display='flex';
     btn.textContent='📋 LOT 선택으로 전환';
   }
+}
+
+function updateManualLot(input){
+  const row=input.closest('.exp-row');
+  const codeEl=row.querySelector('[id^="lot-code-fixed-"]');
+  const code=codeEl?codeEl.textContent.trim():'';
+  const dateVal=row.querySelector('.lot-manual-date')?.value||'';
+  const expVal=row.querySelector('.lot-manual-exp')?.value||'';
+  const full=`${code}-${dateVal}-${expVal}`;
+  const hidden=row.querySelector('.lot-manual-full');
+  if(hidden) hidden.value=full;
+  // dataset.exp도 세팅
+  const sel=row.querySelector('.lot-select');
+  if(sel) sel.dataset.exp=fmtExp(expVal);
+  updateAutoCalc(row.closest('.ing-block'));
 }
 
 // 소비기한 형식 통일 YY.MM.DD
@@ -835,16 +857,29 @@ function addExpRow(btn){
   if(rows.length>=3){ alert('LOT는 최대 3개까지 입력 가능합니다'); return; }
   if(rows.length>0){
     const last=rows[rows.length-1]; last.classList.remove('auto-row');
-    const ai=last.querySelectorAll('input')[0]; if(ai){ai.removeAttribute('readonly'); ai.placeholder=''; ai.classList.remove('readonly'); ai.type='number';}
+    const numInput=Array.from(last.querySelectorAll('input')).find(i=>!i.classList.contains('lot-manual-date')&&!i.classList.contains('lot-manual-exp')&&!i.classList.contains('lot-manual-full')&&!i.classList.contains('readonly'));
+    if(numInput){numInput.removeAttribute('readonly'); numInput.placeholder=''; numInput.classList.remove('readonly'); numInput.type='number';}
   }
   const lots=JSON.parse(block.dataset.lotOptions||'[]');
+  const ingCode=block.dataset.ingCode||'';
   const lotOptions=lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}">${l.label}</option>`).join('');
   const newRow=document.createElement('div'); newRow.className='exp-row auto-row';
   newRow.innerHTML=`
-    <select class="exp-input" onchange="onLotSelect(this)">
-      <option value="">-- LOT 선택 --</option>
-      ${lotOptions}
-    </select>
+    <div style="display:flex;flex-direction:column;gap:3px;flex:1;">
+      <select class="exp-input lot-select" onchange="onLotSelect(this)" style="display:block;">
+        <option value="">-- LOT 선택 --</option>
+        ${lotOptions}
+      </select>
+      <div class="lot-manual-wrap" style="display:none;align-items:center;gap:4px;">
+        <span class="exp-input" style="background:#f0f4ff;color:var(--primary);font-weight:700;padding:8px;border-radius:8px;font-size:13px;white-space:nowrap;">${ingCode}</span>
+        <span style="color:var(--text2);font-weight:700;">-</span>
+        <input class="exp-input lot-manual-date" placeholder="입고일(YYMMDD)" maxlength="6" inputmode="numeric" style="flex:1;" oninput="updateManualLot(this)">
+        <span style="color:var(--text2);font-weight:700;">-</span>
+        <input class="exp-input lot-manual-exp" placeholder="소비기한(YYMMDD)" maxlength="6" inputmode="numeric" style="flex:1;" oninput="updateManualLot(this)">
+        <input class="lot-manual-full" type="hidden">
+      </div>
+      <div style="font-size:10px;color:var(--primary);cursor:pointer;padding:2px 4px;" onclick="toggleLotInput(this)">✏️ 직접입력 / 선택으로 전환</div>
+    </div>
     <input class="exp-input readonly" placeholder="자동계산" readonly>
     <div class="del-btn" onclick="delExpRow(this)">×</div>`;
   expRows.appendChild(newRow); updateAutoCalc(block);
@@ -873,12 +908,14 @@ function completeBatch(){
     const rows=block.querySelectorAll('.exp-row'); const exps=[];
     rows.forEach(row=>{
       const sel=row.querySelector('select.lot-select');
-      const manual=row.querySelector('input.lot-manual');
+      const manual=row.querySelector('.lot-manual-wrap');
       const amtInput=row.querySelectorAll('input').length>1?row.querySelectorAll('input')[row.querySelectorAll('input').length-1]:row.querySelector('input');
       let lotVal='', expVal='';
-      if(manual&&manual.style.display!=='none'){
-        lotVal=manual.value.trim();
-        expVal='';
+      if(manual&&manual.style.display==='flex'){
+        const hidden=row.querySelector('.lot-manual-full');
+        lotVal=hidden?hidden.value.trim():'';
+        const expInput=row.querySelector('.lot-manual-exp');
+        expVal=expInput?fmtExp(expInput.value.trim()):'';
       } else if(sel){
         lotVal=sel.value.trim();
         expVal=sel.dataset.exp||sel.options[sel.selectedIndex]?.dataset.exp||'';
