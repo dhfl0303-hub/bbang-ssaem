@@ -812,55 +812,88 @@ tr:hover td{background:var(--bg);}
 
 <!-- 원료 정보 수정 모달 -->
 <div class="modal-overlay" id="editIngredientModal" onclick="closeModalOutside(event,'editIngredientModal')">
-  <div class="modal" style="width:480px;">
+  <div class="modal" style="width:520px;">
     <div class="modal-hd">
-      <div class="modal-title">✏️ 원료 정보 수정</div>
+      <div class="modal-title">✏️ 원료 수정</div>
       <button class="modal-close" onclick="closeModal('editIngredientModal')">×</button>
     </div>
+    <!-- 탭 -->
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);padding:0 16px;">
+      <button id="ei-tab-info" onclick="switchEiTab('info')" style="padding:10px 16px;border:none;background:none;font-family:'Noto Sans KR',sans-serif;font-size:13px;font-weight:700;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;">원료정보</button>
+      <button id="ei-tab-init" onclick="switchEiTab('init')" style="padding:10px 16px;border:none;background:none;font-family:'Noto Sans KR',sans-serif;font-size:13px;font-weight:700;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-2px;">전일재고</button>
+    </div>
     <div class="modal-bd">
-      <input type="hidden" id="ei-code">
-      <div class="form-row">
-        <label class="form-label">원료코드</label>
-        <input class="form-input" id="ei-code-display" readonly style="background:#f8f9fb;color:var(--primary);font-weight:700;">
-      </div>
-      <div class="form-row">
-        <label class="form-label">원료명</label>
-        <input class="form-input" id="ei-name" placeholder="원료명">
-      </div>
-      <div class="form-row">
-        <label class="form-label">원산지</label>
-        <input class="form-input" id="ei-origin" placeholder="예: 국내제조">
-      </div>
-      <div class="form-row">
-        <label class="form-label">보관기준</label>
-        <div style="display:flex;flex-direction:column;gap:6px;padding:8px 0;">
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-            <input type="checkbox" id="ei-stor-1" value="실온(1~35℃)" style="width:16px;height:16px;accent-color:var(--primary);"> 실온(1~35℃)
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-            <input type="checkbox" id="ei-stor-2" value="냉장(0~5℃)" style="width:16px;height:16px;accent-color:var(--primary);"> 냉장(0~5℃)
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-            <input type="checkbox" id="ei-stor-3" value="냉장(0~10℃)" style="width:16px;height:16px;accent-color:var(--primary);"> 냉장(0~10℃)
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-            <input type="checkbox" id="ei-stor-4" value="냉동(-18℃ 이하)" style="width:16px;height:16px;accent-color:var(--primary);"> 냉동(-18℃ 이하)
-          </label>
+      <!-- 원료정보 탭 -->
+      <div id="ei-panel-info">
+        <input type="hidden" id="ei-code">
+        <div class="form-row">
+          <label class="form-label">원료코드</label>
+          <input class="form-input" id="ei-code-display" readonly style="background:#f8f9fb;color:var(--primary);font-weight:700;">
+        </div>
+        <div class="form-row">
+          <label class="form-label">원료명</label>
+          <input class="form-input" id="ei-name" placeholder="원료명">
+        </div>
+        <div class="form-row">
+          <label class="form-label">원산지</label>
+          <input class="form-input" id="ei-origin" placeholder="예: 국내제조">
+        </div>
+        <div class="form-row">
+          <label class="form-label">보관기준</label>
+          <div style="display:flex;flex-direction:column;gap:6px;padding:8px 0;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+              <input type="checkbox" id="ei-stor-1" value="실온(1~35℃)" style="width:16px;height:16px;accent-color:var(--primary);"> 실온(1~35℃)
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+              <input type="checkbox" id="ei-stor-2" value="냉장(0~5℃)" style="width:16px;height:16px;accent-color:var(--primary);"> 냉장(0~5℃)
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+              <input type="checkbox" id="ei-stor-3" value="냉장(0~10℃)" style="width:16px;height:16px;accent-color:var(--primary);"> 냉장(0~10℃)
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+              <input type="checkbox" id="ei-stor-4" value="냉동(-18℃ 이하)" style="width:16px;height:16px;accent-color:var(--primary);"> 냉동(-18℃ 이하)
+            </label>
+          </div>
+        </div>
+        <div class="form-row">
+          <label class="form-label">단위</label>
+          <select class="form-input" id="ei-unit">
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+            <option value="ea">ea</option>
+            <option value="L">L</option>
+          </select>
         </div>
       </div>
-      <div class="form-row">
-        <label class="form-label">단위</label>
-        <select class="form-input" id="ei-unit">
-          <option value="kg">kg</option>
-          <option value="g">g</option>
-          <option value="ea">ea</option>
-          <option value="L">L</option>
-        </select>
+      <!-- 전일재고 탭 -->
+      <div id="ei-panel-init" style="display:none;">
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="form-row">
+            <label class="form-label">기준날짜 YYMMDD</label>
+            <input class="form-input" id="ei-init-date" placeholder="예: 260528" maxlength="6" inputmode="numeric" oninput="fmtInitDate(this)">
+          </div>
+          <div class="form-row">
+            <label class="form-label">재고량 (kg)</label>
+            <input class="form-input" id="ei-init-qty" type="number" placeholder="0" step="0.001">
+          </div>
+          <div class="form-row">
+            <label class="form-label">소비기한 YYMMDD</label>
+            <input class="form-input" id="ei-init-exp" placeholder="예: 270518" maxlength="6" inputmode="numeric" oninput="fmtInitDate(this)">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" style="margin-bottom:12px;" onclick="addEiInitRow()">+ 추가</button>
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">등록된 전일재고</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>재고량</th><th>소비기한</th><th>기준일</th><th>관리</th></tr></thead>
+            <tbody id="ei-init-tbody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
     <div class="modal-ft">
       <button class="btn btn-outline" onclick="closeModal('editIngredientModal')">취소</button>
-      <button class="btn btn-primary" onclick="saveEditIngredient()">저장</button>
+      <button class="btn btn-primary" id="ei-save-btn" onclick="saveEditIngredient()">저장</button>
     </div>
   </div>
 </div>
@@ -1564,6 +1597,26 @@ function renderLedger(){
 
 function filterLedger(){ renderLedger(); }
 
+// YYMMDD → YY.MM.DD 변환
+function fmtInitDate(input){
+  const v=input.value.replace(/\D/g,'').slice(0,6);
+  input.value=v;
+  if(v.length===6){
+    input.dataset.formatted=`${v.slice(0,2)}.${v.slice(2,4)}.${v.slice(4,6)}`;
+    input.style.color='var(--primary)';
+    input.style.fontWeight='700';
+  } else {
+    input.dataset.formatted='';
+    input.style.color='';
+    input.style.fontWeight='';
+  }
+}
+function getInitDateVal(id){
+  const el=document.getElementById(id);
+  if(!el) return '';
+  return el.dataset.formatted||el.value||'';
+}
+
 // 초기재고 등록
 let initRows = [];
 function openInitStock(e){
@@ -1573,18 +1626,16 @@ function openInitStock(e){
   const tb=document.getElementById('initStockTbody');
   if(tb) tb.innerHTML='';
   const initDate=document.getElementById('initDate');
-  if(initDate) initDate.value=getTodayISO2();
+  if(initDate){ initDate.value=''; initDate.dataset.formatted=''; initDate.style.color=''; }
   const initIngName=document.getElementById('initIngName');
   if(initIngName) initIngName.value='';
   const initQty=document.getElementById('initQty');
   if(initQty) initQty.value='';
   const initExp=document.getElementById('initExp');
-  if(initExp) initExp.value='';
-  // 기존 전일재고 목록 렌더
+  if(initExp){ initExp.value=''; initExp.dataset.formatted=''; initExp.style.color=''; }
   renderSavedInitStock();
   const modal=document.getElementById('initStockModal');
   if(modal) modal.classList.add('open');
-  else alert('모달을 찾을 수 없습니다. 페이지를 새로고침해주세요.');
 }
 
 function renderSavedInitStock(){
@@ -1612,24 +1663,27 @@ function deleteSavedInitRow(key){
   renderLedger();
 }
 function addInitRow(){
-  const name = document.getElementById('initIngName').value.trim();
-  const qty = parseFloat(document.getElementById('initQty').value)||0;
-  const exp = document.getElementById('initExp').value;
-  const date = document.getElementById('initDate').value||getTodayISO2();
-  if(!name||!qty||!exp){ alert('원료명, 재고량, 소비기한을 모두 입력해주세요'); return; }
-  const ing = getIngByName(name);
-  const row = {date, name, code:ing?ing.code:'', qty, exp, type:'init'};
+  const name=document.getElementById('initIngName').value.trim();
+  const qty=parseFloat(document.getElementById('initQty').value)||0;
+  const exp=getInitDateVal('initExp');
+  const date=getInitDateVal('initDate');
+  if(!name){ alert('원료명을 입력해주세요'); return; }
+  if(!qty){ alert('재고량을 입력해주세요'); return; }
+  if(!date){ alert('기준 날짜를 입력해주세요 (YYMMDD)'); return; }
+  const ing=getIngByName(name);
+  const row={date, name, code:ing?ing.code:'', qty, exp:exp||'-', type:'init'};
   initRows.push(row);
   renderInitRows();
   document.getElementById('initIngName').value='';
   document.getElementById('initQty').value='';
-  document.getElementById('initExp').value='';
+  const expEl=document.getElementById('initExp');
+  expEl.value=''; expEl.dataset.formatted=''; expEl.style.color='';
 }
 function renderInitRows(){
-  document.getElementById('initStockTbody').innerHTML = initRows.map((r,i)=>`
+  document.getElementById('initStockTbody').innerHTML=initRows.map((r,i)=>`
     <tr>
       <td style="font-weight:600">${r.name}</td>
-      <td><span class="badge badge-blue" style="font-size:10px">${r.code}</span></td>
+      <td><span class="badge badge-blue" style="font-size:10px">${r.code||'-'}</span></td>
       <td class="tc">${r.qty.toFixed(3)}</td>
       <td class="tc">${r.exp}</td>
       <td class="tc">${r.date}</td>
@@ -1730,8 +1784,8 @@ function printLedger(){
       </div>
       <div class="form-grid" style="margin-bottom:12px">
         <div class="form-row">
-          <label class="form-label">기준 날짜 (전일)</label>
-          <input class="form-input" id="initDate" type="date">
+          <label class="form-label">기준 날짜 (전일) YYMMDD</label>
+          <input class="form-input" id="initDate" placeholder="예: 260528" maxlength="6" inputmode="numeric" oninput="fmtInitDate(this)">
         </div>
         <div class="form-row">
           <label class="form-label">원료 선택</label>
@@ -1746,8 +1800,8 @@ function printLedger(){
           <input class="form-input" id="initQty" type="number" placeholder="0" step="0.001">
         </div>
         <div class="form-row">
-          <label class="form-label">소비기한</label>
-          <input class="form-input" id="initExp" type="date">
+          <label class="form-label">소비기한 YYMMDD</label>
+          <input class="form-input" id="initExp" placeholder="예: 270518" maxlength="6" inputmode="numeric" oninput="fmtInitDate(this)">
         </div>
       </div>
       <button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="event.stopPropagation();addInitRow()">+ 추가</button>
@@ -1761,7 +1815,7 @@ function printLedger(){
       <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">기존 전일재고 목록</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>원료명</th><th>코드</th><th>재고량(kg)</th><th>소비기한</th><th>기준일</th><th>관리</th></tr></thead>
+          <thead><tr><th style="min-width:80px">원료명</th><th>코드</th><th>재고량</th><th>소비기한</th><th>기준일</th><th style="min-width:60px">관리</th></tr></thead>
           <tbody id="savedInitStockTbody"></tbody>
         </table>
       </div>
@@ -1993,7 +2047,62 @@ let currentLedgerCode = '';
 
 
 
-function openEditIngredient(code){
+function switchEiTab(tab){
+  ['info','init'].forEach(t=>{
+    document.getElementById('ei-panel-'+t).style.display=t===tab?'block':'none';
+    const btn=document.getElementById('ei-tab-'+t);
+    btn.style.color=t===tab?'var(--primary)':'var(--text2)';
+    btn.style.borderBottom=t===tab?'2px solid var(--primary)':'2px solid transparent';
+  });
+  document.getElementById('ei-save-btn').textContent=tab==='info'?'저장':'닫기';
+  document.getElementById('ei-save-btn').onclick=tab==='info'?saveEditIngredient:()=>closeModal('editIngredientModal');
+  if(tab==='init') renderEiInitRows();
+}
+
+function renderEiInitRows(){
+  const code=document.getElementById('ei-code').value;
+  const name=document.getElementById('ei-name').value;
+  const recs=ledgerRecords.filter(r=>r.type==='init'&&(r.code===code||r.name===name));
+  const tbody=document.getElementById('ei-init-tbody');
+  if(!recs.length){ tbody.innerHTML='<tr><td colspan="4" class="tc" style="padding:12px;color:var(--text3)">등록된 전일재고 없음</td></tr>'; return; }
+  tbody.innerHTML=recs.map((r,i)=>`<tr>
+    <td class="tc">${r.qty}</td>
+    <td class="tc">${r.exp||'-'}</td>
+    <td class="tc">${r.date}</td>
+    <td><button class="btn btn-sm btn-danger" onclick="deleteEiInitRow('${r._initKey||r.name+r.date}')">삭제</button></td>
+  </tr>`).join('');
+}
+
+function addEiInitRow(){
+  const code=document.getElementById('ei-code').value;
+  const name=document.getElementById('ei-name').value;
+  const date=getInitDateVal('ei-init-date');
+  const qty=parseFloat(document.getElementById('ei-init-qty').value)||0;
+  const exp=getInitDateVal('ei-init-exp');
+  if(!date){ alert('기준날짜를 입력해주세요 (YYMMDD)'); return; }
+  if(!qty){ alert('재고량을 입력해주세요'); return; }
+  const _initKey=name+date+qty;
+  ledgerRecords.push({date,name,code,qty,exp:exp||'-',type:'init',_initKey});
+  saveLedger();
+  renderEiInitRows();
+  renderLedger();
+  document.getElementById('ei-init-date').value='';
+  document.getElementById('ei-init-qty').value='';
+  document.getElementById('ei-init-exp').value='';
+  ['ei-init-date','ei-init-exp'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.dataset.formatted=''; el.style.color='';
+  });
+  alert('전일재고 추가 완료');
+}
+
+function deleteEiInitRow(key){
+  if(!confirm('삭제하시겠습니까?')) return;
+  ledgerRecords=ledgerRecords.filter(r=>!(r.type==='init'&&(r._initKey===key||r.name+r.date===key)));
+  saveLedger();
+  renderEiInitRows();
+  renderLedger();
+}
   const ing = INGREDIENT_DB.find(i=>i.code===code);
   if(!ing){ alert('원료를 찾을 수 없습니다'); return; }
   document.getElementById('ei-code').value = code;
@@ -3697,8 +3806,8 @@ renderRecipe();
       </div>
       <div class="form-grid" style="margin-bottom:12px">
         <div class="form-row">
-          <label class="form-label">기준 날짜 (전일)</label>
-          <input class="form-input" id="initDate" type="date">
+          <label class="form-label">기준 날짜 (전일) YYMMDD</label>
+          <input class="form-input" id="initDate" placeholder="예: 260528" maxlength="6" inputmode="numeric" oninput="fmtInitDate(this)">
         </div>
         <div class="form-row">
           <label class="form-label">원료 선택</label>
@@ -3713,8 +3822,8 @@ renderRecipe();
           <input class="form-input" id="initQty" type="number" placeholder="0" step="0.001">
         </div>
         <div class="form-row">
-          <label class="form-label">소비기한</label>
-          <input class="form-input" id="initExp" type="date">
+          <label class="form-label">소비기한 YYMMDD</label>
+          <input class="form-input" id="initExp" placeholder="예: 270518" maxlength="6" inputmode="numeric" oninput="fmtInitDate(this)">
         </div>
       </div>
       <button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="event.stopPropagation();addInitRow()">+ 추가</button>
@@ -3728,7 +3837,7 @@ renderRecipe();
       <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">기존 전일재고 목록</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>원료명</th><th>코드</th><th>재고량(kg)</th><th>소비기한</th><th>기준일</th><th>관리</th></tr></thead>
+          <thead><tr><th style="min-width:80px">원료명</th><th>코드</th><th>재고량</th><th>소비기한</th><th>기준일</th><th style="min-width:60px">관리</th></tr></thead>
           <tbody id="savedInitStockTbody"></tbody>
         </table>
       </div>
