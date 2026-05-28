@@ -848,13 +848,12 @@ function completeBatch(){
       const manual=row.querySelector('input.lot-manual');
       const amtInput=row.querySelectorAll('input').length>1?row.querySelectorAll('input')[row.querySelectorAll('input').length-1]:row.querySelector('input');
       let lotVal='', expVal='';
-      // 수동입력 모드인지 확인
       if(manual&&manual.style.display!=='none'){
         lotVal=manual.value.trim();
         expVal='';
       } else if(sel){
         lotVal=sel.value.trim();
-        expVal=sel.options[sel.selectedIndex]?.dataset.exp||'';
+        expVal=sel.dataset.exp||sel.options[sel.selectedIndex]?.dataset.exp||'';
       }
       const av=amtInput?amtInput.value:'';
       if(lotVal) exps.push({lot:lotVal, exp:expVal, amount:parseFloat(av)||0});
