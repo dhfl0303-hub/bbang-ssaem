@@ -163,12 +163,8 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
     <div class="sec">오늘 완료된 포장</div>
     <div id="todayList"><div class="tc txs" style="padding:16px 0">오늘 완료된 포장이 없습니다</div></div>
 
-    <div class="sec mt-12">제품 선택</div>
-    <div class="search-box">
-      <span style="color:var(--text3);font-size:16px">🔍</span>
-      <input class="search-input" placeholder="제품명 검색..." id="searchInput" oninput="filterProducts()">
-    </div>
-    <div class="product-list" id="productList"></div>
+    <div class="sec mt-12">배합 LOT 선택</div>
+    <div id="batchLotList"></div>
   </div>
 
   <!-- 설정 페이지 -->
@@ -226,6 +222,10 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 
   <!-- 포장 입력 -->
   <div class="page" id="page-form">
+    <div class="lot-box">
+      <div class="lot-lbl">포장로트번호</div>
+      <div class="lot-num" id="packLot">-</div>
+    </div>
 
     <!-- 내포장 -->
     <div class="sec">📦 내포장</div>
@@ -299,7 +299,18 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
           </div>
           <div>
             <div class="field-label">필름사용량</div>
-            <input class="field-input" type="number" id="filmQty" placeholder="개">
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input class="field-input" type="number" id="filmQtyInt" placeholder="0" min="0" style="flex:1;margin-bottom:0;" oninput="updateFilmDisplay()">
+              <select class="field-input" id="filmQtyFrac" style="flex:1;margin-bottom:0;" onchange="updateFilmDisplay()">
+                <option value="">없음</option>
+                <option value="1/2">1/2</option>
+                <option value="1/3">1/3</option>
+                <option value="1/4">1/4</option>
+                <option value="2/3">2/3</option>
+                <option value="3/4">3/4</option>
+              </select>
+            </div>
+            <div id="filmQtyDisplay" style="font-size:12px;color:var(--primary);font-weight:700;margin-top:4px;min-height:18px;"></div>
           </div>
         </div>
 
@@ -578,7 +589,16 @@ function saveDeviceFromForm(){
 function initFormPage(){
   loadBatchLots();
   loadSubLots();
-  // 이전 설비세팅값 불러오기
+  // 배합LOT 자동 선택
+  const sel=document.getElementById('batchLotSel');
+  if(sel&&S.batchLot) sel.value=S.batchLot;
+  // 포장LOT 표시
+  const today=getTodayKey();
+  const existCount=S.todayRecords.filter(r=>r.productCode===S.product).length;
+  const lot=`포장-${S.product}-${today}-${String(existCount+1).padStart(3,'0')}`;
+  const packLotEl=document.getElementById('packLot');
+  if(packLotEl) packLotEl.textContent=lot;
+  // 설비세팅값 불러오기
   if(S.product){
     const settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
     const dev=settings.find(d=>d.code===S.product);
@@ -589,6 +609,11 @@ function initFormPage(){
       document.getElementById('sealingK2').value=dev.sealingK2||'';
       document.getElementById('sealerTemp').value=dev.sealerTemp||'';
     }
+  }
+  // 시작시간 자동입력
+  if(!document.getElementById('startTime').value) {
+    const now=getNow();
+    document.getElementById('startTime').value=now;
   }
 }
 function saveDeviceSetting(){
@@ -735,21 +760,42 @@ function initMain(){
   const s=loadSettings();
   document.getElementById('mainDate').textContent=getToday();
   document.getElementById('mainWorker').textContent=s.workerName ? s.workerName+' 작업자' : '👤 작업자 설정 (탭하세요)';
-  // 설비세팅 미리 로드
   loadDeviceSettings();
-  renderProductList(Object.keys(RECIPE_DB));
+  renderBatchLotList();
   loadLocal();
 }
-function filterProducts(){
-  const q=document.getElementById('searchInput').value.trim().toLowerCase();
-  renderProductList(Object.keys(RECIPE_DB).filter(c=>RECIPE_DB[c].name.toLowerCase().includes(q)||c.toLowerCase().includes(q)));
-}
-function renderProductList(codes){
-  document.getElementById('productList').innerHTML=codes.map(code=>`
-    <div class="product-item" onclick="selectProduct('${code}')">
-      <div><div class="product-name">${RECIPE_DB[code].name}</div><div class="product-code">${code}</div></div>
+
+function renderBatchLotList(){
+  const el=document.getElementById('batchLotList');
+  if(!el) return;
+  // 오늘 날짜 키로 배합 기록 가져오기
+  const todayKey=getTodayKey();
+  const recs=JSON.parse(localStorage.getItem('batchRecords_'+todayKey)||'[]');
+  if(!recs.length){
+    el.innerHTML='<div class="tc txs" style="padding:24px 0;color:var(--text3)">오늘 완료된 배합 LOT가 없습니다<br><span style="font-size:11px">배합일지에서 배합을 완료해주세요</span></div>';
+    return;
+  }
+  el.innerHTML=recs.map(r=>`
+    <div class="product-item" onclick="selectBatchLot('${r.productCode}','${r.batchRecords?r.batchRecords[0]?.lot||r.lot:r.lot}')">
+      <div>
+        <div class="product-name">${r.product}</div>
+        <div class="product-code">${r.productCode} · ${r.batchRecords?r.batchRecords.map(b=>b.lot).join(', '):r.lot}</div>
+      </div>
       <div style="color:var(--text3);font-size:20px">›</div>
     </div>`).join('');
+}
+
+function selectBatchLot(code, lot){
+  S.product=code;
+  S.batchLot=lot;
+  // topbar 업데이트
+  document.getElementById('tbTitle').textContent=RECIPE_DB[code]?.name||code;
+  document.getElementById('tbSub').textContent=code;
+  // 포장LOT 생성
+  const today=getTodayKey();
+  const existCount=S.todayRecords.filter(r=>r.productCode===code).length;
+  document.getElementById('packLot')&&(document.getElementById('packLot').textContent=`포장-${code}-${today}-${String(existCount+1).padStart(3,'0')}`);
+  showPage('form');
 }
 function updateStats(){
   const total=S.todayRecords.reduce((s,r)=>s+(r.qtyPcs||0),0);
@@ -842,6 +888,22 @@ function setExpiry(months){
   document.getElementById('expiryDate').value=`${ey}.${em}.${ed}`;
 }
 
+// 필름사용량 분수 표시
+function fmtFilmQty(intVal, fracVal){
+  const i=parseInt(intVal)||0;
+  const f=fracVal||'';
+  if(!i&&!f) return '-';
+  if(i&&f) return `${i}롤 + ${f}`;
+  if(i&&!f) return `${i}롤`;
+  return f;
+}
+function updateFilmDisplay(){
+  const i=document.getElementById('filmQtyInt').value;
+  const f=document.getElementById('filmQtyFrac').value;
+  const el=document.getElementById('filmQtyDisplay');
+  if(el) el.textContent=fmtFilmQty(i,f);
+}
+
 // 박스 자동계산
 function calcBoxes(){
   const pcs=parseInt(document.getElementById('qtyPcs').value)||0;
@@ -856,6 +918,7 @@ function calcBoxes(){
 function genPrint(r){
   const s=loadSettings();
   const approvalHtml=`<table style="border-collapse:collapse;border:1px solid #bbb;table-layout:fixed;width:auto;"><tr><th rowspan="2" style="width:38px;border:1px solid #bbb;background:#f0f0f0;font-size:10px;font-weight:700;writing-mode:vertical-rl;letter-spacing:3px;text-align:center;vertical-align:middle;padding:6px 4px;">결재</th><th style="width:113px;border:1px solid #bbb;background:#f0f0f0;font-size:10px;font-weight:700;text-align:center;padding:3px;">작성</th><th style="width:113px;border:1px solid #bbb;background:#f0f0f0;font-size:10px;font-weight:700;text-align:center;padding:3px;">승인</th></tr><tr><td style="border:1px solid #bbb;padding:0;width:113px;"><div style="height:55px;position:relative;">${r.signImg?`<img src="${r.signImg}" style="width:100%;height:100%;object-fit:contain;">`:''}</div></td><td style="border:1px solid #bbb;padding:0;width:113px;"><div style="height:55px;position:relative;"></div></td></tr></table>`;
+  const filmQtyStr=r.filmQtyDisplay||fmtFilmQty(r.filmQtyInt||0,r.filmQtyFrac||'');
   document.getElementById('printArea').innerHTML=`<div style="padding:16px;font-size:11px;font-family:'Noto Sans KR',sans-serif;max-width:100%;">
     <div style="position:relative;margin-bottom:8px;min-height:80px;"><div style="font-size:18px;font-weight:900;letter-spacing:1px;padding-top:8px;">포장일지</div><div style="position:absolute;top:0;right:0;">${approvalHtml}</div></div>
     <!-- 기본정보 -->
@@ -878,45 +941,51 @@ function genPrint(r){
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">작업인원</td>
         <td style="border:1px solid #999;padding:4px 8px">${r.workers}명</td>
       </tr>
-      <tr>
-        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">작업시간</td>
-        <td style="border:1px solid #999;padding:4px 8px">${r.startTime} ~ ${r.endTime}</td>
-        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">소비기한</td>
-        <td style="border:1px solid #999;padding:4px 8px;font-weight:700">${r.expiryDate}</td>
-      </tr>
-      <tr>
-        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">생산수량</td>
-        <td style="border:1px solid #999;padding:4px 8px">${(r.qtyPcs||0).toLocaleString()}개 / ${r.qtyBoxes||0}박스</td>
-        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">잔량</td>
-        <td style="border:1px solid #999;padding:4px 8px">${r.remaining||0}개</td>
-      </tr>
     </table>
-    <!-- 설비세팅 -->
+    <!-- 내포장 -->
     <table style="border-collapse:collapse;width:100%;margin-bottom:8px;font-size:10px;">
-      <tr style="background:#e8f0fb"><th style="border:1px solid #999;padding:4px;text-align:center" colspan="4">설비 세팅값</th></tr>
+      <tr style="background:#e8f0fb"><th style="border:1px solid #999;padding:4px;text-align:center" colspan="4">내포장</th></tr>
       <tr>
-        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:20%">자동삼면포장기</td>
-        <td style="border:1px solid #999;padding:4px 8px" colspan="3">센터온도 전:${r.sealingC1}℃ 후:${r.sealingC2}℃ / 캇타온도 상:${r.sealingK1}℃ 하:${r.sealingK2}℃</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:15%">작업시간</td>
+        <td style="border:1px solid #999;padding:4px 8px;width:35%">${r.startTime} ~ ${r.endTime}</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:15%">생산수량(개)</td>
+        <td style="border:1px solid #999;padding:4px 8px">${(r.qtyPcs||0).toLocaleString()}개</td>
       </tr>
       <tr>
-        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">실링기</td>
-        <td style="border:1px solid #999;padding:4px 8px" colspan="3">${r.sealerTemp}℃</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">설비세팅값</td>
+        <td style="border:1px solid #999;padding:4px 8px" colspan="3">센터온도 전:${r.sealingC1||0}℃ 후:${r.sealingC2||0}℃ / 캇타온도 상:${r.sealingK1||0}℃ 하:${r.sealingK2||0}℃ / 실링기:${r.sealerTemp||0}℃</td>
       </tr>
-    </table>
-    <!-- 외포장 -->
-    <table style="border-collapse:collapse;width:100%;font-size:10px;">
-      <tr style="background:#e8f0fb"><th style="border:1px solid #999;padding:4px;text-align:center" colspan="4">외포장</th></tr>
       <tr>
-        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:15%">필름LOT</td>
-        <td style="border:1px solid #999;padding:4px 8px;width:35%">${r.filmLot||'-'}</td>
-        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:15%">필름사용량</td>
-        <td style="border:1px solid #999;padding:4px 8px">${r.filmQty||0}</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">필름LOT</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.filmLot||'-'}</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">필름사용량</td>
+        <td style="border:1px solid #999;padding:4px 8px">${filmQtyStr}</td>
       </tr>
       <tr>
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">벌크비닐LOT</td>
         <td style="border:1px solid #999;padding:4px 8px">${r.bulkLot||'-'}</td>
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">벌크비닐사용량</td>
         <td style="border:1px solid #999;padding:4px 8px">${r.bulkQty||0}</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">소비기한</td>
+        <td style="border:1px solid #999;padding:4px 8px;font-weight:700" colspan="3">${r.expiryDate||'-'}</td>
+      </tr>
+    </table>
+    <!-- 외포장 -->
+    <table style="border-collapse:collapse;width:100%;font-size:10px;">
+      <tr style="background:#e8f0fb"><th style="border:1px solid #999;padding:4px;text-align:center" colspan="4">외포장</th></tr>
+      <tr>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:15%">생산수량(박스)</td>
+        <td style="border:1px solid #999;padding:4px 8px;width:35%">${r.qtyBoxes||0}박스</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5;width:15%">입수량</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.perBox||0}개/박스</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">잔량(개)</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.remaining||0}개</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5"></td>
+        <td style="border:1px solid #999;padding:4px 8px"></td>
       </tr>
       <tr>
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">박스LOT</td>
@@ -1071,7 +1140,9 @@ function completePackaging(signImg=''){
     sealerTemp:document.getElementById('sealerTemp').value||0,
     // 부자재 LOT
     filmLot:document.getElementById('filmLot')?.value||'-',
-    filmQty:document.getElementById('filmQty').value||0,
+    filmQtyInt:parseInt(document.getElementById('filmQtyInt')?.value)||0,
+    filmQtyFrac:document.getElementById('filmQtyFrac')?.value||'',
+    filmQtyDisplay:fmtFilmQty(document.getElementById('filmQtyInt')?.value||0, document.getElementById('filmQtyFrac')?.value||''),
     bulkLot:document.getElementById('bulkLot')?.value||'-',
     bulkQty:document.getElementById('bulkQty').value||0,
     boxLot:document.getElementById('boxLot')?.value||'-',
