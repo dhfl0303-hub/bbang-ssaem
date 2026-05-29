@@ -3261,31 +3261,6 @@ function renderDevice(){
 
 </script>
 
-<!-- 초기재고 등록 모달 -->
-        </div>
-        <div class="form-row">
-          <label class="form-label">재고량 (kg)</label>
-          <input class="form-input" id="initQty" type="number" placeholder="0" step="0.001">
-        </div>
-        <div class="form-row">
-          <label class="form-label">소비기한</label>
-          <input class="form-input" id="initExp" type="date">
-        </div>
-      </div>
-      <button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="event.stopPropagation();addInitRow()">+ 추가</button>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>원료명</th><th>코드</th><th>재고량(kg)</th><th>소비기한</th><th>기준일</th><th></th></tr></thead>
-          <tbody id="initStockTbody"></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="modal-ft">
-      <button class="btn btn-outline" onclick="closeModal('initStockModal')">취소</button>
-      <button class="btn btn-primary" onclick="event.stopPropagation();saveInitStock()">전체 저장</button>
-    </div>
-  </div>
-</div>
 
 <!-- 부자재 신규등록 모달 -->
 <div class="modal-overlay" id="newSubItemModal" onclick="closeModalOutside(event,'newSubItemModal')">
