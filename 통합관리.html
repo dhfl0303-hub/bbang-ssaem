@@ -3511,7 +3511,7 @@ function flFmtDate6(d6){
   return `20${d6.slice(0,2)}.${d6.slice(2,4)}.${d6.slice(4,6)}`;
 }
 
-function flSyncFromPack(){
+function flSyncFromPack(silent=false){
   // 포장일지 전 날짜 키 스캔해서 자동 동기화
   const keys=Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
   let count=0;
@@ -3546,13 +3546,13 @@ function flSyncFromPack(){
     });
   });
   flSave();
-  // alert(`동기화 완료: ${count}건 추가`); // 자동동기화는 알림 제거
+  if(!silent) alert(`동기화 완료: ${count}건 추가`);
   flRenderStock(); flRefreshOutboundCombos();
 }
 
 function initFinishedLedger(){
   flLoad();
-  flSyncFromPack();
+  flSyncFromPack(true);
 }
 
 function switchFlTab(tab){
