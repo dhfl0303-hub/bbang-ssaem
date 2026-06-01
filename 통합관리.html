@@ -255,6 +255,7 @@ tr:hover td{background:var(--bg);}
     <div class="topbar-title" id="topbarTitle">배합비 관리</div>
     <div style="display:flex;gap:8px;align-items:center;">
       <button class="btn btn-sm" style="background:var(--success-light);color:var(--success);border:1px solid #9ecdb5;" onclick="syncAllData()">🔄 데이터 동기화</button>
+      <button class="btn btn-sm" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;" onclick="uploadAllToFirebase()">☁️ 전체 Firebase 업로드</button>
       <div class="topbar-badge" id="topbarDate"></div>
     </div>
   </div>
@@ -1064,7 +1065,82 @@ function initData(){
   finishedStock = JSON.parse(localStorage.getItem('finishedStock') || '[]');
   subsidiaryStock = JSON.parse(localStorage.getItem('subsidiaryStock') || '[]');
 }
-function saveData(key, data){ localStorage.setItem(key, JSON.stringify(data)); }
+function saveData(key, data){
+  localStorage.setItem(key, JSON.stringify(data));
+  autoSyncToFirebase(key, data);
+}
+
+// ===== 전체 localStorage → Firebase 업로드 =====
+async function uploadAllToFirebase(){
+  if(!window._db){ alert('Firebase 연결 안됨'); return; }
+  if(!confirm('현재 이 기기의 모든 데이터를 Firebase에 업로드합니다.\n다른 기기에서 접속하면 이 데이터가 보이게 됩니다.\n계속하시겠습니까?')) return;
+
+  const btn = document.querySelector('[onclick="uploadAllToFirebase()"]');
+  btn.textContent = '⏳ 업로드 중...';
+  btn.disabled = true;
+
+  const UPLOAD_KEYS = [
+    'incomingRecords','ledgerRecords','ingStock',
+    'recipeDB','lotMapping','deviceSettings','customIngredients',
+    '완제품_lots','완제품_products','완제품_clients',
+    'subLedgerRecords','subItemDB','subIncomingRecords','subsidiaryStock',
+    'packSettings','batchSettings','workerList',
+    'sub_suppliers','suppliers_incoming',
+  ];
+  Object.keys(localStorage).forEach(k=>{
+    if((k.startsWith('packRecords_')||k.startsWith('batchRecords_'))&&!UPLOAD_KEYS.includes(k))
+      UPLOAD_KEYS.push(k);
+  });
+
+  let count=0, fail=0;
+  for(const key of UPLOAD_KEYS){
+    const val = localStorage.getItem(key);
+    if(!val) continue;
+    try{
+      await window._db.collection('autoSync').doc(key).set({
+        key, data:val, updatedAt:new Date().toISOString()
+      });
+      count++;
+    }catch(e){ console.warn('업로드 실패:',key,e); fail++; }
+  }
+
+  btn.textContent=`✅ ${count}개 완료${fail?` (${fail}개 실패)`:''}`;
+  setTimeout(()=>{btn.textContent='☁️ 전체 Firebase 업로드';btn.disabled=false;},3000);
+  alert(`Firebase 업로드 완료!\n성공: ${count}개${fail?`\n실패: ${fail}개`:''}`);
+}
+
+// Firebase 자동 동기화 - 키별 컬렉션 매핑
+const FB_KEY_MAP = {
+  'recipeDB':'settings', 'lotMapping':'settings', 'ingStock':'settings',
+  'deviceSettings':'settings', 'customIngredients':'settings',
+  'ledgerRecords':'ledgerRecords',
+  '완제품_lots':'finishedData', '완제품_products':'finishedData', '완제품_clients':'finishedData',
+  'subLedgerRecords':'subLedgerRecords', 'subItemDB':'settings',
+  'subsidiaryStock':'settings', 'subIncomingRecords':'subIncomingData',
+  'incomingRecords':'incomingRecords',
+};
+function autoSyncToFirebase(key, data){
+  if(!window._db) return;
+  try{
+    window._db.collection('autoSync').doc(key).set({
+      key, data:JSON.stringify(data), updatedAt:new Date().toISOString()
+    }).catch(e=>console.warn('Firebase 저장 실패:',key,e));
+  }catch(e){}
+}
+async function loadFromFirebaseAuto(){
+  if(!window._db) return;
+  try{
+    const snap = await window._db.collection('autoSync').get();
+    snap.forEach(doc=>{
+      const d=doc.data();
+      if(d.key && d.data){
+        try{
+          localStorage.setItem(d.key, d.data);
+        }catch(e){}
+      }
+    });
+  }catch(e){ console.warn('Firebase 로드 실패',e); }
+}
 
 // ===== 날짜 =====
 function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
@@ -2290,7 +2366,7 @@ function renderIngStock(){
       <div class="alert-item ${a.type==='expired'?'alert-red':'alert-orange'}">
         <div>
           <div class="alert-name">${a.name}</div>
-          <div class="alert-sub">소비기한: ${a.expiry} · 재고: ${Number(a.qty).toLocaleString()}g</div>
+          <div class="alert-sub">소비기한: ${a.expiry} · 재고: ${Number(a.qty).toLocaleString()}kg</div>
         </div>
         <span class="badge ${a.type==='expired'?'badge-red':'badge-orange'}">
           ${a.type==='expired'?'초과':'D-'+a.diff}
@@ -2308,7 +2384,7 @@ function renderIngStock(){
       return `<tr>
         <td><span class="badge badge-blue" style="font-size:10px;">${code}</span></td>
         <td style="font-weight:600">${s.name}</td>
-        <td>${Number(s.qty).toLocaleString()}g</td>
+        <td>${Number(s.qty).toLocaleString()}kg</td>
         <td>${s.expiry}</td>
         <td><span class="badge ${badge}">${label}</span></td>
         <td><button class="btn btn-sm btn-danger" onclick="deleteIngStock(${i})">삭제</button></td>
@@ -2554,10 +2630,13 @@ function saveSubsidiary(){
 }
 
 // ===== 초기화 =====
-initData();
-document.getElementById('topbarDate').textContent=getToday();
-const _ld=document.getElementById('ledgerDate'); if(_ld) _ld.value=getTodayISO2();
-renderRecipe();
+(async ()=>{
+  await loadFromFirebaseAuto();
+  initData();
+  document.getElementById('topbarDate').textContent=getToday();
+  const _ld=document.getElementById('ledgerDate'); if(_ld) _ld.value=getTodayISO2();
+  renderRecipe();
+})();
 </script>
 
 </body>

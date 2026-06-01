@@ -350,7 +350,28 @@ function renderLedger(){
   }).join('');
 }
 
-function saveLedger(){ localStorage.setItem('ledgerRecords', JSON.stringify(ledgerRecords)); }
+function saveLedger(){
+  localStorage.setItem('ledgerRecords', JSON.stringify(ledgerRecords));
+  autoSyncToFirebase('ledgerRecords', ledgerRecords);
+}
+function autoSyncToFirebase(key, data){
+  if(!window._db) return;
+  try{
+    window._db.collection('autoSync').doc(key).set({
+      key, data:JSON.stringify(data), updatedAt:new Date().toISOString()
+    }).catch(e=>console.warn('Firebase 저장 실패:',key,e));
+  }catch(e){}
+}
+async function loadFromFirebaseAuto(){
+  if(!window._db) return;
+  try{
+    const snap = await window._db.collection('autoSync').get();
+    snap.forEach(doc=>{
+      const d=doc.data();
+      if(d.key && d.data) try{ localStorage.setItem(d.key, d.data); }catch(e){}
+    });
+  }catch(e){ console.warn('Firebase 로드 실패',e); }
+}
 
 function fmtInitDate(input){
   const v=input.value.replace(/\D/g,'').slice(0,6);
@@ -554,12 +575,15 @@ function saveOut(){
 }
 
 // ===== 초기화 =====
-initLedger();
-syncIncoming();
-syncBatch();
-document.getElementById('topbarDate').textContent=getToday();
-document.getElementById('ledgerDate').value=getTodayISO2();
-renderLedger();
+(async ()=>{
+  await loadFromFirebaseAuto();
+  initLedger();
+  syncIncoming();
+  syncBatch();
+  document.getElementById('topbarDate').textContent=getToday();
+  document.getElementById('ledgerDate').value=getTodayISO2();
+  renderLedger();
+})();
 </script>
 </body>
 </html>

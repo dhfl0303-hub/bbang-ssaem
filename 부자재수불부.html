@@ -201,7 +201,7 @@ function initSubLedger(){
         }
       });
     });
-    localStorage.setItem('subLedgerRecords',JSON.stringify(subLedgerRecords));
+    localStorage.setItem('subLedgerRecords',JSON.stringify(subLedgerRecords)); autoSyncToFirebase('subLedgerRecords',subLedgerRecords);
   }catch(e){}
   subLedgerRecords.forEach(r=>{
     if(r.name&&!SUB_ITEM_DB.find(i=>i.name===r.name)){
@@ -209,7 +209,7 @@ function initSubLedger(){
       SUB_ITEM_DB.push({code:r.code||autoSubCode(cat),name:r.name,category:cat,spec:'',unit:'EA',supplier:r.supplier||''});
     }
   });
-  localStorage.setItem('subItemDB',JSON.stringify(SUB_ITEM_DB));
+  localStorage.setItem('subItemDB',JSON.stringify(SUB_ITEM_DB)); autoSyncToFirebase('subItemDB',SUB_ITEM_DB);
 }
 
 function autoSubCode(category){
@@ -277,15 +277,15 @@ function saveSubLedgerRecord(){
   const note=document.getElementById('slrNote').value.trim();
   if(!qty){alert('수량을 입력해주세요');return;}
   subLedgerRecords.push({date,name,code,qty,mfg,note,type});
-  localStorage.setItem('subLedgerRecords',JSON.stringify(subLedgerRecords));
+  localStorage.setItem('subLedgerRecords',JSON.stringify(subLedgerRecords)); autoSyncToFirebase('subLedgerRecords',subLedgerRecords);
   closeModal('subLedgerRecordModal');renderSubLedger();
 }
 function deleteSubItem(code){
   if(!confirm('해당 품목과 수불 기록을 모두 삭제하시겠습니까?'))return;
   const item=SUB_ITEM_DB.find(i=>i.code===code);
-  if(item){subLedgerRecords=subLedgerRecords.filter(r=>r.name!==item.name);localStorage.setItem('subLedgerRecords',JSON.stringify(subLedgerRecords));}
+  if(item){subLedgerRecords=subLedgerRecords.filter(r=>r.name!==item.name);localStorage.setItem('subLedgerRecords',JSON.stringify(subLedgerRecords)); autoSyncToFirebase('subLedgerRecords',subLedgerRecords);}
   SUB_ITEM_DB=SUB_ITEM_DB.filter(i=>i.code!==code);
-  localStorage.setItem('subItemDB',JSON.stringify(SUB_ITEM_DB));
+  localStorage.setItem('subItemDB',JSON.stringify(SUB_ITEM_DB)); autoSyncToFirebase('subItemDB',SUB_ITEM_DB);
   renderSubLedger();
 }
 function openNewSubItemModal(){
@@ -312,7 +312,7 @@ function saveNewSubItem(){
   if(!name){alert('품목명을 입력해주세요');return;}
   if(SUB_ITEM_DB.find(i=>i.name===name)){alert('이미 등록된 품목명입니다');return;}
   SUB_ITEM_DB.push({code,name,category,spec,unit,supplier});
-  localStorage.setItem('subItemDB',JSON.stringify(SUB_ITEM_DB));
+  localStorage.setItem('subItemDB',JSON.stringify(SUB_ITEM_DB)); autoSyncToFirebase('subItemDB',SUB_ITEM_DB);
   closeModal('newSubItemModal');renderSubLedger();
 }
 function openSubInitStock(){
@@ -341,7 +341,7 @@ function saveSubInitStock(){
   if(!subInitRows.length){alert('등록할 재고가 없습니다');return;}
   subLedgerRecords=subLedgerRecords.filter(r=>r.type!=='init');
   subInitRows.forEach(r=>subLedgerRecords.push(r));
-  localStorage.setItem('subLedgerRecords',JSON.stringify(subLedgerRecords));
+  localStorage.setItem('subLedgerRecords',JSON.stringify(subLedgerRecords)); autoSyncToFirebase('subLedgerRecords',subLedgerRecords);
   closeModal('subInitStockModal');renderSubLedger();
 }
 function printSubLedger(){
@@ -367,11 +367,34 @@ function renderSubsidiary(){renderSubLedger();}
 function openAddSubsidiary(){openNewSubItemModal();}
 function saveSubsidiary(){}
 
+// ===== Firebase 자동 동기화 =====
+function autoSyncToFirebase(key, data){
+  if(!window._db) return;
+  try{
+    window._db.collection('autoSync').doc(key).set({
+      key, data:JSON.stringify(data), updatedAt:new Date().toISOString()
+    }).catch(e=>console.warn('Firebase 저장 실패:',key,e));
+  }catch(e){}
+}
+async function loadFromFirebaseAuto(){
+  if(!window._db) return;
+  try{
+    const snap = await window._db.collection('autoSync').get();
+    snap.forEach(doc=>{
+      const d=doc.data();
+      if(d.key && d.data) try{ localStorage.setItem(d.key, d.data); }catch(e){}
+    });
+  }catch(e){ console.warn('Firebase 로드 실패',e); }
+}
+
 // ===== 초기화 =====
-initSubLedger();
-document.getElementById('topbarDate').textContent=getToday();
-document.getElementById('subLedgerDate').value=getTodayISO2();
-renderSubLedger();
+(async ()=>{
+  await loadFromFirebaseAuto();
+  initSubLedger();
+  document.getElementById('topbarDate').textContent=getToday();
+  document.getElementById('subLedgerDate').value=getTodayISO2();
+  renderSubLedger();
+})();
 </script>
 </body>
 </html>

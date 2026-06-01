@@ -272,6 +272,27 @@ function flSave(){
   localStorage.setItem('완제품_lots',JSON.stringify(FL_STATE.lots));
   localStorage.setItem('완제품_products',JSON.stringify(FL_STATE.products));
   localStorage.setItem('완제품_clients',JSON.stringify(FL_STATE.clients));
+  autoSyncToFirebase('완제품_lots', FL_STATE.lots);
+  autoSyncToFirebase('완제품_products', FL_STATE.products);
+  autoSyncToFirebase('완제품_clients', FL_STATE.clients);
+}
+function autoSyncToFirebase(key, data){
+  if(!window._db) return;
+  try{
+    window._db.collection('autoSync').doc(key).set({
+      key, data:JSON.stringify(data), updatedAt:new Date().toISOString()
+    }).catch(e=>console.warn('Firebase 저장 실패:',key,e));
+  }catch(e){}
+}
+async function loadFromFirebaseAuto(){
+  if(!window._db) return;
+  try{
+    const snap = await window._db.collection('autoSync').get();
+    snap.forEach(doc=>{
+      const d=doc.data();
+      if(d.key && d.data) try{ localStorage.setItem(d.key, d.data); }catch(e){}
+    });
+  }catch(e){ console.warn('Firebase 로드 실패',e); }
 }
 function flLoad(){
   FL_STATE.lots=JSON.parse(localStorage.getItem('완제품_lots')||'[]');
@@ -595,14 +616,17 @@ function printFinishedLedger(){
 }
 
 // ===== 초기화 =====
-initFinishedLedger();
-const _todayRaw=new Date();
-const _yy=String(_todayRaw.getFullYear()).slice(2);
-const _mm=String(_todayRaw.getMonth()+1).padStart(2,'0');
-const _dd=String(_todayRaw.getDate()).padStart(2,'0');
-const _obEl=document.getElementById('fl-ob-date');
-if(_obEl){ _obEl.value=`${_yy}.${_mm}.${_dd}`; _obEl.dataset.raw=`${_yy}${_mm}${_dd}`; _obEl.style.color='var(--primary)'; _obEl.style.fontWeight='700'; }
-switchFlTab('outbound');
+(async ()=>{
+  await loadFromFirebaseAuto();
+  initFinishedLedger();
+  const _todayRaw=new Date();
+  const _yy=String(_todayRaw.getFullYear()).slice(2);
+  const _mm=String(_todayRaw.getMonth()+1).padStart(2,'0');
+  const _dd=String(_todayRaw.getDate()).padStart(2,'0');
+  const _obEl=document.getElementById('fl-ob-date');
+  if(_obEl){ _obEl.value=`${_yy}.${_mm}.${_dd}`; _obEl.dataset.raw=`${_yy}${_mm}${_dd}`; _obEl.style.color='var(--primary)'; _obEl.style.fontWeight='700'; }
+  switchFlTab('outbound');
+})();
 </script>
 </body>
 </html>
