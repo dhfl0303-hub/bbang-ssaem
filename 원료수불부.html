@@ -366,9 +366,24 @@ async function loadFromFirebaseAuto(){
   if(!window._db) return;
   try{
     const snap = await window._db.collection('autoSync').get();
+    if(snap.empty) return;
     snap.forEach(doc=>{
       const d=doc.data();
-      if(d.key && d.data) try{ localStorage.setItem(d.key, d.data); }catch(e){}
+      if(!d.key || !d.data) return;
+      const localVal = localStorage.getItem(d.key);
+      if(!localVal){
+        try{ localStorage.setItem(d.key, d.data); }catch(e){}
+      } else {
+        try{
+          const fbUpdated = d.updatedAt || '0';
+          const localObj = JSON.parse(localVal);
+          const localUpdated = localObj._updatedAt || '0';
+          if(fbUpdated > localUpdated) localStorage.setItem(d.key, d.data);
+        }catch(e){}
+      }
+    });
+  }catch(e){ console.warn('Firebase 로드 실패',e); }
+}catch(e){}
     });
   }catch(e){ console.warn('Firebase 로드 실패',e); }
 }
