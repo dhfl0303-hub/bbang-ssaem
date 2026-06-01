@@ -312,8 +312,14 @@ function flLoad(){
   FL_STATE.lots=JSON.parse(localStorage.getItem('완제품_lots')||'[]');
   FL_STATE.products=JSON.parse(localStorage.getItem('완제품_products')||'null')||FL_DEFAULT_PRODUCTS;
   FL_STATE.clients=JSON.parse(localStorage.getItem('완제품_clients')||'null')||FL_DEFAULT_CLIENTS;
+}function flGroupKey(lotNum){const p=lotNum.split('-');return p.length>=2?`${p[0]}-${p[1]}`:lotNum;}
+
+// 삭제된 pkg_lot 목록 관리
+function flGetDeletedLots(){ return JSON.parse(localStorage.getItem('완제품_deleted_lots')||'[]'); }
+function flAddDeletedLot(pkgLot){
+  const deleted = flGetDeletedLots();
+  if(!deleted.includes(pkgLot)){ deleted.push(pkgLot); localStorage.setItem('완제품_deleted_lots', JSON.stringify(deleted)); autoSyncToFirebase('완제품_deleted_lots', deleted); }
 }
-function flGroupKey(lotNum){const p=lotNum.split('-');return p.length>=2?`${p[0]}-${p[1]}`:lotNum;}
 function flGetGroups(hideZero=false,clientFilter='전체',groupFilter='전체'){
   const map={},order=[];
   for(const l of FL_STATE.lots){
@@ -331,11 +337,13 @@ function flFmtDate6(d6){if(!d6||d6.length!==6)return d6||'-';return `20${d6.slic
 function flSyncFromPack(silent=false){
   const keys=Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
   const lotMapping=JSON.parse(localStorage.getItem('lotMapping')||'[]');
+  const deletedLots=flGetDeletedLots();
   let count=0;
   keys.forEach(k=>{
     const recs=JSON.parse(localStorage.getItem(k)||'[]');
     recs.forEach(r=>{
       if(!r.lot||!r.productCode) return;
+      if(deletedLots.includes(r.lot)) return; // 삭제된 것 건너뜀
       const existing=FL_STATE.lots.find(l=>l.pkg_lot===r.lot);
       if(existing) return;
       const prod=FL_STATE.products.find(p=>p.lot_code===r.productCode);
@@ -514,11 +522,14 @@ function flRenderStock(){
 function flToggleStock(gk){if(FL_STATE.expandedStock.has(gk))FL_STATE.expandedStock.delete(gk);else FL_STATE.expandedStock.add(gk);flRenderStock();}
 function flDeleteStockLot(idx){
   if(!confirm('이 LOT를 삭제하시겠습니까?')) return;
+  const lot = FL_STATE.lots[idx];
+  if(lot && lot.pkg_lot) flAddDeletedLot(lot.pkg_lot);
   FL_STATE.lots.splice(idx,1);
   flSave(); flRefreshOutboundCombos(); flRenderStock(); flRenderOutbound();
 }
 function flDeleteStockGroup(gk){
   if(!confirm(`"${gk}" 그룹 전체를 삭제하시겠습니까?\n해당 그룹의 모든 LOT와 출고내역이 삭제됩니다.`)) return;
+  FL_STATE.lots.filter(l=>flGroupKey(l.lot_number)===gk).forEach(l=>{ if(l.pkg_lot) flAddDeletedLot(l.pkg_lot); });
   FL_STATE.lots=FL_STATE.lots.filter(l=>flGroupKey(l.lot_number)!==gk);
   FL_STATE.expandedStock.delete(gk);
   flSave(); flRefreshOutboundCombos(); flRenderStock(); flRenderOutbound();
