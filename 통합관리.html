@@ -482,7 +482,11 @@ tr:hover td{background:var(--bg);}
       <div class="card">
         <div class="card-hd">
           <div class="card-hd-title">원료 재고 목록</div>
-          <button class="btn btn-primary btn-sm" onclick="openAddIngStock()">+ 원료 등록</button>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button class="btn btn-sm btn-outline" id="sortCodeBtn" onclick="setIngSort('code')" style="background:var(--primary);color:#fff;border-color:var(--primary)">코드순</button>
+            <button class="btn btn-sm btn-outline" id="sortNameBtn" onclick="setIngSort('name')">원료명순</button>
+            <button class="btn btn-primary btn-sm" onclick="openAddIngStock()">+ 원료 등록</button>
+          </div>
         </div>
         <div class="card-bd" style="padding:0">
           <div class="table-wrap">
@@ -2352,6 +2356,13 @@ function deleteRecipe(){
 }
 
 // ===== ② 원료 재고 현황 =====
+let ingSortMode = 'code'; // 'code' or 'name'
+function setIngSort(mode){
+  ingSortMode = mode;
+  document.getElementById('sortCodeBtn').style.cssText = mode==='code' ? 'background:var(--primary);color:#fff;border-color:var(--primary)' : '';
+  document.getElementById('sortNameBtn').style.cssText = mode==='name' ? 'background:var(--primary);color:#fff;border-color:var(--primary)' : '';
+  renderIngStock();
+}
 function renderIngStock(){
   const today=new Date(); today.setHours(0,0,0,0);
   let expired=0,near=0,normal=0;
@@ -2384,12 +2395,11 @@ function renderIngStock(){
 
   document.getElementById('ingStockTbody').innerHTML=ingStock.length?
     [...ingStock].sort((a,b)=>{
-      const codeA=a.code||''; const codeB=b.code||'';
-      // 코드 숫자 기준 정렬 (M001, M002...)
-      const numA=parseInt(codeA.replace(/\D/g,''))||0;
-      const numB=parseInt(codeB.replace(/\D/g,''))||0;
+      if(ingSortMode==='name') return a.name.localeCompare(b.name,'ko');
+      // 코드순
+      const numA=parseInt((a.code||'').replace(/\D/g,''))||0;
+      const numB=parseInt((b.code||'').replace(/\D/g,''))||0;
       if(numA!==numB) return numA-numB;
-      // 코드 같으면 원료명 ㄱㄴㄷ순
       return a.name.localeCompare(b.name,'ko');
     }).map((s,i)=>{
       const diff=daysDiff(s.expiry);
