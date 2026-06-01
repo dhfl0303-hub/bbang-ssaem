@@ -355,6 +355,12 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
           </div>
         </div>
 
+        <!-- 제품중량 -->
+        <div style="margin-top:10px;">
+          <div class="field-label">제품중량 (g/개)</div>
+          <input class="field-input" type="number" id="itemWeight" placeholder="예: 65">
+        </div>
+
         <!-- 잔량 -->
         <div style="margin-top:10px;">
           <div class="field-label">잔량 (개)</div>
@@ -862,7 +868,7 @@ function selectProduct(code){
   document.querySelectorAll('.month-btn').forEach(b=>b.classList.remove('active'));
 
   // 입력 초기화
-  ['workers','perBox','startTime','endTime','qtyPcs','remaining','filmQty','filmDate','bulkQty','bulkDate','boxQty'].forEach(id=>{
+  ['workers','perBox','itemWeight','startTime','endTime','qtyPcs','remaining','filmQty','filmDate','bulkQty','bulkDate','boxQty'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.value='';
   });
@@ -1128,6 +1134,7 @@ function completePackaging(signImg=''){
     startTime:getTimeVal('startTime'),
     endTime:getTimeVal('endTime'),
     perBox:document.getElementById('perBox').value||0,
+    itemWeight:parseInt(document.getElementById('itemWeight').value)||0,
     qtyPcs:parseInt(document.getElementById('qtyPcs').value)||0,
     qtyBoxes:document.getElementById('qtyBoxes').value||0,
     remaining:document.getElementById('remaining').value||0,

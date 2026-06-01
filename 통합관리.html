@@ -1918,16 +1918,19 @@ function loadYield(){
   });
   // 포장 생산량
   packRecs.forEach(r=>{
-    if(!batchMap[r.productCode]) batchMap[r.productCode]={name:r.product,input:0,pcs:0,boxes:0};
+    if(!batchMap[r.productCode]) batchMap[r.productCode]={name:r.product,input:0,pcs:0,boxes:0,itemWeight:0};
     batchMap[r.productCode].pcs  += parseInt(r.qtyPcs)||0;
     batchMap[r.productCode].boxes+= parseInt(r.qtyBoxes)||0;
+    // itemWeight: 저장된 값 우선, 없으면 기존값 유지
+    if(parseInt(r.itemWeight)) batchMap[r.productCode].itemWeight = parseInt(r.itemWeight);
   });
 
   const rows = Object.entries(batchMap);
   let yieldSum=0, yieldCnt=0;
   tbody.innerHTML = rows.map(([code,d])=>{
     const inputKg = d.input;
-    const outputKg = d.pcs * 0.065; // 평균 65g 기준 (추후 제품별 적용 가능)
+    const weight = d.itemWeight || 65; // 제품중량(g), 미입력시 65g 기본값
+    const outputKg = d.pcs * weight;
     const yieldPct = inputKg>0 ? Math.round((outputKg/inputKg)*1000)/10 : '-';
     const lossPct  = inputKg>0 ? Math.round(((inputKg-outputKg)/inputKg)*1000)/10 : '-';
     if(typeof yieldPct==='number'){ yieldSum+=yieldPct; yieldCnt++; }
@@ -1938,7 +1941,7 @@ function loadYield(){
       <td style="text-align:center;">${d.boxes>0?d.boxes.toLocaleString()+' box':'-'}</td>
       <td style="text-align:center;font-weight:700;color:var(--success);">${typeof yieldPct==='number'?yieldPct+'%':'-'}</td>
       <td style="text-align:center;font-weight:700;color:var(--danger);">${typeof lossPct==='number'?lossPct+'%':'-'}</td>
-      <td style="font-size:11px;color:var(--text3);">※ 평균 65g 기준</td>
+      <td style="font-size:11px;color:var(--text3);">※ ${weight}g 기준</td>
     </tr>`;
   }).join('');
 
