@@ -2383,19 +2383,28 @@ function renderIngStock(){
   } else alertCard.style.display='none';
 
   document.getElementById('ingStockTbody').innerHTML=ingStock.length?
-    ingStock.map((s,i)=>{
+    [...ingStock].sort((a,b)=>{
+      const codeA=a.code||''; const codeB=b.code||'';
+      // 코드 숫자 기준 정렬 (M001, M002...)
+      const numA=parseInt(codeA.replace(/\D/g,''))||0;
+      const numB=parseInt(codeB.replace(/\D/g,''))||0;
+      if(numA!==numB) return numA-numB;
+      // 코드 같으면 원료명 ㄱㄴㄷ순
+      return a.name.localeCompare(b.name,'ko');
+    }).map((s,i)=>{
       const diff=daysDiff(s.expiry);
       const badge=diff<0?'badge-red':diff<=7?'badge-orange':'badge-green';
       const label=diff<0?'초과':diff<=7?'D-'+diff:'정상';
       const ing = (typeof INGREDIENT_DB!=='undefined') ? INGREDIENT_DB.find(x=>x.name===s.name) : null;
       const code = s.code || (ing?ing.code:'-');
+      const origIdx = ingStock.indexOf(s);
       return `<tr>
         <td><span class="badge badge-blue" style="font-size:10px;">${code}</span></td>
         <td style="font-weight:600">${s.name}</td>
         <td>${Number(s.qty).toLocaleString()}kg</td>
         <td>${s.expiry}</td>
         <td><span class="badge ${badge}">${label}</span></td>
-        <td><button class="btn btn-sm btn-danger" onclick="deleteIngStock(${i})">삭제</button></td>
+        <td><button class="btn btn-sm btn-danger" onclick="deleteIngStock(${origIdx})">삭제</button></td>
       </tr>`;
     }).join(''):
     '<tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">등록된 원료가 없습니다</td></tr>';
