@@ -1961,8 +1961,24 @@ function loadYield(){
     if(!batchMap[r.productCode]) batchMap[r.productCode]={name:r.product,input:0,pcs:0,boxes:0,itemWeight:0};
     batchMap[r.productCode].pcs  += parseInt(r.qtyPcs)||0;
     batchMap[r.productCode].boxes+= parseInt(r.qtyBoxes)||0;
-    // itemWeight: 저장된 값 우선, 없으면 기존값 유지
-    if(parseInt(r.itemWeight)) batchMap[r.productCode].itemWeight = parseInt(r.itemWeight);
+    // itemWeight: 저장된 값 우선, 없으면 완제품_products의 spec에서 중량 추출
+    if(parseInt(r.itemWeight)){
+      batchMap[r.productCode].itemWeight = parseInt(r.itemWeight);
+    } else if(!batchMap[r.productCode].itemWeight){
+      try{
+        // lotMapping에서 productCode → lot_code 찾기
+        const lm = lotMapping.find(m=>m.pLot===r.productCode);
+        const wLotCode = lm&&lm.wLots.length ? lm.wLots[0].lot : null;
+        if(wLotCode){
+          const finProds = JSON.parse(localStorage.getItem('완제품_products')||'[]');
+          const prod = finProds.find(p=>p.lot_code===wLotCode);
+          if(prod && prod.spec){
+            const m = prod.spec.match(/^(\d+)g/);
+            if(m) batchMap[r.productCode].itemWeight = parseInt(m[1]);
+          }
+        }
+      }catch(e){}
+    }
   });
 
   const rows = Object.entries(batchMap);
