@@ -369,7 +369,10 @@ tr:hover td{background:var(--bg);}
     <!-- 추적성관리 패널 -->
     <div class="panel" id="panel-traceability">
       <div class="card">
-        <div class="card-hd"><div class="card-hd-title">🔍 LOT 추적</div></div>
+        <div class="card-hd">
+          <div class="card-hd-title">🔍 LOT 추적</div>
+          <button class="btn btn-outline btn-sm" onclick="printTrace()">🖨️ PDF 출력</button>
+        </div>
         <div class="card-bd">
           <!-- 방향 탭 -->
           <div style="display:flex;gap:8px;margin-bottom:12px;">
@@ -377,7 +380,7 @@ tr:hover td{background:var(--bg);}
             <button class="btn btn-outline btn-sm" id="trace-tab-reverse" onclick="setTraceTab('reverse')">◀ 역방향 추적</button>
           </div>
           <div class="filter-row">
-            <input class="search-input" id="traceInput" placeholder="LOT번호 입력 (예: M001-260526-270920)" style="flex:1;" id="traceInput">
+            <input class="search-input" id="traceInput" placeholder="LOT번호 입력 (예: M001-260526-270920)" style="flex:1;">
             <button class="btn btn-primary" onclick="searchTrace()">추적</button>
           </div>
           <div id="trace-hint" style="font-size:12px;color:var(--text3);margin-bottom:12px;">
@@ -1651,25 +1654,56 @@ function searchTrace(){
 
 function buildTraceTable(title, headers, rows){
   const sectionColors = {
-    '완제품':'#e8f0fb', '포장 공정':'#e8f5ef', '배합 공정':'#fff3e0', '사용원료':'#fce8e8'
+    '완제품':'#e8f0fb','포장 공정':'#e8f5ef','배합 공정':'#fff3e0','사용원료':'#fce8e8'
   };
   const headerColors = {
-    '완제품':'#1a5fa8', '포장 공정':'#1e9e6e', '배합 공정':'#e07b1a', '사용원료':'#c0392b'
+    '완제품':'#1a5fa8','포장 공정':'#1e9e6e','배합 공정':'#e07b1a','사용원료':'#c0392b'
   };
   const bgColor = sectionColors[title]||'#f4f6fa';
   const hColor = headerColors[title]||'#555';
+  const colWidth = `width:25%;`;
   const emptyRow = rows.length===0
     ? `<tr><td colspan="${headers.length}" style="padding:12px;text-align:center;color:#999;">관련 기록 없음</td></tr>`
-    : rows.map(r=>`<tr>${r.map(c=>`<td style="padding:8px 12px;border:1px solid #e0e4ea;font-size:12px;">${c}</td>`).join('')}</tr>`).join('');
+    : rows.map(r=>`<tr>${r.map(c=>`<td style="padding:8px 12px;border:1px solid #e0e4ea;font-size:12px;${colWidth}">${c}</td>`).join('')}</tr>`).join('');
   return `<div style="margin-bottom:20px;">
     <div style="font-size:13px;font-weight:700;margin-bottom:8px;">${title}</div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;">
-      <thead><tr>${headers.map(h=>`<th style="padding:8px 12px;background:${bgColor};border:1px solid #e0e4ea;font-weight:700;text-align:left;color:${hColor};">${h}</th>`).join('')}</tr></thead>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;">
+      <thead><tr>${headers.map(h=>`<th style="padding:8px 12px;background:${bgColor};border:1px solid #e0e4ea;font-weight:700;text-align:left;color:${hColor};${colWidth}">${h}</th>`).join('')}</tr></thead>
       <tbody>${emptyRow}</tbody>
     </table>
   </div>`;
 }
+
 function buildTraceArrowHtml(){ return '<div style="text-align:center;font-size:18px;color:#aaa;margin:4px 0;">↓</div>'; }
+function printTrace(){
+  const result = document.getElementById('traceResult');
+  const input = document.getElementById('traceInput').value.trim();
+  const mode = traceMode==='forward'?'순방향':'역방향';
+  if(!input){ alert('먼저 추적을 실행해주세요'); return; }
+  const content = result.innerHTML;
+  if(content.includes('LOT번호를 입력하고')){ alert('먼저 추적을 실행해주세요'); return; }
+
+  const printWin = window.open('','_blank');
+  printWin.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>LOT추적 - ${input}</title>
+  <style>
+    body{font-family:"Noto Sans KR",sans-serif;font-size:11px;padding:20px;}
+    h2{font-size:16px;margin-bottom:4px;}
+    .sub{font-size:12px;color:#666;margin-bottom:16px;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:16px;}
+    th{background:#e0e0e0!important;border:1px solid #bbb;padding:7px 10px;font-weight:700;text-align:left;color:#333;}
+    td{border:1px solid #ccc;padding:7px 10px;font-size:11px;width:25%;}
+    .section-title{font-size:12px;font-weight:700;margin-bottom:6px;margin-top:4px;}
+    .arrow{text-align:center;font-size:16px;color:#aaa;margin:4px 0;}
+    @page{margin:10mm;size:A4;}
+  </style></head><body>
+  <h2>LOT 추적 보고서</h2>
+  <div class="sub">추적번호: ${input} / ${mode} / 출력일시: ${new Date().toLocaleString('ko-KR')}</div>
+  ${content}
+  </body></html>`);
+  printWin.document.close();
+  setTimeout(()=>printWin.print(),500);
+}
 
 // ===== 데이터 반환 함수들 =====
 function findRawMaterialData(lot){
@@ -1746,6 +1780,7 @@ function findBatchByLotData(batchLot){
 function findIngredientByBatchLotData(batchLot){
   try{
     const keys=Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
+    const incomingRecs=JSON.parse(localStorage.getItem('incomingRecords')||'[]');
     const found=[];
     keys.forEach(k=>{
       const recs=JSON.parse(localStorage.getItem(k)||'[]');
@@ -1754,7 +1789,20 @@ function findIngredientByBatchLotData(batchLot){
           if(b.lot===batchLot){
             (b.ingredients||[]).forEach(ing=>{
               (ing.exps||[]).forEach(e=>{
-                found.push({lot:e.lot||'-',name:ing.name,exp:e.exp||'-',expType:e.exp?'소비기한':'제조일자',qty:e.amount||0});
+                // 입고검사일지에서 해당 LOT의 mfg/exp 찾기
+                let expType='소비기한';
+                let expVal=e.exp||'-';
+                if(e.lot){
+                  for(const rec of incomingRecs){
+                    const row=(rec.rows||[]).find(r=>r.lot===e.lot);
+                    if(row){
+                      if(row.mfg&&!row.exp){ expType='제조일자'; expVal=row.mfg; }
+                      else if(row.exp){ expType='소비기한'; expVal=row.exp; }
+                      break;
+                    }
+                  }
+                }
+                found.push({lot:e.lot||'-',name:ing.name,exp:expVal,expType,qty:e.amount||0});
               });
             });
           }
