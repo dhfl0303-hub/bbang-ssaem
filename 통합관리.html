@@ -891,86 +891,6 @@ function printLedger(){
 function filterLedger(){ renderLedger(); }
 
 // 초기재고 등록
-function printLedger(){
-  const selDate=document.getElementById('ledgerDate').value||getTodayISO2();
-  const rows=document.getElementById('ledgerTbody').innerHTML;
-  const printWin=window.open('','_blank');
-  printWin.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>원료수불부 ${selDate}</title>
-  <style>
-    body{font-family:"Noto Sans KR",sans-serif;font-size:10px;padding:20px;}
-    h2{font-size:16px;margin-bottom:4px;}
-    .sub{font-size:12px;color:#666;margin-bottom:14px;}
-    table{width:100%;border-collapse:collapse;}
-    th{background:#f0f0f0;border:1px solid #999;padding:5px;text-align:center;font-weight:700;}
-    td{border:1px solid #999;padding:5px;text-align:center;}
-    td:nth-child(2){text-align:left;font-weight:600;}
-    td:nth-child(3){text-align:left;}
-    @page{margin:10mm;size:A4 landscape;}
-  </style></head><body>
-  <h2>원료수불부</h2>
-  <div class="sub">조회일자: ${selDate} / 출력일시: ${new Date().toLocaleString('ko-KR')}</div>
-  <table>
-    <thead><tr>
-      <th>코드</th><th>품목명</th><th>원산지</th><th>보관기준</th><th>단위</th>
-      <th>전월재고</th><th>입고</th><th>출고</th><th>마감재고</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  
-
-
-<!-- 초기재고 등록 모달 -->
-<div class="modal-overlay" id="initStockModal" onclick="closeModalOutside(event,'initStockModal')">
-  <div class="modal" style="width:680px">
-    <div class="modal-hd">
-      <div class="modal-title">📋 초기 재고 등록</div>
-      <button class="modal-close" onclick="closeModal('initStockModal')">×</button>
-    </div>
-    <div class="modal-bd">
-      <div style="background:var(--warning-light);border:1px solid #f0c080;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--warning)">
-        ⚠️ 최초 1회만 입력하세요. 이후 입고/출고는 입고검사일지·배합일지에서 자동 반영됩니다.
-      </div>
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="form-row">
-          <label class="form-label">기준 날짜 (전월말일)</label>
-          <input class="form-input" id="initDate" type="date">
-        </div>
-        <div class="form-row">
-          <label class="form-label">원료 선택</label>
-          <div class="autocomplete-wrap">
-            <input class="form-input" id="initIngName" placeholder="원료명 입력/검색" autocomplete="off"
-              oninput="showIngAC('initIngName')" onfocus="showIngAC('initIngName')" onblur="setTimeout(()=>hideIngAC('initIngName'),150)">
-            <div class="autocomplete-list" id="ac-initIngName"></div>
-          </div>
-        </div>
-        <div class="form-row">
-          <label class="form-label">재고량 (kg)</label>
-          <input class="form-input" id="initQty" type="number" placeholder="0" step="0.001">
-        </div>
-        <div class="form-row">
-          <label class="form-label">소비기한</label>
-          <input class="form-input" id="initExp" type="date">
-        </div>
-      </div>
-      <button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="event.stopPropagation();addInitRow()">+ 추가</button>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>원료명</th><th>코드</th><th>재고량(kg)</th><th>소비기한</th><th>기준일</th><th></th></tr></thead>
-          <tbody id="initStockTbody"></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="modal-ft">
-      <button class="btn btn-outline" onclick="closeModal('initStockModal')">취소</button>
-      <button class="btn btn-primary" onclick="event.stopPropagation();saveInitStock()">전체 저장</button>
-    </div>
-  </div>
-</div>
-</body></html>`);
-  printWin.document.close();
-  setTimeout(()=>printWin.print(),500);
-}
 
 // ===== 입고현황 =====
 let incomingRecords = [];
@@ -1099,11 +1019,6 @@ function daysDiff(dateStr){
   const exp=new Date(dateStr); exp.setHours(0,0,0,0);
   return Math.floor((exp-today)/(1000*60*60*24));
 }
-
-// ===== 패널 전환 =====
-
-
-
 
 // ===== 전체 데이터 동기화 =====
 async function syncAllData(){
@@ -1623,29 +1538,72 @@ function searchTrace(){
       }
     }
   } else {
-    // 역방향
-    const finItems = findFinishedByLotData(input);
-    html += buildTraceTable('완제품', ['LOT','품명','소비기한','잔량'],
-      finItems.map(f=>[f.lot_number, f.name, f.exp_date||'-', f.remain_box+'BOX']));
+    // 역방향: 완제품LOT → lotMapping → 포장LOT → 배합LOT → 원료LOT
 
-    const pkgLots = finItems.map(f=>f.pkg_lot).filter(Boolean);
-    if(pkgLots.length){
+    // 1단계: lotMapping에서 완제품LOT 찾기
+    const mappingEntry = lotMapping.find(m => m.wLots && m.wLots.some(w => w.lot === input));
+    const wLotInfo = mappingEntry ? mappingEntry.wLots.find(w => w.lot === input) : null;
+
+    const finRows = [];
+    if(wLotInfo){
+      finRows.push([input, wLotInfo.name||'-', wLotInfo.client||'-', mappingEntry.pLot||'-']);
+    }
+    // 완제품_lots 에서도 보완 검색
+    try{
+      const finLots = JSON.parse(localStorage.getItem('완제품_lots')||'[]');
+      finLots.filter(f=>f.lot_number===input||f.lot_number===input).forEach(f=>{
+        if(!finRows.find(r=>r[0]===f.lot_number))
+          finRows.push([f.lot_number, f.name||'-', f.exp_date||'-', f.pkg_lot||'-']);
+      });
+    }catch(e){}
+    html += buildTraceTable('완제품', ['완제품LOT','제품명','거래처/소비기한','포장LOT/제품코드'], finRows);
+
+    // 2단계: 포장LOT 찾기
+    // lotMapping의 pLot는 제품코드(P026 형식), packRecords에서 해당 제품코드로 검색
+    const productCode = mappingEntry ? mappingEntry.pLot : null;
+    let packItems = [];
+
+    if(productCode){
+      // packRecords에서 productCode 일치하는 레코드 검색
+      const packKeys = Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
+      packKeys.forEach(k=>{
+        try{
+          const recs = JSON.parse(localStorage.getItem(k)||'[]');
+          recs.forEach(r=>{
+            if(r.productCode===productCode || r.lot===productCode) packItems.push(r);
+          });
+        }catch(e){}
+      });
+    }
+    // 완제품_lots의 pkg_lot으로도 보완
+    try{
+      const finLots = JSON.parse(localStorage.getItem('완제품_lots')||'[]');
+      const pkgLots = finLots.filter(f=>f.lot_number===input).map(f=>f.pkg_lot).filter(Boolean);
+      pkgLots.forEach(pl=>{
+        const found = findPackRecordData(pl);
+        found.forEach(p=>{ if(!packItems.find(x=>x.lot===p.lot)) packItems.push({lot:p.lot,product:p.product,expiryDate:p.expiry,qtyPcs:p.qtyPcs,batchLot:p.batchLot,productCode:p.productCode}); });
+      });
+    }catch(e){}
+
+    if(packItems.length){
       html += buildTraceArrowHtml();
-      const packItems = pkgLots.flatMap(pl=>findPackRecordData(pl));
-      html += buildTraceTable('포장 공정', ['LOT','품명','소비기한','수량'],
-        packItems.map(p=>[p.lot, p.product, p.expiry||'-', (p.qtyPcs||0)+'개']));
+      html += buildTraceTable('포장 공정', ['포장LOT','품명','소비기한','수량(개)'],
+        packItems.map(p=>[p.lot||'-', p.product||'-', p.expiryDate||p.expiry||'-', (p.qtyPcs||0)+'개']));
 
-      const batchLots = packItems.map(p=>p.batchLot).filter(Boolean);
-      if(batchLots.length){
+      // 3단계: 배합LOT 찾기
+      const batchLots = [...new Set(packItems.map(p=>p.batchLot).filter(Boolean))];
+      const batchItems = batchLots.flatMap(bl=>findBatchByLotData(bl));
+
+      if(batchItems.length){
         html += buildTraceArrowHtml();
-        const batchItems = batchLots.flatMap(bl=>findBatchByLotData(bl));
-        html += buildTraceTable('배합 공정', ['LOT','품명','제조일자','배합수'],
+        html += buildTraceTable('배합 공정', ['배합LOT','품명','제조일자','배합수'],
           batchItems.map(b=>[b.lot, b.product, b.date, b.batches+'번']));
 
-        if(batchItems.length){
+        // 4단계: 원료LOT 찾기
+        const ingItems = batchItems.flatMap(b=>findIngredientByBatchLotData(b.lot));
+        if(ingItems.length){
           html += buildTraceArrowHtml();
-          const ingItems = batchItems.flatMap(b=>findIngredientByBatchLotData(b.lot));
-          html += buildTraceTable('사용원료', ['원료LOT','배합 사용원료','제조일자 or 소비기한','사용량(g)'],
+          html += buildTraceTable('사용원료', ['원료LOT','원료명','제조일자 or 소비기한','사용량(g)'],
             ingItems.map(i=>[i.lot||'-', i.name, i.expType+': '+i.exp, Number(i.qty).toLocaleString()]));
         }
       }
@@ -1933,8 +1891,7 @@ function loadYield(){
   document.getElementById('yieldCnt').textContent = rows.length;
 }
 
-// ===== showPanel 오버라이드 (날짜 기본값 설정) =====
-const _origShowPanel = showPanel;
+// ===== showPanel 확장 (날짜 기본값 설정) =====
 function showPanel(id){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+id).classList.add('active');
@@ -2390,33 +2347,7 @@ function openOutboundModal(){ alert('출고 등록은 완제품 재고 목록에
 
 // ===== ⑦ 부자재 수불 =====
 function renderSubsidiary(){
-  // 부자재입고검사일지(subIncomingRecords)와 동기화
-  try{
-    const subRecs = JSON.parse(localStorage.getItem('subIncomingRecords')||'[]');
-    subRecs.forEach(rec=>{
-      (rec.rows||[]).forEach(row=>{
-        if(!row.item||!row.qty) return;
-        const itemMap={'필름포장지':'film','벌크비닐':'bulk','박스':'box','패키지박스':'pkgbox'};
-        const itemKey = itemMap[row.item]||row.item;
-        const exists = subsidiaryStock.find(s=>s.lot===row.lot&&s.item===itemKey);
-        if(!exists) subsidiaryStock.push({item:itemKey,qty:parseFloat(row.qty)||0,date:rec.date||'',lot:row.lot||'',note:row.spec||'',type:'in'});
-      });
-    });
-    saveData('subsidiaryStock',subsidiaryStock);
-  }catch(e){}
-  const film=subsidiaryStock.filter(s=>s.item==='film').reduce((s,r)=>s+(r.type==='in'?r.qty:-r.qty),0);
-  const bulk=subsidiaryStock.filter(s=>s.item==='bulk').reduce((s,r)=>s+(r.type==='in'?r.qty:-r.qty),0);
-  const box=subsidiaryStock.filter(s=>s.item==='box').reduce((s,r)=>s+(r.type==='in'?r.qty:-r.qty),0);
-  const pkgbox=subsidiaryStock.filter(s=>s.item==='pkgbox').reduce((s,r)=>s+(r.type==='in'?r.qty:-r.qty),0);
-function renderSubsidiary(){
   // 부자재수불부는 별도 파일로 분리됨 - 통합관리에서는 링크 카드만 표시
-}
-      <td>${names[s.item]||s.item}</td>
-      <td>${s.qty}</td>
-      <td>${s.date}</td>
-      <td style="color:var(--text2)">${s.note||'-'}</td>
-    </tr>`).join(''):
-    '<tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">데이터가 없습니다</td></tr>';
 }
 function openAddSubsidiary(){
   closeAllModals();
