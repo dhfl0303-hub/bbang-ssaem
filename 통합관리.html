@@ -2229,6 +2229,16 @@ function saveRecipe(){
       if(nm&&amt) ingsList[n-1].push({name:nm,amount:amt});
     });
   });
+
+  // 배합1 원료명 기준으로 배합2,3,4 원료명 동기화
+  // 배합1의 순서대로 원료명을 맞춰줌 (수량은 각 배합별 유지)
+  [ings2,ings3,ings4].forEach(ingsN=>{
+    if(!ingsN.length) return;
+    ings1.forEach((ing1,i)=>{
+      if(ingsN[i]) ingsN[i].name=ing1.name;
+    });
+  });
+
   const now=new Date();
   const updatedAt=`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   if(editingCode&&editingCode!==code) delete DB[editingCode];
