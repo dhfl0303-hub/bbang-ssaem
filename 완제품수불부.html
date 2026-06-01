@@ -269,10 +269,12 @@ const FL_DEFAULT_PRODUCTS=[
 let FL_STATE={lots:[],products:[],clients:[],expandedStock:new Set()};
 
 function flSave(){
-  localStorage.setItem('완제품_lots',JSON.stringify(FL_STATE.lots));
-  localStorage.setItem('완제품_products',JSON.stringify(FL_STATE.products));
-  localStorage.setItem('완제품_clients',JSON.stringify(FL_STATE.clients));
-  autoSyncToFirebase('완제품_lots', FL_STATE.lots);
+  const ts = new Date().toISOString();
+  const lots = FL_STATE.lots.map(l=>({...l, _updatedAt:ts}));
+  localStorage.setItem('완제품_lots', JSON.stringify(lots));
+  localStorage.setItem('완제품_products', JSON.stringify(FL_STATE.products));
+  localStorage.setItem('완제품_clients', JSON.stringify(FL_STATE.clients));
+  autoSyncToFirebase('완제품_lots', lots);
   autoSyncToFirebase('완제품_products', FL_STATE.products);
   autoSyncToFirebase('완제품_clients', FL_STATE.clients);
 }

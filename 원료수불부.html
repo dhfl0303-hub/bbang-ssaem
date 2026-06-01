@@ -290,8 +290,10 @@ function renderLedger(){
 }
 
 function saveLedger(){
-  localStorage.setItem('ledgerRecords', JSON.stringify(ledgerRecords));
-  autoSyncToFirebase('ledgerRecords', ledgerRecords);
+  const ts = new Date().toISOString();
+  const data = ledgerRecords.map(r=>({...r, _updatedAt:ts}));
+  localStorage.setItem('ledgerRecords', JSON.stringify(data));
+  autoSyncToFirebase('ledgerRecords', data);
 }
 
 function fmtInitDate(input){
