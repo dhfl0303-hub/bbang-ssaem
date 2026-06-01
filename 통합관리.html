@@ -177,19 +177,24 @@ tr:hover td{background:var(--bg);}
     <span>1. 생산관리</span>
     <span class="accordion-arrow open" id="arrow-acc-production" style="transform:rotate(0deg);">▼</span>
   </div>
-  <div class="accordion-body" id="acc-production" style="max-height:420px;overflow-y:auto;">
+  <div class="accordion-body" id="acc-production" style="max-height:500px;overflow-y:auto;">
     <div class="nav-sub-section">원료관리</div>
-    <div class="nav-item active" onclick="showPanel('material-ledger')">
-      <span class="nav-icon">📒</span>원료수불부
-    </div>
     <div class="nav-item" onclick="showPanel('ingredient-stock')">
       <span class="nav-icon">🧂</span>원료 재고현황
     </div>
     <div class="nav-item" onclick="showPanel('incoming')">
       <span class="nav-icon">🚚</span>입고현황
     </div>
+
+    <div class="nav-sub-section">수불부관리</div>
+    <div class="nav-item active" onclick="showPanel('material-ledger')">
+      <span class="nav-icon">📒</span>원료수불부
+    </div>
     <div class="nav-item" onclick="showPanel('subsidiary')">
-      <span class="nav-icon">🏷️</span>부자재 수불
+      <span class="nav-icon">🏷️</span>부자재수불부
+    </div>
+    <div class="nav-item" onclick="showPanel('finished-ledger')">
+      <span class="nav-icon">📦</span>완제품수불부
     </div>
 
     <div class="nav-sub-section">생산관리</div>
@@ -204,11 +209,6 @@ tr:hover td{background:var(--bg);}
     </div>
     <div class="nav-item" onclick="showPanel('pack-status')">
       <span class="nav-icon">📦</span>포장현황
-    </div>
-
-    <div class="nav-sub-section">완제품관리</div>
-    <div class="nav-item" onclick="showPanel('finished-ledger')">
-      <span class="nav-icon">📦</span>완제품수불부
     </div>
   </div>
 
