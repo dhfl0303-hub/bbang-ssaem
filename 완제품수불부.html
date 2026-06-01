@@ -115,7 +115,7 @@ tr:hover td{background:var(--bg);}
       <select class="search-input" id="fl-st-group" onchange="flRenderStock()"><option value="전체">전체 그룹</option></select>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="fl-st-hide-zero" onchange="flRenderStock()"> 재고있는것만</label>
     </div>
-    <div class="card"><div class="card-bd" style="padding:0"><div class="table-wrap"><table style="min-width:700px"><thead><tr><th>▸</th><th>그룹LOT</th><th>거래처</th><th>품명</th><th>제조일자</th><th>소비기한</th><th>입고</th><th>출고</th><th>잔량</th></tr></thead><tbody id="fl-stock-tbody"></tbody></table></div></div></div>
+    <div class="card"><div class="card-bd" style="padding:0"><div class="table-wrap"><table style="min-width:800px"><thead><tr><th>▸</th><th>그룹LOT</th><th>거래처</th><th>품명</th><th>제조일자</th><th>소비기한</th><th>입고</th><th>출고</th><th>잔량</th><th>완파렛트</th><th>잔여박스</th></tr></thead><tbody id="fl-stock-tbody"></tbody></table></div></div></div>
   </div>
 
   <div class="fl-panel" id="fl-panel-manage">
@@ -153,6 +153,7 @@ tr:hover td{background:var(--bg);}
 </div>
 
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
 firebase.initializeApp({
@@ -167,6 +168,7 @@ window._db = firebase.firestore();
 </script>
 <script>
 
+function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
 function fmtObDate(input){
   const v=input.value.replace(/\D/g,'').slice(0,6);
   if(v.length===6){
@@ -410,12 +412,47 @@ function flRenderStock(){
   if(gsel){const gv=gsel.value;gsel.innerHTML='<option value="전체">전체 그룹</option>'+allGroups.map(g=>`<option value="${g.key}">${g.key} / ${g.name}</option>`).join('');gsel.value=gv;}
   const tbody=document.getElementById('fl-stock-tbody');
   if(!tbody) return;
-  if(!groups.length){tbody.innerHTML='<tr><td colspan="9" class="tc" style="padding:24px;color:var(--text3)">재고 데이터가 없습니다</td></tr>';return;}
+  if(!groups.length){tbody.innerHTML='<tr><td colspan="11" class="tc" style="padding:24px;color:var(--text3)">재고 데이터가 없습니다</td></tr>';return;}
   let html='';
   for(const g of groups){
     const exp=FL_STATE.expandedStock.has(g.key);
-    html+=`<tr style="cursor:pointer;${g.remain_box===0?'color:var(--text3);':''}" onclick="flToggleStock('${g.key}')"><td>${exp?'▼':'▶'}</td><td style="font-size:11px;font-weight:700;color:var(--primary)">${g.key}</td><td style="font-size:12px">${g.client}</td><td style="font-weight:600">${g.name}</td><td class="tc" style="font-size:12px">${flFmtDate6(g.mfg_date)}</td><td class="tc" style="font-size:12px">${g.exp_date||'-'}</td><td class="tc" style="color:var(--success);font-weight:700">${g.total_box.toLocaleString()}</td><td class="tc" style="color:var(--danger)">${g.total_out.toLocaleString()}</td><td class="tc" style="font-weight:700;color:${g.remain_box>0?'var(--primary)':'var(--text3)'}">${g.remain_box.toLocaleString()}</td></tr>`;
-    if(exp){for(const l of g.lots){const totalOut=l.outbound.reduce((s,o)=>s+o.box,0);html+=`<tr style="background:var(--bg);font-size:12px;"><td></td><td colspan="3" style="color:var(--text2);padding-left:24px">${l.lot_number}</td><td></td><td></td><td class="tc">${l.total_box}</td><td class="tc">${totalOut}</td><td class="tc" style="color:${l.remain_box>0?'var(--success)':'var(--text3)'}">${l.remain_box}</td></tr>`;}}
+    // 파렛트 계산 - products에서 lot_code_base로 pallet_qty 찾기
+    const prod=FL_STATE.products.find(p=>p.lot_code===g.key.split('-')[0]);
+    const palletQty=prod?prod.pallet_qty:0;
+    const fullPallets=palletQty>0?Math.floor(g.remain_box/palletQty):0;
+    const remBoxes=palletQty>0?g.remain_box%palletQty:0;
+    const palletStr=palletQty>0?`<span style="font-weight:700;color:var(--success)">${fullPallets}P</span>`:`-`;
+    const remStr=palletQty>0?`<span style="color:var(--warning)">${remBoxes}box</span>`:`-`;
+    html+=`<tr style="cursor:pointer;${g.remain_box===0?'color:var(--text3);':''}" onclick="flToggleStock('${g.key}')">
+      <td>${exp?'▼':'▶'}</td>
+      <td style="font-size:11px;font-weight:700;color:var(--primary)">${g.key}</td>
+      <td style="font-size:12px">${g.client}</td>
+      <td style="font-weight:600">${g.name}</td>
+      <td class="tc" style="font-size:12px">${flFmtDate6(g.mfg_date)}</td>
+      <td class="tc" style="font-size:12px">${g.exp_date||'-'}</td>
+      <td class="tc" style="color:var(--success);font-weight:700">${g.total_box.toLocaleString()}</td>
+      <td class="tc" style="color:var(--danger)">${g.total_out.toLocaleString()}</td>
+      <td class="tc" style="font-weight:700;color:${g.remain_box>0?'var(--primary)':'var(--text3)'}">${g.remain_box.toLocaleString()}</td>
+      <td class="tc">${palletStr}</td>
+      <td class="tc">${remStr}</td>
+    </tr>`;
+    if(exp){
+      for(const l of g.lots){
+        const totalOut=l.outbound.reduce((s,o)=>s+o.box,0);
+        const lFull=palletQty>0?Math.floor(l.remain_box/palletQty):0;
+        const lRem=palletQty>0?l.remain_box%palletQty:0;
+        html+=`<tr style="background:var(--bg);font-size:12px;">
+          <td></td>
+          <td colspan="3" style="color:var(--text2);padding-left:24px">${l.lot_number}</td>
+          <td></td><td></td>
+          <td class="tc">${l.total_box}</td>
+          <td class="tc">${totalOut}</td>
+          <td class="tc" style="color:${l.remain_box>0?'var(--success)':'var(--text3)'}">${l.remain_box}</td>
+          <td class="tc" style="font-size:11px">${palletQty>0?lFull+'P':'-'}</td>
+          <td class="tc" style="font-size:11px">${palletQty>0?lRem+'box':'-'}</td>
+        </tr>`;
+      }
+    }
   }
   tbody.innerHTML=html;
 }
