@@ -57,7 +57,12 @@ tr:hover td{background:var(--bg);}
 .autocomplete-list.open{display:block;}
 .autocomplete-item{padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);}
 .autocomplete-item:hover{background:var(--primary-light);color:var(--primary);}
-.tc{text-align:center;}
+@media print{
+  .topbar,.filter-row,.btn{display:none!important;}
+  .card-hd .badge{display:none!important;}
+  body{background:#fff;}
+  .card{box-shadow:none;border:1px solid #ddd;}
+}
 </style>
 </head>
 <body>
@@ -224,8 +229,8 @@ function getIngByCode(code){ return INGREDIENT_DB.find(i=>i.code===code); }
 function renderLedger(){
   const selDate=document.getElementById('ledgerDate').value||getTodayISO2();
   const q=document.getElementById('ledgerSearch').value.trim().toLowerCase();
-  const stor=document.getElementById('ledgerStorage').value;
-  document.getElementById('ledgerDate-display').textContent=selDate;
+  const stor=document.getElementById('ledgerFilter').value;
+  document.getElementById('ledgerDateDisplay').textContent=selDate;
 
   // 선택 날짜의 월 범위
   const [sy,sm]=selDate.split('-').map(Number);
@@ -382,29 +387,51 @@ function deleteSavedInitRow(key){
 
 function printLedger(){
   const selDate=document.getElementById('ledgerDate').value||getTodayISO2();
-  const rows=document.getElementById('ledgerTbody').innerHTML;
+  const q=document.getElementById('ledgerSearch').value.trim().toLowerCase();
+  const stor=document.getElementById('ledgerFilter').value;
+  let ings=INGREDIENT_DB.filter(i=>{
+    const qMatch=!q||i.name.toLowerCase().includes(q)||i.code.toLowerCase().includes(q);
+    const sMatch=!stor||i.storage.includes(stor);
+    return qMatch&&sMatch;
+  });
+  let bodyHtml='';
+  ings.forEach(ing=>{
+    const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
+    const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+    const prevStock=Math.max(0,prevInit+prevIn-prevOut);
+    const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
+    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
+    const closing=Math.max(0,prevStock+monthIn-monthOut);
+    bodyHtml+=`<tr>
+      <td>${ing.code}</td>
+      <td style="text-align:left;font-weight:600">${ing.name}</td>
+      <td style="text-align:left">${ing.origin||'-'}</td>
+      <td>${ing.storage||'-'}</td>
+      <td>${ing.unit||'kg'}</td>
+      <td>${prevStock>0?prevStock.toFixed(3):'-'}</td>
+      <td>${monthIn>0?'+'+monthIn.toFixed(3):'-'}</td>
+      <td>${monthOut>0?'-'+monthOut.toFixed(3):'-'}</td>
+      <td style="font-weight:700">${closing>0?closing.toFixed(3):'0.000'}</td>
+    </tr>`;
+  });
   const printWin=window.open('','_blank');
   printWin.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>원료수불부 ${selDate}</title>
   <style>
-    body{font-family:sans-serif;font-size:10px;padding:20px;}
+    body{font-family:"Noto Sans KR",sans-serif;font-size:10px;padding:20px;}
     h2{font-size:16px;margin-bottom:4px;}
     .sub{font-size:12px;color:#666;margin-bottom:14px;}
     table{width:100%;border-collapse:collapse;}
     th{background:#f0f0f0;border:1px solid #999;padding:5px;text-align:center;font-weight:700;}
     td{border:1px solid #999;padding:5px;text-align:center;}
-    td:nth-child(2){text-align:left;font-weight:600;}
-    td:nth-child(3){text-align:left;}
     @page{margin:10mm;size:A4 landscape;}
   </style></head><body>
   <h2>원료수불부</h2>
   <div class="sub">조회일자: ${selDate} / 출력일시: ${new Date().toLocaleString('ko-KR')}</div>
   <table>
-    <thead><tr>
-      <th>코드</th><th>품목명</th><th>원산지</th><th>보관기준</th><th>단위</th>
-      <th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
+    <thead><tr><th>코드</th><th>품목명</th><th>원산지</th><th>보관기준</th><th>단위</th><th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th></tr></thead>
+    <tbody>${bodyHtml}</tbody>
   </table>
   </body></html>`);
   printWin.document.close();
