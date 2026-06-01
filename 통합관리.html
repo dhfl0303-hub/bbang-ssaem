@@ -2356,7 +2356,13 @@ function deleteRecipe(){
 }
 
 // ===== ② 원료 재고 현황 =====
-let ingSortMode = 'code'; // 'code' or 'name'
+let ingSortMode = 'code';
+const ingExpandedSet = new Set();
+function toggleIngGroup(code){
+  if(ingExpandedSet.has(code)) ingExpandedSet.delete(code);
+  else ingExpandedSet.add(code);
+  renderIngStock();
+}
 function setIngSort(mode){
   ingSortMode = mode;
   document.getElementById('sortCodeBtn').style.cssText = mode==='code' ? 'background:var(--primary);color:#fff;border-color:var(--primary)' : '';
@@ -2420,32 +2426,65 @@ function renderIngStock(){
       </div>`).join('');
   } else alertCard.style.display='none';
 
-  document.getElementById('ingStockTbody').innerHTML=ingStock.length?
-    [...ingStock].sort((a,b)=>{
-      if(ingSortMode==='name') return a.name.localeCompare(b.name,'ko');
-      // 코드순
-      const numA=parseInt((a.code||'').replace(/\D/g,''))||0;
-      const numB=parseInt((b.code||'').replace(/\D/g,''))||0;
-      if(numA!==numB) return numA-numB;
-      return a.name.localeCompare(b.name,'ko');
-    }).map((s,i)=>{
-      const diff=daysDiff(s.expiry);
-      const badge=diff<0?'badge-red':diff<=7?'badge-orange':'badge-green';
-      const label=diff<0?'초과':diff<=7?'D-'+diff:'정상';
-      const ing = (typeof INGREDIENT_DB!=='undefined') ? INGREDIENT_DB.find(x=>x.name===s.name) : null;
-      const code = s.code || (ing?ing.code:'-');
-      const origIdx = ingStock.indexOf(s);
-      const dateLabel = s.mfg ? `제조: ${s.mfg}` : (s.expiry ? `소비: ${s.expiry}` : '-');
-      return `<tr>
-        <td><span class="badge badge-blue" style="font-size:10px;">${code}</span></td>
-        <td style="font-weight:600">${s.name}</td>
-        <td>${Number(s.qty).toLocaleString()}kg</td>
-        <td>${dateLabel}</td>
-        <td><span class="badge ${badge}">${label}</span></td>
-        <td><button class="btn btn-sm btn-danger" onclick="deleteIngStock(${origIdx})">삭제</button></td>
-      </tr>`;
-    }).join(''):
-    '<tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">등록된 원료가 없습니다</td></tr>';
+  // 코드별 그룹핑
+  const sorted = [...ingStock].sort((a,b)=>{
+    if(ingSortMode==='name') return a.name.localeCompare(b.name,'ko');
+    const numA=parseInt((a.code||'').replace(/\D/g,''))||9999;
+    const numB=parseInt((b.code||'').replace(/\D/g,''))||9999;
+    if(numA!==numB) return numA-numB;
+    return a.name.localeCompare(b.name,'ko');
+  });
+
+  // 코드별 그룹 생성
+  const groups={}, groupOrder=[];
+  sorted.forEach(s=>{
+    const ing=(typeof INGREDIENT_DB!=='undefined')?INGREDIENT_DB.find(x=>x.name===s.name):null;
+    const code=s.code||(ing?ing.code:'-');
+    if(!groups[code]){ groups[code]={code,name:s.name,items:[]}; groupOrder.push(code); }
+    groups[code].items.push({...s, _code:code});
+  });
+
+  if(!groupOrder.length){
+    document.getElementById('ingStockTbody').innerHTML='<tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">등록된 원료가 없습니다</td></tr>';
+    return;
+  }
+
+  let html='';
+  groupOrder.forEach(code=>{
+    const g=groups[code];
+    const totalQty=g.items.reduce((s,i)=>s+Number(i.qty),0);
+    const expanded=ingExpandedSet.has(code);
+    // 그룹 내 상태 중 가장 심각한 것
+    const worstDiff=Math.min(...g.items.map(i=>daysDiff(i.expiry)||999));
+    const gBadge=worstDiff<0?'badge-red':worstDiff<=7?'badge-orange':'badge-green';
+    const gLabel=worstDiff<0?'초과':worstDiff<=7?'D-'+worstDiff:'정상';
+    html+=`<tr style="cursor:pointer;background:var(--bg2)" onclick="toggleIngGroup('${code}')">
+      <td><span class="badge badge-blue" style="font-size:10px">${code}</span></td>
+      <td style="font-weight:700">${g.name} <span style="font-size:11px;color:var(--text3)">(${g.items.length}건)</span></td>
+      <td style="font-weight:700">${totalQty.toLocaleString()}kg</td>
+      <td style="color:var(--text3);font-size:12px">-</td>
+      <td><span class="badge ${gBadge}">${gLabel}</span></td>
+      <td class="tc" style="font-size:12px">${expanded?'▲':'▼'}</td>
+    </tr>`;
+    if(expanded){
+      g.items.forEach(s=>{
+        const origIdx=ingStock.indexOf(ingStock.find(x=>x._syncKey===s._syncKey&&x.name===s.name&&x.qty===s.qty));
+        const diff=daysDiff(s.expiry);
+        const badge=diff<0?'badge-red':diff<=7?'badge-orange':'badge-green';
+        const label=diff<0?'초과':diff<=7?'D-'+diff:'정상';
+        const dateLabel=s.mfg?`제조: ${s.mfg}`:(s.expiry?`소비: ${s.expiry}`:'-');
+        html+=`<tr style="background:var(--bg);font-size:12px">
+          <td></td>
+          <td style="padding-left:24px;color:var(--text2)">${s.name}</td>
+          <td>${Number(s.qty).toLocaleString()}kg</td>
+          <td>${dateLabel}</td>
+          <td><span class="badge ${badge}">${label}</span></td>
+          <td><button class="btn btn-sm btn-danger" onclick="deleteIngStock(${origIdx})">삭제</button></td>
+        </tr>`;
+      });
+    }
+  });
+  document.getElementById('ingStockTbody').innerHTML=html;
 }
 function openAddIngStock(){
   closeAllModals();
