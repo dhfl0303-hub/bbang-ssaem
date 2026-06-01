@@ -644,31 +644,31 @@ tr:hover td{background:var(--bg);}
       </div>
       <!-- 배합 탭 -->
       <div style="display:flex;gap:6px;margin-bottom:12px;">
-        <button class="btn btn-sm" id="tab-b1" onclick="showBatch('b1')" style="background:var(--primary);color:#fff">배합1</button>
-        <button class="btn btn-sm" id="tab-b2" onclick="showBatch('b2')">배합2</button>
-        <button class="btn btn-sm" id="tab-b3" onclick="showBatch('b3')">배합3</button>
-        <button class="btn btn-sm" id="tab-b4" onclick="showBatch('b4')">배합4</button>
+        <button class="btn btn-sm" id="bTab1" onclick="showBatch('b1')" style="background:var(--primary);color:#fff;border-color:var(--primary)">배합1</button>
+        <button class="btn btn-sm" id="bTab2" onclick="showBatch('b2')">배합2</button>
+        <button class="btn btn-sm" id="bTab3" onclick="showBatch('b3')">배합3</button>
+        <button class="btn btn-sm" id="bTab4" onclick="showBatch('b4')">배합4</button>
       </div>
       <!-- 배합1 -->
-      <div id="batchPanel-b1">
+      <div id="batch-b1">
         <div class="form-row" style="margin-bottom:8px"><label class="form-label">반죽중량(g)</label><input class="form-input" id="rW1" type="number" placeholder="0" style="max-width:160px"></div>
         <div id="ingRows1"></div>
         <button class="btn btn-sm btn-outline" onclick="addIngRowN(1)">+ 원료 추가</button>
       </div>
       <!-- 배합2 -->
-      <div id="batchPanel-b2" style="display:none">
+      <div id="batch-b2" style="display:none">
         <div class="form-row" style="margin-bottom:8px"><label class="form-label">반죽중량(g)</label><input class="form-input" id="rW2" type="number" placeholder="0" style="max-width:160px"></div>
         <div id="ingRows2"></div>
         <button class="btn btn-sm btn-outline" onclick="addIngRowN(2)">+ 원료 추가</button>
       </div>
       <!-- 배합3 -->
-      <div id="batchPanel-b3" style="display:none">
+      <div id="batch-b3" style="display:none">
         <div class="form-row" style="margin-bottom:8px"><label class="form-label">반죽중량(g)</label><input class="form-input" id="rW3" type="number" placeholder="0" style="max-width:160px"></div>
         <div id="ingRows3"></div>
         <button class="btn btn-sm btn-outline" onclick="addIngRowN(3)">+ 원료 추가</button>
       </div>
       <!-- 배합4 -->
-      <div id="batchPanel-b4" style="display:none">
+      <div id="batch-b4" style="display:none">
         <div class="form-row" style="margin-bottom:8px"><label class="form-label">반죽중량(g)</label><input class="form-input" id="rW4" type="number" placeholder="0" style="max-width:160px"></div>
         <div id="ingRows4"></div>
         <button class="btn btn-sm btn-outline" onclick="addIngRowN(4)">+ 원료 추가</button>
