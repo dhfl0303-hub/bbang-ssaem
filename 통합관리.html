@@ -1578,58 +1578,70 @@ function searchTrace(){
   const result = document.getElementById('traceResult');
   if(!input){ result.innerHTML='<div style="text-align:center;padding:24px;color:var(--text3);">LOT번호를 입력해주세요</div>'; return; }
 
-  let html = `<div style="margin-bottom:16px;padding:12px 16px;background:var(--primary-light);border-radius:8px;font-size:14px;font-weight:700;color:var(--primary);">
+  let html = `<div style="margin-bottom:20px;padding:12px 16px;background:var(--primary-light);border-radius:8px;font-size:14px;font-weight:700;color:var(--primary);">
     🔍 "${input}" ${traceMode==='forward'?'순방향':'역방향'} 추적 결과</div>`;
 
   if(traceMode === 'forward'){
-    // ===== 순방향 =====
+    // 원료LOT 순방향
     if(input.startsWith('M')){
-      html += buildTraceSection('📦 원료 입고', findRawMaterial(input));
-      html += buildTraceArrow();
-      const batchItems = findBatchByIngredient(input);
-      html += buildTraceSection('🥣 배합 사용', batchItems);
+      const rawItems = findRawMaterialData(input);
+      html += buildTraceTable('사용원료', ['원료LOT','원료명','소비기한or제조일자','사용량(g)'],
+        rawItems.map(r=>[r.lot||input, r.name||'-', r.exp||'-', r.qty||'-']));
+      const batchItems = findBatchByIngredientData(input);
       if(batchItems.length){
-        const batchLots = batchItems.map(b=>b.split('배합LOT: ')[1]).filter(Boolean);
-        const packItems = batchLots.flatMap(bl=>findPackByBatchLot(bl));
+        html += buildTraceArrowHtml();
+        html += buildTraceTable('배합 공정', ['LOT','품명','제조일자','배합수'],
+          batchItems.map(b=>[b.lot, b.product, b.date, b.batches+'번']));
+        const packItems = batchItems.flatMap(b=>findPackByBatchLotData(b.lot));
         if(packItems.length){
-          html += buildTraceArrow();
-          html += buildTraceSection('📦 포장', packItems);
-          const packLots = packItems.map(p=>p.split(' · ')[2]).filter(Boolean);
-          const finItems = packLots.flatMap(pl=>findFinishedByPackLot(pl));
+          html += buildTraceArrowHtml();
+          html += buildTraceTable('포장 공정', ['LOT','품명','소비기한','수량'],
+            packItems.map(p=>[p.lot, p.product, p.expiry||'-', (p.qtyPcs||0)+'개']));
+          const finItems = packItems.flatMap(p=>findFinishedByPackLotData(p.lot));
           if(finItems.length){
-            html += buildTraceArrow();
-            html += buildTraceSection('🏬 완제품', finItems);
+            html += buildTraceArrowHtml();
+            html += buildTraceTable('완제품', ['LOT','품명','소비기한','잔량'],
+              finItems.map(f=>[f.lot_number, f.name, f.exp_date||'-', f.remain_box+'BOX']));
           }
         }
       }
-    } else if(input.startsWith('포장-') || /^포장/.test(input)){
-      html += buildTraceSection('📦 포장 LOT', findPackRecord(input));
-      html += buildTraceArrow();
-      html += buildTraceSection('🏬 완제품 입고', findFinishedByPackLot(input));
-    } else {
-      html += buildTraceSection('🏬 완제품 재고', findFinishedByLot(input));
+    } else if(/^포장-/.test(input)){
+      const packItems = findPackRecordData(input);
+      html += buildTraceTable('포장 공정', ['LOT','품명','소비기한','수량'],
+        packItems.map(p=>[p.lot, p.product, p.expiry||'-', (p.qtyPcs||0)+'개']));
+      const finItems = packItems.flatMap(p=>findFinishedByPackLotData(p.lot));
+      if(finItems.length){
+        html += buildTraceArrowHtml();
+        html += buildTraceTable('완제품', ['LOT','품명','소비기한','잔량'],
+          finItems.map(f=>[f.lot_number, f.name, f.exp_date||'-', f.remain_box+'BOX']));
+      }
     }
   } else {
-    // ===== 역방향 =====
-    // 완제품LOT → 포장LOT → 배합LOT → 원료LOT
-    html += buildTraceSection('🏬 완제품', findFinishedByLot(input));
-    html += buildTraceArrow();
-    const pkgLot = findPackLotFromFinished(input);
-    html += buildTraceSection('📦 포장 LOT', pkgLot);
-    if(pkgLot.length){
-      html += buildTraceArrow();
-      // 포장LOT에서 P코드 추출 → 배합LOT 찾기
-      const pCodes = pkgLot.map(p=>{ const m=p.match(/포장-(P\d+)/); return m?m[1]:null; }).filter(Boolean);
-      const batchItems = pCodes.flatMap(pc=>findBatchByProductCode(pc));
-      html += buildTraceSection('🥣 배합 LOT', batchItems);
-      if(batchItems.length){
-        html += buildTraceArrow();
-        // 배합LOT에서 원료 추출
-        const ingItems = batchItems.flatMap(b=>{
-          const lotPart = b.split('배합LOT: ')[1];
-          return lotPart ? findIngredientByBatchLot(lotPart) : [];
-        });
-        html += buildTraceSection('📦 사용 원료', ingItems);
+    // 역방향
+    const finItems = findFinishedByLotData(input);
+    html += buildTraceTable('완제품', ['LOT','품명','소비기한','잔량'],
+      finItems.map(f=>[f.lot_number, f.name, f.exp_date||'-', f.remain_box+'BOX']));
+
+    const pkgLots = finItems.map(f=>f.pkg_lot).filter(Boolean);
+    if(pkgLots.length){
+      html += buildTraceArrowHtml();
+      const packItems = pkgLots.flatMap(pl=>findPackRecordData(pl));
+      html += buildTraceTable('포장 공정', ['LOT','품명','소비기한','수량'],
+        packItems.map(p=>[p.lot, p.product, p.expiry||'-', (p.qtyPcs||0)+'개']));
+
+      const batchLots = packItems.map(p=>p.batchLot).filter(Boolean);
+      if(batchLots.length){
+        html += buildTraceArrowHtml();
+        const batchItems = batchLots.flatMap(bl=>findBatchByLotData(bl));
+        html += buildTraceTable('배합 공정', ['LOT','품명','제조일자','배합수'],
+          batchItems.map(b=>[b.lot, b.product, b.date, b.batches+'번']));
+
+        if(batchItems.length){
+          html += buildTraceArrowHtml();
+          const ingItems = batchItems.flatMap(b=>findIngredientByBatchLotData(b.lot));
+          html += buildTraceTable('사용원료', ['원료LOT','배합 사용원료','제조일자 or 소비기한','사용량(g)'],
+            ingItems.map(i=>[i.lot||'-', i.name, i.expType+': '+i.exp, Number(i.qty).toLocaleString()]));
+        }
       }
     }
   }
@@ -1637,14 +1649,121 @@ function searchTrace(){
   result.innerHTML = html;
 }
 
-function buildTraceSection(title, items){
-  if(!items||!items.length) return `<div style="padding:12px 16px;margin-bottom:8px;background:#f8f9fb;border-radius:8px;color:var(--text3);font-size:13px;">${title}: 관련 기록 없음</div>`;
-  return `<div style="margin-bottom:8px;">
-    <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">${title}</div>
-    ${items.map(i=>`<div style="padding:10px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:4px;font-size:13px;">${i}</div>`).join('')}
+function buildTraceTable(title, headers, rows){
+  const sectionColors = {
+    '완제품':'#e8f0fb', '포장 공정':'#e8f5ef', '배합 공정':'#fff3e0', '사용원료':'#fce8e8'
+  };
+  const headerColors = {
+    '완제품':'#1a5fa8', '포장 공정':'#1e9e6e', '배합 공정':'#e07b1a', '사용원료':'#c0392b'
+  };
+  const bgColor = sectionColors[title]||'#f4f6fa';
+  const hColor = headerColors[title]||'#555';
+  const emptyRow = rows.length===0
+    ? `<tr><td colspan="${headers.length}" style="padding:12px;text-align:center;color:#999;">관련 기록 없음</td></tr>`
+    : rows.map(r=>`<tr>${r.map(c=>`<td style="padding:8px 12px;border:1px solid #e0e4ea;font-size:12px;">${c}</td>`).join('')}</tr>`).join('');
+  return `<div style="margin-bottom:20px;">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;">${title}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr>${headers.map(h=>`<th style="padding:8px 12px;background:${bgColor};border:1px solid #e0e4ea;font-weight:700;text-align:left;color:${hColor};">${h}</th>`).join('')}</tr></thead>
+      <tbody>${emptyRow}</tbody>
+    </table>
   </div>`;
 }
-function buildTraceArrow(){ return '<div style="text-align:center;font-size:20px;color:var(--text3);margin:4px 0;">↓</div>'; }
+function buildTraceArrowHtml(){ return '<div style="text-align:center;font-size:18px;color:#aaa;margin:4px 0;">↓</div>'; }
+
+// ===== 데이터 반환 함수들 =====
+function findRawMaterialData(lot){
+  try{
+    const r=JSON.parse(localStorage.getItem('incomingRecords')||'[]');
+    return r.flatMap(rec=>rec.rows.filter(row=>row.lot===lot).map(row=>({
+      lot:row.lot, name:row.product, exp:row.exp||'-', qty:row.qty
+    })));
+  }catch(e){ return []; }
+}
+function findBatchByIngredientData(lot){
+  try{
+    const keys=Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
+    const found=[];
+    keys.forEach(k=>{
+      const recs=JSON.parse(localStorage.getItem(k)||'[]');
+      recs.forEach(r=>{
+        (r.batchRecords||[]).forEach(b=>{
+          const used=(b.ingredients||[]).some(ing=>(ing.exps||[]).some(e=>e.lot===lot||e.exp===lot));
+          if(used) found.push({lot:b.lot, product:r.product, date:r.date, batches:r.totalBatches||1});
+        });
+      });
+    });
+    return found;
+  }catch(e){ return []; }
+}
+function findPackByBatchLotData(batchLot){
+  try{
+    const keys=Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
+    const found=[];
+    keys.forEach(k=>{
+      const recs=JSON.parse(localStorage.getItem(k)||'[]');
+      recs.forEach(r=>{ if(r.batchLot===batchLot) found.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot}); });
+    });
+    return found;
+  }catch(e){ return []; }
+}
+function findPackRecordData(packLot){
+  try{
+    const keys=Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
+    const found=[];
+    keys.forEach(k=>{
+      const recs=JSON.parse(localStorage.getItem(k)||'[]');
+      recs.forEach(r=>{ if(r.lot===packLot) found.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot}); });
+    });
+    return found;
+  }catch(e){ return []; }
+}
+function findFinishedByPackLotData(packLot){
+  try{
+    return JSON.parse(localStorage.getItem('완제품_lots')||'[]').filter(r=>r.pkg_lot===packLot);
+  }catch(e){ return []; }
+}
+function findFinishedByLotData(finLot){
+  try{
+    return JSON.parse(localStorage.getItem('완제품_lots')||'[]').filter(r=>r.lot_number===finLot||r.lot_number.startsWith(finLot));
+  }catch(e){ return []; }
+}
+function findBatchByLotData(batchLot){
+  try{
+    const keys=Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
+    const found=[];
+    keys.forEach(k=>{
+      const recs=JSON.parse(localStorage.getItem(k)||'[]');
+      recs.forEach(r=>{
+        (r.batchRecords||[]).forEach(b=>{
+          if(b.lot===batchLot) found.push({lot:b.lot,product:r.product,date:r.date,batches:r.totalBatches||1,ingredients:b.ingredients});
+        });
+      });
+    });
+    return found;
+  }catch(e){ return []; }
+}
+function findIngredientByBatchLotData(batchLot){
+  try{
+    const keys=Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
+    const found=[];
+    keys.forEach(k=>{
+      const recs=JSON.parse(localStorage.getItem(k)||'[]');
+      recs.forEach(r=>{
+        (r.batchRecords||[]).forEach(b=>{
+          if(b.lot===batchLot){
+            (b.ingredients||[]).forEach(ing=>{
+              (ing.exps||[]).forEach(e=>{
+                found.push({lot:e.lot||'-',name:ing.name,exp:e.exp||'-',expType:e.exp?'소비기한':'제조일자',qty:e.amount||0});
+              });
+            });
+          }
+        });
+      });
+    });
+    return found;
+  }catch(e){ return []; }
+}
 
 function findPackByBatchLot(batchLot){
   try{
