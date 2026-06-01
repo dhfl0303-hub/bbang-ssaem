@@ -91,7 +91,7 @@ tr:hover td{background:var(--bg);}
           </div>
           <div class="form-row"><label class="form-label">출고처</label><select class="form-input" id="fl-ob-client"><option value="">-- 선택 --</option></select></div>
           <div class="form-grid">
-            <div class="form-row"><label class="form-label">출고일</label><input class="form-input" id="fl-ob-date" type="date"></div>
+            <div class="form-row"><label class="form-label">출고일</label><input class="form-input" id="fl-ob-date" type="text" placeholder="예: 260601" maxlength="8" oninput="fmtObDate(this)"></div>
             <div class="form-row"><label class="form-label">출고 박스수</label><input class="form-input" id="fl-ob-boxes" type="number" placeholder="0"></div>
           </div>
           <button class="btn btn-success" style="width:100%;margin-top:8px;" onclick="flRegisterOutbound()">🚚 출고 등록</button>
@@ -122,7 +122,7 @@ tr:hover td{background:var(--bg);}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div>
         <div class="card"><div class="card-hd"><div class="card-hd-title">🏷 제품 관리</div></div><div class="card-bd"><div class="form-grid"><div class="form-row"><label class="form-label">LOT코드</label><input class="form-input" id="fl-pm-lot-code" placeholder="예: E11"></div><div class="form-row"><label class="form-label">거래처</label><input class="form-input" id="fl-pm-client" placeholder="거래처명"></div><div class="form-row"><label class="form-label">제품명</label><input class="form-input" id="fl-pm-name" placeholder="제품명"></div><div class="form-row"><label class="form-label">규격</label><input class="form-input" id="fl-pm-spec" placeholder="예: 65g*24ea/box"></div><div class="form-row"><label class="form-label">파렛트당 박스</label><input class="form-input" id="fl-pm-pallet" type="number" placeholder="0"></div></div><button class="btn btn-primary btn-sm" style="width:100%;margin-top:8px;" onclick="flAddProduct()">+ 제품 추가</button></div></div>
-        <div class="card"><div class="card-bd" style="padding:0"><div class="table-wrap"><table style="min-width:300px"><thead><tr><th>LOT</th><th>거래처</th><th>제품명</th><th>규격</th><th></th></tr></thead><tbody id="fl-product-tbody"></tbody></table></div></div></div>
+        <div class="card"><div class="card-bd" style="padding:0"><div class="table-wrap"><table style="min-width:300px"><thead><tr><th>LOT</th><th>거래처</th><th>제품명</th><th>규격</th><th>파렛트/박스</th><th></th></tr></thead><tbody id="fl-product-tbody"></tbody></table></div></div></div>
       </div>
       <div>
         <div class="card"><div class="card-hd"><div class="card-hd-title">🏢 출고처 관리</div></div><div class="card-bd"><div style="display:flex;gap:8px;margin-bottom:10px;"><input class="form-input" id="fl-cl-new" placeholder="출고처명 입력"><button class="btn btn-primary btn-sm" onclick="flAddClient()">추가</button></div><div class="table-wrap"><table style="min-width:200px"><thead><tr><th>출고처명</th><th></th></tr></thead><tbody id="fl-client-tbody"></tbody></table></div></div></div>
@@ -132,7 +132,27 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<!-- 제품 수정 모달 -->
+<div class="modal-overlay" id="fl-edit-product-modal" onclick="closeModalOutside(event,'fl-edit-product-modal')">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title">✏️ 제품 수정</div><button class="modal-close" onclick="closeModal('fl-edit-product-modal')">×</button></div>
+    <div class="modal-bd">
+      <div class="form-row"><label class="form-label">LOT코드</label><input class="form-input" id="fl-ep-lot" readonly style="background:var(--bg);color:var(--text3)"></div>
+      <div class="form-grid">
+        <div class="form-row"><label class="form-label">거래처</label><input class="form-input" id="fl-ep-client"></div>
+        <div class="form-row"><label class="form-label">제품명</label><input class="form-input" id="fl-ep-name"></div>
+        <div class="form-row"><label class="form-label">규격</label><input class="form-input" id="fl-ep-spec"></div>
+        <div class="form-row"><label class="form-label">파렛트당 박스</label><input class="form-input" id="fl-ep-pallet" type="number" placeholder="0"></div>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-outline" onclick="closeModal('fl-edit-product-modal')">취소</button>
+      <button class="btn btn-primary" onclick="flSaveEditProduct()">저장</button>
+    </div>
+  </div>
+</div>
+
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
 firebase.initializeApp({
@@ -147,7 +167,22 @@ window._db = firebase.firestore();
 </script>
 <script>
 
-function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
+function fmtObDate(input){
+  const v=input.value.replace(/\D/g,'').slice(0,6);
+  if(v.length===6){
+    input.value=`${v.slice(0,2)}.${v.slice(2,4)}.${v.slice(4,6)}`;
+    input.dataset.raw=v;
+    input.style.color='var(--primary)'; input.style.fontWeight='700';
+  } else {
+    input.dataset.raw='';
+    input.style.color=''; input.style.fontWeight='';
+    input.value=v;
+  }
+}
+function getObDateVal(){
+  const el=document.getElementById('fl-ob-date');
+  return el ? (el.dataset.raw||el.value.replace(/\./g,'')||'') : '';
+}
 function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 function closeModalOutside(e,id){ if(e.target.id===id) closeModal(id); }
@@ -155,6 +190,80 @@ function closeAllModals(){ document.querySelectorAll('.modal-overlay.open').forE
 
 // ===== 완제품수불부 =====
 const FL_DEFAULT_CLIENTS=["골든박스컴퍼니","주식회사그라프팅","그린박스컴퍼니","스마트푸드네트웍스","파미유","오아시스성남센터","풍농오산물류센터","제때오산센터"];
+const FL_DEFAULT_PRODUCTS=[
+  {lot_code:"A1",  client:"골든박스",    name:"수제소금빵",              spec:"70g*24ea/box",         pallet_qty:80},
+  {lot_code:"A2",  client:"골든박스",    name:"수제감자빵",              spec:"100g*6ea/box",         pallet_qty:40},
+  {lot_code:"A3",  client:"골든박스",    name:"볼케이노감자빵",          spec:"90g*4ea/box",          pallet_qty:0},
+  {lot_code:"A4",  client:"골든박스",    name:"플레인베이글",            spec:"110g*50ea/box",        pallet_qty:64},
+  {lot_code:"A5",  client:"골든박스",    name:"양파베이글",              spec:"110g*50ea/box",        pallet_qty:64},
+  {lot_code:"A6",  client:"골든박스",    name:"올리브베이글",            spec:"110g*50ea/box",        pallet_qty:64},
+  {lot_code:"A7",  client:"골든박스",    name:"감자베이글",              spec:"150g*35ea/box",        pallet_qty:64},
+  {lot_code:"A8",  client:"골든박스",    name:"치즈베이글",              spec:"110g*50ea/box",        pallet_qty:64},
+  {lot_code:"A9",  client:"골든박스",    name:"페페로니칠리베이글",      spec:"110g*50ea/box",        pallet_qty:64},
+  {lot_code:"A10", client:"골든박스",    name:"바질토마토베이글",        spec:"110g*50ea/box",        pallet_qty:64},
+  {lot_code:"B1",  client:"골든브라운",  name:"소금빵(완)",              spec:"65g*24ea/box",         pallet_qty:80},
+  {lot_code:"B2",  client:"골든브라운",  name:"감자빵",                  spec:"100g*12ea/box",        pallet_qty:135},
+  {lot_code:"B3",  client:"골든브라운",  name:"고구마빵",                spec:"100g*12ea/box",        pallet_qty:135},
+  {lot_code:"C1",  client:"그라프팅",    name:"박뚜기 소금빵 성형생지",  spec:"70g*40ea/box",         pallet_qty:120},
+  {lot_code:"C2",  client:"그린박스",    name:"달리는소금빵(성형생지)",  spec:"80g*40ea/box",         pallet_qty:28},
+  {lot_code:"C3",  client:"그린박스",    name:"달리는소금빵(성형생지)",  spec:"80g*200ea/box",        pallet_qty:0},
+  {lot_code:"C4",  client:"그린박스",    name:"대파소금빵(성형생지)",    spec:"78g*200ea/box",        pallet_qty:28},
+  {lot_code:"D1",  client:"메가커피",    name:"MGC한컵브런치",           spec:"110g*12ea/box",        pallet_qty:0},
+  {lot_code:"E1",  client:"범용",        name:"리얼감자생지",            spec:"100g*50ea/box",        pallet_qty:80},
+  {lot_code:"E2",  client:"범용",        name:"리얼고구마생지",          spec:"180g*40ea/box",        pallet_qty:80},
+  {lot_code:"E3",  client:"범용",        name:"단과자생지",              spec:"60g*120ea/box",        pallet_qty:80},
+  {lot_code:"E4",  client:"범용",        name:"우유식빵생지",            spec:"80g*70ea/box",         pallet_qty:80},
+  {lot_code:"E5",  client:"범용",        name:"소금빵생지",              spec:"75g*100ea/box",        pallet_qty:80},
+  {lot_code:"E6",  client:"범용",        name:"소금빵(완)",              spec:"65g*12ea/box",         pallet_qty:80},
+  {lot_code:"E7",  client:"범용",        name:"앵커버터소금빵",          spec:"65g*12ea/box",         pallet_qty:120},
+  {lot_code:"E8",  client:"범용",        name:"앵커버터소금빵",          spec:"70g*12ea/box",         pallet_qty:120},
+  {lot_code:"E9",  client:"범용",        name:"우유크림소금빵",          spec:"95g*12ea/box",         pallet_qty:120},
+  {lot_code:"E10", client:"범용",        name:"소금버터식빵",            spec:"150g*5ea*1pack/box",   pallet_qty:120},
+  {lot_code:"E11", client:"범용",        name:"공주밤빵",                spec:"80g*8ea/box",          pallet_qty:120},
+  {lot_code:"E12", client:"범용",        name:"불고기피자",              spec:"90g*12ea/box",         pallet_qty:135},
+  {lot_code:"E13", client:"범용",        name:"베이컨포테이토피자",      spec:"90g*12ea/box",         pallet_qty:135},
+  {lot_code:"E14", client:"범용",        name:"애플파이",                spec:"70g*12ea/box",         pallet_qty:120},
+  {lot_code:"E15", client:"범용",        name:"버터떡",                  spec:"30g*24ea/box",         pallet_qty:135},
+  {lot_code:"F1",  client:"빽다방",      name:"고메버터 소금빵",         spec:"65g*12ea/box",         pallet_qty:120},
+  {lot_code:"F2",  client:"빽다방",      name:"햄치즈샌드위치",          spec:"120g*8ea/box",         pallet_qty:135},
+  {lot_code:"F3",  client:"빽다방",      name:"쫀득감자빵",              spec:"100g*12ea/box",        pallet_qty:135},
+  {lot_code:"F4",  client:"빽다방",      name:"쫀득고구마빵",            spec:"100g*12ea/box",        pallet_qty:135},
+  {lot_code:"G1",  client:"솔트앤스낵",  name:"소금빵(완)",              spec:"65g*24ea/box",         pallet_qty:80},
+  {lot_code:"G2",  client:"솔트앤스낵",  name:"초코소금빵(완)",          spec:"65g*24ea/box",         pallet_qty:0},
+  {lot_code:"H1",  client:"에이바우트",  name:"에이바우트피자 콘치즈",   spec:"90g*16ea/box",         pallet_qty:120},
+  {lot_code:"H2",  client:"에이바우트",  name:"에이바우트피자 페퍼로니", spec:"80g*16ea/box",         pallet_qty:120},
+  {lot_code:"H3",  client:"에이바우트",  name:"에이바우트피자 불고기",   spec:"90g*16ea/box",         pallet_qty:120},
+  {lot_code:"H4",  client:"에이바우트",  name:"에이바우트피자 포테이토", spec:"90g*16ea/box",         pallet_qty:120},
+  {lot_code:"I1",  client:"욤",          name:"소금빵(완)",              spec:"65g*24ea/box",         pallet_qty:80},
+  {lot_code:"I2",  client:"욤",          name:"감자빵",                  spec:"100g*12ea/box",        pallet_qty:0},
+  {lot_code:"I3",  client:"욤",          name:"고구마빵",                spec:"100g*12ea/box",        pallet_qty:0},
+  {lot_code:"J1",  client:"이디야",      name:"플레인소금빵",            spec:"65g*8ea/box",          pallet_qty:144},
+  {lot_code:"J2",  client:"이디야",      name:"백두랑이마들렌(황치즈)",  spec:"65g*12ea/box",         pallet_qty:144},
+  {lot_code:"J3",  client:"이디야",      name:"백두랑이마들렌(초코)",    spec:"65g*12ea/box",         pallet_qty:144},
+  {lot_code:"K1",  client:"지구",        name:"앵커버터소금빵 반생지",   spec:"80g*40ea/box",         pallet_qty:120},
+  {lot_code:"L1",  client:"컴포즈",      name:"쫀득버터떡",              spec:"30g*12ea/box",         pallet_qty:0},
+  {lot_code:"M1",  client:"코리안파인",  name:"잣러스크",                spec:"130g*20ea/box",        pallet_qty:0},
+  {lot_code:"N1",  client:"타타스베이글",name:"플레인베이글생지TATAS",   spec:"130g*20ea*2pack/box",  pallet_qty:88},
+  {lot_code:"N2",  client:"타타스베이글",name:"플레인베이글TATAS",       spec:"100g*6ea*3pack/box",   pallet_qty:88},
+  {lot_code:"N3",  client:"타타스베이글",name:"어니언베이글TATAS",       spec:"100g*6ea*3pack/box",   pallet_qty:88},
+  {lot_code:"N4",  client:"타타스베이글",name:"무화과베이글TATAS",       spec:"100g*6ea*3pack/box",   pallet_qty:88},
+  {lot_code:"N5",  client:"타타스베이글",name:"올리브베이글TATAS",       spec:"100g*6ea*3pack/box",   pallet_qty:88},
+  {lot_code:"N6",  client:"타타스베이글",name:"크랜베리호두베이글TATAS", spec:"100g*6ea*3pack/box",   pallet_qty:88},
+  {lot_code:"N7",  client:"타타스베이글",name:"블루베리베이글TATAS",     spec:"100g*6ea*3pack/box",   pallet_qty:88},
+  {lot_code:"N8",  client:"타타스베이글",name:"딥초코베이글TATAS",       spec:"100g*6ea*3pack/box",   pallet_qty:88},
+  {lot_code:"N9",  client:"타타스베이글",name:"곡물베이글TATAS",         spec:"100g*6ea*3pack/box",   pallet_qty:88},
+  {lot_code:"N10", client:"타타스베이글",name:"감자베이글TATAS",         spec:"125g*6ea*3pack/box",   pallet_qty:88},
+  {lot_code:"N11", client:"타타스베이글",name:"거북이단과자생지",         spec:"70g*100ea/box",        pallet_qty:64},
+  {lot_code:"O1",  client:"탐앤탐스",    name:"티요프레즐생지",          spec:"135g*50ea*2pack/box",  pallet_qty:32},
+  {lot_code:"P1",  client:"파스마브레드",name:"파스마 소금빵 알생지",    spec:"70g*100ea/box",        pallet_qty:80},
+  {lot_code:"Q1",  client:"푸드뱅크",    name:"소금빵(완)",              spec:"65g*60ea/box",         pallet_qty:0},
+  {lot_code:"Q2",  client:"푸드뱅크",    name:"앵커버터소금빵",          spec:"65g*60ea/box",         pallet_qty:0},
+  {lot_code:"Q3",  client:"푸드뱅크",    name:"우유크림소금빵",          spec:"95g*60ea/box",         pallet_qty:0},
+  {lot_code:"Q4",  client:"푸드뱅크",    name:"감자빵",                  spec:"100g*40ea/box",        pallet_qty:0},
+  {lot_code:"Q5",  client:"푸드뱅크",    name:"고구마빵",                spec:"100g*40ea/box",        pallet_qty:0},
+  {lot_code:"Q6",  client:"푸드뱅크",    name:"크로크무슈",              spec:"120g*30ea/box",        pallet_qty:0},
+  {lot_code:"Q7",  client:"푸드뱅크",    name:"베이글(혼합)",            spec:"100g*60ea/box",        pallet_qty:0},
+];
 let FL_STATE={lots:[],products:[],clients:[],expandedStock:new Set()};
 
 function flSave(){
@@ -164,7 +273,7 @@ function flSave(){
 }
 function flLoad(){
   FL_STATE.lots=JSON.parse(localStorage.getItem('완제품_lots')||'[]');
-  FL_STATE.products=JSON.parse(localStorage.getItem('완제품_products')||'null')||[];
+  FL_STATE.products=JSON.parse(localStorage.getItem('완제품_products')||'null')||FL_DEFAULT_PRODUCTS;
   FL_STATE.clients=JSON.parse(localStorage.getItem('완제품_clients')||'null')||FL_DEFAULT_CLIENTS;
 }
 function flGroupKey(lotNum){const p=lotNum.split('-');return p.length>=2?`${p[0]}-${p[1]}`:lotNum;}
@@ -184,6 +293,7 @@ function flGetGroups(hideZero=false,clientFilter='전체',groupFilter='전체'){
 function flFmtDate6(d6){if(!d6||d6.length!==6)return d6||'-';return `20${d6.slice(0,2)}.${d6.slice(2,4)}.${d6.slice(4,6)}`;}
 function flSyncFromPack(silent=false){
   const keys=Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
+  const lotMapping=JSON.parse(localStorage.getItem('lotMapping')||'[]');
   let count=0;
   keys.forEach(k=>{
     const recs=JSON.parse(localStorage.getItem(k)||'[]');
@@ -193,9 +303,24 @@ function flSyncFromPack(silent=false){
       if(existing) return;
       const prod=FL_STATE.products.find(p=>p.lot_code===r.productCode);
       const mfg=r.date||'';
-      const existCount=FL_STATE.lots.filter(l=>l.lot_code_base===r.productCode&&l.mfg_date===mfg).length;
-      const lotNum=`${r.productCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
-      FL_STATE.lots.push({lot_number:lotNum,lot_code_base:r.productCode,client:prod?prod.client:'',name:r.product||prod?.name||'',spec:prod?.spec||'',mfg_date:mfg,exp_date:r.expiryDate||'',total_box:parseInt(r.qtyBoxes)||0,remain_box:parseInt(r.qtyBoxes)||0,is_partial:false,pkg_lot:r.lot,outbound:[],reg_date:r.date||getTodayISO2()});
+      // lotMapping에서 productCode에 해당하는 wLot 코드 찾기 (N6, B1 등)
+      const mappingEntry=lotMapping.find(m=>m.pLot===r.productCode);
+      const wLotCode=mappingEntry&&mappingEntry.wLots.length ? mappingEntry.wLots[0].lot : r.productCode;
+      const wLotName=mappingEntry&&mappingEntry.wLots.length ? mappingEntry.wLots[0].name : (r.product||prod?.name||'');
+      const wLotClient=mappingEntry&&mappingEntry.wLots.length ? mappingEntry.wLots[0].client : (prod?prod.client:'');
+      // 완제품 LOT 형식: N6-260601-01
+      const existCount=FL_STATE.lots.filter(l=>l.lot_code_base===wLotCode&&l.mfg_date===mfg).length;
+      const lotNum=`${wLotCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
+      FL_STATE.lots.push({
+        lot_number:lotNum, lot_code_base:wLotCode,
+        client:wLotClient, name:wLotName,
+        spec:prod?.spec||'', mfg_date:mfg,
+        exp_date:r.expiryDate||'',
+        total_box:parseInt(r.qtyBoxes)||0,
+        remain_box:parseInt(r.qtyBoxes)||0,
+        is_partial:false, pkg_lot:r.lot,
+        outbound:[], reg_date:r.date||getTodayISO2()
+      });
       count++;
     });
   });
@@ -241,8 +366,8 @@ function flRegisterOutbound(){
   if(!gk){alert('그룹LOT를 선택해주세요');return;}
   const client=document.getElementById('fl-ob-client').value;
   if(!client){alert('출고처를 선택해주세요');return;}
-  const date=document.getElementById('fl-ob-date').value;
-  if(!date){alert('출고일을 선택해주세요');return;}
+  const date=getObDateVal();
+  if(!date||date.length!==6){alert('출고일을 입력해주세요 (예: 260601)');return;}
   const boxes=parseInt(document.getElementById('fl-ob-boxes').value)||0;
   if(!boxes){alert('출고 박스수를 입력해주세요');return;}
   const g=flGetGroups().find(x=>x.key===gk);
@@ -311,7 +436,39 @@ function flDeleteProduct(lotCode){if(!confirm(`'${lotCode}' 제품을 삭제하�
 function flRenderProductTable(){
   const el=document.getElementById('fl-product-tbody');
   if(!el) return;
-  el.innerHTML=FL_STATE.products.map(p=>`<tr><td><span class="badge badge-blue" style="font-size:10px">${p.lot_code}</span></td><td style="font-size:12px">${p.client}</td><td style="font-weight:600">${p.name}</td><td style="font-size:11px;color:var(--text2)">${p.spec}</td><td><button class="btn btn-sm btn-danger" onclick="flDeleteProduct('${p.lot_code}')">삭제</button></td></tr>`).join('')||'<tr><td colspan="5" class="tc" style="padding:16px;color:var(--text3)">등록된 제품이 없습니다</td></tr>';
+  el.innerHTML=FL_STATE.products.map((p,i)=>`<tr>
+    <td><span class="badge badge-blue" style="font-size:10px">${p.lot_code}</span></td>
+    <td style="font-size:12px">${p.client}</td>
+    <td style="font-weight:600">${p.name}</td>
+    <td style="font-size:11px;color:var(--text2)">${p.spec}</td>
+    <td class="tc" style="font-size:12px">${p.pallet_qty||0}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-sm btn-outline" onclick="flOpenEditProduct(${i})">수정</button>
+      <button class="btn btn-sm btn-danger" onclick="flDeleteProduct('${p.lot_code}')">삭제</button>
+    </td>
+  </tr>`).join('')||'<tr><td colspan="6" class="tc" style="padding:16px;color:var(--text3)">등록된 제품이 없습니다</td></tr>';
+}
+function flOpenEditProduct(idx){
+  const p=FL_STATE.products[idx];
+  if(!p) return;
+  document.getElementById('fl-ep-lot').value=p.lot_code;
+  document.getElementById('fl-ep-client').value=p.client||'';
+  document.getElementById('fl-ep-name').value=p.name||'';
+  document.getElementById('fl-ep-spec').value=p.spec||'';
+  document.getElementById('fl-ep-pallet').value=p.pallet_qty||0;
+  document.getElementById('fl-edit-product-modal').dataset.idx=idx;
+  document.getElementById('fl-edit-product-modal').classList.add('open');
+}
+function flSaveEditProduct(){
+  const idx=parseInt(document.getElementById('fl-edit-product-modal').dataset.idx);
+  const p=FL_STATE.products[idx];
+  if(!p) return;
+  p.client=document.getElementById('fl-ep-client').value.trim();
+  p.name=document.getElementById('fl-ep-name').value.trim();
+  p.spec=document.getElementById('fl-ep-spec').value.trim();
+  p.pallet_qty=parseInt(document.getElementById('fl-ep-pallet').value)||0;
+  flSave(); closeModal('fl-edit-product-modal'); flRenderProductTable();
+  alert('수정 완료');
 }
 function flAddClient(){
   const name=document.getElementById('fl-cl-new').value.trim();
@@ -327,20 +484,87 @@ function flRenderClientTable(){
 }
 function flResetData(){if(!confirm('완제품수불부 전체 데이터를 초기화하시겠습니까?'))return;FL_STATE.lots=[];FL_STATE.products=[];FL_STATE.clients=FL_DEFAULT_CLIENTS;flSave();flRenderStock();flRenderProductTable();flRenderClientTable();alert('초기화 완료');}
 function printFinishedLedger(){
-  const groups=flGetGroups().reverse();
+  const clientFilter=document.getElementById('fl-st-client')?.value||'전체';
+  const groups=flGetGroups(false, clientFilter).reverse();
   if(!groups.length){alert('출력할 데이터가 없습니다');return;}
-  let bodyHtml='';
-  groups.forEach(g=>{bodyHtml+=`<tr><td class="bold blue">${g.key}</td><td class="left bold">${g.name}</td><td>${g.client}</td><td>${flFmtDate6(g.mfg_date)}</td><td>${g.exp_date||'-'}</td><td>${g.total_box.toLocaleString()}</td><td>${g.total_out.toLocaleString()}</td><td class="bold">${g.remain_box.toLocaleString()}</td></tr>`;});
+
+  // 선택 날짜 (재고조회 날짜 기준 - 없으면 오늘)
   const today=getTodayISO2();
+  // YYMMDD → ISO 변환
+  function yymmddToISO(d6){ if(!d6||d6.length!==6) return ''; return `20${d6.slice(0,2)}-${d6.slice(2,4)}-${d6.slice(4,6)}`; }
+
+  let bodyHtml='';
+  groups.forEach(g=>{
+    // 전일재고: 오늘 이전 입고 - 오늘 이전 출고
+    const prevIn = g.lots.reduce((s,l)=> s + (yymmddToISO(l.mfg_date) < today ? l.total_box : 0), 0);
+    const prevOut = g.lots.reduce((s,l)=> s + l.outbound.filter(o=>o.date < today).reduce((ss,o)=>ss+o.box, 0), 0);
+    const prevStock = Math.max(0, prevIn - prevOut);
+    // 당일 입고/출고
+    const todayIn = g.lots.reduce((s,l)=> s + (yymmddToISO(l.mfg_date) === today ? l.total_box : 0), 0);
+    const todayOut = g.lots.reduce((s,l)=> s + l.outbound.filter(o=>o.date === today).reduce((ss,o)=>ss+o.box, 0), 0);
+    const closing = Math.max(0, prevStock + todayIn - todayOut);
+    bodyHtml+=`<tr>
+      <td class="blue bold">${g.key}</td>
+      <td class="left bold">${g.name}</td>
+      <td>${g.client}</td>
+      <td>${flFmtDate6(g.mfg_date)}</td>
+      <td>${g.exp_date||'-'}</td>
+      <td>${prevStock>0?prevStock.toLocaleString():'-'}</td>
+      <td>${todayIn>0?'+'+todayIn.toLocaleString():'-'}</td>
+      <td>${todayOut>0?'-'+todayOut.toLocaleString():'-'}</td>
+      <td class="bold">${closing.toLocaleString()}</td>
+    </tr>`;
+  });
+
   const printWin=window.open('','_blank');
-  printWin.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>완제품수불부 ${today}</title><style>body{font-family:"Noto Sans KR",sans-serif;font-size:10px;padding:20px;}h2{font-size:16px;margin-bottom:4px;}.sub{font-size:12px;color:#666;margin-bottom:14px;}table{width:100%;border-collapse:collapse;}th{background:#f0f0f0;border:1px solid #999;padding:5px;text-align:center;font-weight:700;}td{border:1px solid #999;padding:5px;text-align:center;}td.left{text-align:left;}td.bold{font-weight:700;}td.blue{color:#1a5fa8;}@page{margin:10mm;size:A4 landscape;}</style></head><body><h2>완제품수불부</h2><div class="sub">출력일시: ${new Date().toLocaleString('ko-KR')}</div><table><thead><tr><th>그룹LOT</th><th>품명</th><th>거래처</th><th>제조일자</th><th>소비기한</th><th>입고(box)</th><th>출고(box)</th><th>잔량(box)</th></tr></thead><tbody>${bodyHtml}</tbody></table></body></html>`);
+  printWin.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>완제품수불부 ${today}</title>
+  <style>
+    body{font-family:"Noto Sans KR",sans-serif;font-size:9px;padding:15px;}
+    h2{font-size:15px;margin-bottom:4px;}
+    .sub{font-size:11px;color:#666;margin-bottom:14px;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    th{background:#f0f0f0;border:1px solid #999;padding:4px 3px;text-align:center;font-weight:700;word-break:keep-all;}
+    td{border:1px solid #999;padding:4px 3px;text-align:center;}
+    td.left{text-align:left;}
+    td.bold{font-weight:700;}
+    td.blue{color:#1a5fa8;}
+    td.num{text-align:right;white-space:nowrap;}
+    col.c-lot{width:9%;}
+    col.c-name{width:18%;}
+    col.c-client{width:12%;}
+    col.c-date{width:9%;}
+    col.c-exp{width:9%;}
+    col.c-num{width:10%;}
+    @page{margin:10mm;size:A4;}
+  </style></head><body>
+  <h2>완제품수불부</h2>
+  <div class="sub">출력일시: ${new Date().toLocaleString('ko-KR')}${clientFilter!=='전체'?' / 거래처: '+clientFilter:''}</div>
+  <table>
+    <colgroup>
+      <col class="c-lot"><col class="c-name"><col class="c-client">
+      <col class="c-date"><col class="c-exp">
+      <col class="c-num"><col class="c-num"><col class="c-num"><col class="c-num">
+    </colgroup>
+    <thead><tr>
+      <th>그룹LOT</th><th>품명</th><th>거래처</th><th>제조일자</th><th>소비기한</th>
+      <th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th>
+    </tr></thead>
+    <tbody>${bodyHtml}</tbody>
+  </table>
+  </body></html>`);
   printWin.document.close();
   setTimeout(()=>printWin.print(),500);
 }
 
 // ===== 초기화 =====
 initFinishedLedger();
-document.getElementById('fl-ob-date').value=getTodayISO2();
+const _todayRaw=new Date();
+const _yy=String(_todayRaw.getFullYear()).slice(2);
+const _mm=String(_todayRaw.getMonth()+1).padStart(2,'0');
+const _dd=String(_todayRaw.getDate()).padStart(2,'0');
+const _obEl=document.getElementById('fl-ob-date');
+if(_obEl){ _obEl.value=`${_yy}.${_mm}.${_dd}`; _obEl.dataset.raw=`${_yy}${_mm}${_dd}`; _obEl.style.color='var(--primary)'; _obEl.style.fontWeight='700'; }
 switchFlTab('outbound');
 </script>
 </body>
