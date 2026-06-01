@@ -1559,6 +1559,7 @@ function searchTrace(){
         html += `<div style="text-align:center;padding:24px;color:var(--text3);">해당 LOT 번호를 찾을 수 없습니다.<br><span style="font-size:12px;">원료LOT(M001-...), 포장LOT(포장-P037-...), 배합LOT(P037-...) 형식으로 입력해주세요</span></div>`;
       }
     }
+  } else {
     // ===== 역방향: 완제품LOT → 포장LOT → 배합LOT → 원료LOT =====
 
     const finLots = JSON.parse(localStorage.getItem('완제품_lots')||'[]');
