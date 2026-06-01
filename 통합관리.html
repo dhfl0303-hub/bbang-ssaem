@@ -2363,6 +2363,32 @@ function setIngSort(mode){
   document.getElementById('sortNameBtn').style.cssText = mode==='name' ? 'background:var(--primary);color:#fff;border-color:var(--primary)' : '';
   renderIngStock();
 }
+
+// incomingRecords → ingStock 자동 반영
+function syncIngStockFromIncoming(){
+  try{
+    const incoming = JSON.parse(localStorage.getItem('incomingRecords')||'[]');
+    let changed = false;
+    incoming.forEach(rec=>{
+      (rec.rows||[]).forEach(row=>{
+        if(!row.product||!row.qty) return;
+        const syncKey = 'incoming_'+(rec.date||'')+'_'+(row.lot||row.product);
+        const exists = ingStock.find(s=>s._syncKey===syncKey);
+        if(!exists){
+          ingStock.push({
+            name:row.product,
+            code:row.code||'',
+            qty:parseFloat(row.qty)||0,
+            expiry:row.exp||'',
+            _syncKey:syncKey
+          });
+          changed = true;
+        }
+      });
+    });
+    if(changed) saveData('ingStock', ingStock);
+  }catch(e){}
+}
 function renderIngStock(){
   const today=new Date(); today.setHours(0,0,0,0);
   let expired=0,near=0,normal=0;
@@ -2660,6 +2686,7 @@ function saveSubsidiary(){
 (async ()=>{
   await loadFromFirebaseAuto();
   initData();
+  syncIngStockFromIncoming();
   document.getElementById('topbarDate').textContent=getToday();
   const _ld=document.getElementById('ledgerDate'); if(_ld) _ld.value=getTodayISO2();
   renderRecipe();
