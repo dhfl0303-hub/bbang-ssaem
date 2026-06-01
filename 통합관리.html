@@ -2230,23 +2230,32 @@ function saveRecipe(){
     });
   });
 
-  // 배합1 원료명 기준으로 배합2,3,4 원료명 동기화
-  // 배합1의 순서대로 원료명을 맞춰줌 (수량은 각 배합별 유지)
-  [ings2,ings3,ings4].forEach(ingsN=>{
-    if(!ingsN.length) return;
-    ings1.forEach((ing1,i)=>{
-      if(ingsN[i]) ingsN[i].name=ing1.name;
+  // 배합1 원료명 기준으로 DB의 배합2,3,4 원료명 직접 동기화
+  // 화면 렌더링 여부와 무관하게 기존 DB 데이터에서 이름만 교체
+  const existingBatches = (DB[code]||DB[editingCode]||{}).batches || {};
+  [2,3,4].forEach(n=>{
+    const existing = existingBatches[String(n)];
+    if(!existing||!existing.ingredients) return;
+    existing.ingredients.forEach((ing, i)=>{
+      if(ings1[i]) ing.name = ings1[i].name;
     });
+    // ingsList에 없으면 기존 DB 데이터 사용
+    if(!ingsList[n-1].length && existing.ingredients.length){
+      ingsList[n-1].push(...existing.ingredients);
+    }
   });
 
   const now=new Date();
   const updatedAt=`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   if(editingCode&&editingCode!==code) delete DB[editingCode];
+  const w2=parseFloat(document.getElementById('rW2').value)||existingBatches['2']?.weight||0;
+  const w3=parseFloat(document.getElementById('rW3').value)||existingBatches['3']?.weight||0;
+  const w4=parseFloat(document.getElementById('rW4').value)||existingBatches['4']?.weight||0;
   DB[code]={name,code,updatedAt,batches:{
     '1':ings1.length?{weight:w1,ingredients:ings1}:null,
-    '2':ings2.length?{weight:ings2.reduce((s,i)=>s+i.amount,0),ingredients:ings2}:null,
-    '3':ings3.length?{weight:ings3.reduce((s,i)=>s+i.amount,0),ingredients:ings3}:null,
-    '4':ings4.length?{weight:ings4.reduce((s,i)=>s+i.amount,0),ingredients:ings4}:null,
+    '2':ings2.length?{weight:w2||ings2.reduce((s,i)=>s+i.amount,0),ingredients:ings2}:null,
+    '3':ings3.length?{weight:w3||ings3.reduce((s,i)=>s+i.amount,0),ingredients:ings3}:null,
+    '4':ings4.length?{weight:w4||ings4.reduce((s,i)=>s+i.amount,0),ingredients:ings4}:null,
   }};
   saveData('recipeDB',DB);
   closeModal('recipeModal'); renderRecipe(); alert('저장됐습니다');
