@@ -298,6 +298,7 @@ tr:hover td{background:var(--bg);}
           <input type="date" class="search-input" id="batchStatusDate" style="min-width:160px;">
         </div>
         <button class="btn btn-primary btn-sm" onclick="loadBatchStatus()">🔄 조회</button>
+        <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="deleteBatchStatus()">🗑️ 삭제</button>
       </div>
       <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
         <div class="stat-box"><div class="stat-label">배합 완료 건수</div><div class="stat-value stat-blue" id="bsCnt">-</div><div class="stat-sub">건</div></div>
@@ -335,6 +336,7 @@ tr:hover td{background:var(--bg);}
           <input type="date" class="search-input" id="packStatusDate" style="min-width:160px;">
         </div>
         <button class="btn btn-primary btn-sm" onclick="loadPackStatus()">🔄 조회</button>
+        <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="deletePackStatus()">🗑️ 삭제</button>
       </div>
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);">
         <div class="stat-box"><div class="stat-label">포장 완료 건수</div><div class="stat-value stat-blue" id="psCnt">-</div><div class="stat-sub">건</div></div>
@@ -404,6 +406,7 @@ tr:hover td{background:var(--bg);}
           <input type="date" class="search-input" id="yieldDate" style="min-width:160px;">
         </div>
         <button class="btn btn-primary btn-sm" onclick="loadYield()">🔄 조회</button>
+        <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="deleteYield()">🗑️ 삭제</button>
       </div>
       <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
         <div class="stat-box"><div class="stat-label">평균 수율</div><div class="stat-value stat-green" id="avgYield">-</div><div class="stat-sub">%</div></div>
@@ -1891,6 +1894,43 @@ function findBatchByIngredient(lot){ try{ const keys=Object.keys(localStorage).f
 function findPackRecord(lot){ try{ const keys=Object.keys(localStorage).filter(k=>k.startsWith('packRecords_')); const found=[]; keys.forEach(k=>{ const recs=JSON.parse(localStorage.getItem(k)||'[]'); recs.filter(r=>r.lot===lot||r.productCode===lot.split('-')[1]).forEach(r=>{ found.push(`${r.date} · ${r.product} · ${r.lot} · ${r.qtyBoxes}박스`); }); }); return found; }catch(e){ return []; } }
 function findFinishedByPackLot(lot){ try{ const recs=JSON.parse(localStorage.getItem('완제품_lots')||'[]'); return recs.filter(r=>r.pkg_lot===lot).map(r=>`${r.lot_number} · ${r.name} · ${r.client} · ${r.total_box}box`); }catch(e){ return []; } }
 function findFinishedByLot(lot){ try{ const recs=JSON.parse(localStorage.getItem('완제품_lots')||'[]'); return recs.filter(r=>r.lot_number===lot||r.lot_number.startsWith(lot)).map(r=>`${r.lot_number} · ${r.name} · ${r.client} · 잔량:${r.remain_box}box`); }catch(e){ return []; } }
+
+// ===== 날짜별 데이터 삭제 =====
+function deleteBatchStatus(){
+  const dateVal = document.getElementById('batchStatusDate').value;
+  if(!dateVal){ alert('날짜를 먼저 선택해주세요'); return; }
+  const key = dateToYYMMDD(dateVal);
+  const recs = JSON.parse(localStorage.getItem('batchRecords_'+key)||'[]');
+  if(!recs.length){ alert('해당 날짜의 배합 데이터가 없습니다'); return; }
+  if(!confirm(`${yymmddToDisplay(key)} 배합 데이터 ${recs.length}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  localStorage.removeItem('batchRecords_'+key);
+  loadBatchStatus();
+  alert('삭제 완료');
+}
+function deletePackStatus(){
+  const dateVal = document.getElementById('packStatusDate').value;
+  if(!dateVal){ alert('날짜를 먼저 선택해주세요'); return; }
+  const key = dateToYYMMDD(dateVal);
+  const recs = JSON.parse(localStorage.getItem('packRecords_'+key)||'[]');
+  if(!recs.length){ alert('해당 날짜의 포장 데이터가 없습니다'); return; }
+  if(!confirm(`${yymmddToDisplay(key)} 포장 데이터 ${recs.length}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  localStorage.removeItem('packRecords_'+key);
+  loadPackStatus();
+  alert('삭제 완료');
+}
+function deleteYield(){
+  const dateVal = document.getElementById('yieldDate').value;
+  if(!dateVal){ alert('날짜를 먼저 선택해주세요'); return; }
+  const key = dateToYYMMDD(dateVal);
+  const batchRecs = JSON.parse(localStorage.getItem('batchRecords_'+key)||'[]');
+  const packRecs  = JSON.parse(localStorage.getItem('packRecords_'+key)||'[]');
+  if(!batchRecs.length && !packRecs.length){ alert('해당 날짜의 데이터가 없습니다'); return; }
+  if(!confirm(`${yymmddToDisplay(key)} 배합(${batchRecs.length}건) + 포장(${packRecs.length}건) 데이터를 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  localStorage.removeItem('batchRecords_'+key);
+  localStorage.removeItem('packRecords_'+key);
+  loadYield();
+  alert('삭제 완료');
+}
 
 // ===== 수율 =====
 function loadYield(){
