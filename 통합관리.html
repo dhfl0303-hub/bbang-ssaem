@@ -2374,26 +2374,30 @@ function setIngSort(mode){
 function syncIngStockFromIncoming(){
   try{
     const incoming = JSON.parse(localStorage.getItem('incomingRecords')||'[]');
-    let changed = false;
+    // 기존 ingStock 완전 초기화 후 incomingRecords 기반으로 재구성
+    const newStock = [];
+    const seen = new Set(); // name+expiry+mfg 기준 중복 방지
     incoming.forEach(rec=>{
       (rec.rows||[]).forEach(row=>{
         if(!row.product||!row.qty) return;
-        const syncKey = 'incoming_'+(rec.date||'')+'_'+(row.lot||row.product);
-        const exists = ingStock.find(s=>s._syncKey===syncKey);
-        if(!exists){
-          ingStock.push({
-            name:row.product,
-            code:row.code||'',
-            qty:parseFloat(row.qty)||0,
-            expiry:row.exp||'',
-            mfg:row.mfg||'',
-            _syncKey:syncKey
-          });
-          changed = true;
-        }
+        const key = `${row.product}_${row.exp||''}_${row.mfg||''}_${row.lot||''}`;
+        if(seen.has(key)) return;
+        seen.add(key);
+        newStock.push({
+          name:row.product,
+          code:row.code||'',
+          qty:parseFloat(row.qty)||0,
+          expiry:row.exp||'',
+          mfg:row.mfg||'',
+          lot:row.lot||'',
+          _syncKey:key
+        });
       });
     });
-    if(changed) saveData('ingStock', ingStock);
+    // 수동 등록한 항목은 유지 (_syncKey가 'manual_'로 시작)
+    const manualItems = ingStock.filter(s=>s._syncKey&&s._syncKey.startsWith('manual_'));
+    ingStock = [...newStock, ...manualItems];
+    saveData('ingStock', ingStock);
   }catch(e){}
 }
 function renderIngStock(){
@@ -2498,7 +2502,7 @@ function saveIngStock(){
   const qty=parseFloat(document.getElementById('isQty').value)||0;
   const expiry=document.getElementById('isExp').value;
   if(!name||!expiry){ alert('원료명과 소비기한을 입력해주세요'); return; }
-  ingStock.push({name,qty,expiry});
+  ingStock.push({name,qty,expiry,mfg:'',code:'',_syncKey:`manual_${Date.now()}`});
   saveData('ingStock',ingStock);
   closeModal('ingStockModal'); renderIngStock();
 }
