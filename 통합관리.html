@@ -2404,15 +2404,9 @@ function renderSubsidiary(){
   const bulk=subsidiaryStock.filter(s=>s.item==='bulk').reduce((s,r)=>s+(r.type==='in'?r.qty:-r.qty),0);
   const box=subsidiaryStock.filter(s=>s.item==='box').reduce((s,r)=>s+(r.type==='in'?r.qty:-r.qty),0);
   const pkgbox=subsidiaryStock.filter(s=>s.item==='pkgbox').reduce((s,r)=>s+(r.type==='in'?r.qty:-r.qty),0);
-  document.getElementById('subFilm').textContent=film;
-  document.getElementById('subBulk').textContent=bulk;
-  document.getElementById('subBox').textContent=box;
-  document.getElementById('subPkgBox').textContent=pkgbox;
-  const names={film:'필름포장지',bulk:'벌크비닐',box:'박스',pkgbox:'패키지박스'};
-  document.getElementById('subTbody').innerHTML=subsidiaryStock.length?
-    subsidiaryStock.slice().reverse().map((s,i)=>`<tr>
-      <td>${s.date}</td>
-      <td><span class="badge ${s.type==='in'?'badge-green':'badge-red'}">${s.type==='in'?'입고':'출고'}</span></td>
+function renderSubsidiary(){
+  // 부자재수불부는 별도 파일로 분리됨 - 통합관리에서는 링크 카드만 표시
+}
       <td>${names[s.item]||s.item}</td>
       <td>${s.qty}</td>
       <td>${s.date}</td>
