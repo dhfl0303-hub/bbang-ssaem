@@ -1604,7 +1604,9 @@ function searchTrace(){
     const finRows = matchedFinLots.map(f => {
       // lotMapping에서 거래처 정보 보강
       const wInfo = matchedWLot || (matchedMapping ? matchedMapping.wLots.find(w => input.startsWith(w.lot)) : null);
-      return [f.lot_number, f.name||'-', wInfo ? wInfo.client : (f.client||'-'), f.exp_date||'-'];
+      // 완제품LOT은 사용자가 입력한 값(N6-260601-01) 표시, 내부코드(P037-260601-01)는 괄호로
+      const displayLot = input + (f.lot_number !== input ? ` (${f.lot_number})` : '');
+      return [displayLot, f.name||'-', wInfo ? wInfo.client : (f.client||'-'), f.exp_date||'-'];
     });
     if(!finRows.length && matchedWLot){
       // 완제품_lots에 없어도 lotMapping 정보로 표시
