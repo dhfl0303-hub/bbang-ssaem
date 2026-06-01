@@ -417,7 +417,7 @@ tr:hover td{background:var(--bg);}
             <table>
               <thead>
                 <tr>
-                  <th>제품명</th><th>배합 투입량(kg)</th><th>포장 생산량(ea)</th>
+                  <th>제품명</th><th>배합 투입량(g)</th><th>포장 생산량(ea)</th>
                   <th>포장 생산량(box)</th><th>수율(%)</th><th>로스율(%)</th><th>비고</th>
                 </tr>
               </thead>
@@ -728,6 +728,7 @@ function saveOutgoing(){
 }
 
 function renderLedger(){
+  if(!document.getElementById('ledgerDate')) return;
   const selDate=document.getElementById('ledgerDate').value||getTodayISO2();
   const q=document.getElementById('ledgerSearch').value.trim().toLowerCase();
   const stor=document.getElementById('ledgerStorage').value;
@@ -1123,7 +1124,9 @@ async function syncAllData(){
     s4.forEach(d=>r4.push(d.data())); if(r4.length){localStorage.setItem('완제품_lots',JSON.stringify(r4));total+=r4.length;}
     const s5=await db.collection('subIncomingRecords').get(); const r5=[];
     s5.forEach(d=>r5.push(d.data())); if(r5.length){localStorage.setItem('subIncomingRecords',JSON.stringify(r5));total+=r5.length;}
-    renderSubsidiary();renderIncoming();renderIngStock();renderFinished();
+    renderIncoming();
+    if(document.getElementById('ingStockTbody')) renderIngStock();
+    if(document.getElementById('deviceTbody')) renderDevice();
     if(btn){btn.textContent='🔄 데이터 동기화';btn.disabled=false;}
     alert('✅ 동기화 완료! 총 '+total+'건');
   }catch(e){
@@ -1916,7 +1919,7 @@ function loadYield(){
     if(typeof yieldPct==='number'){ yieldSum+=yieldPct; yieldCnt++; }
     return `<tr>
       <td style="font-weight:700;">${d.name}</td>
-      <td style="text-align:center;">${inputKg>0?inputKg.toFixed(2)+' kg':'-'}</td>
+      <td style="text-align:center;">${inputKg>0?inputKg.toLocaleString()+' g':'-'}</td>
       <td style="text-align:center;">${d.pcs>0?d.pcs.toLocaleString()+' ea':'-'}</td>
       <td style="text-align:center;">${d.boxes>0?d.boxes.toLocaleString()+' box':'-'}</td>
       <td style="text-align:center;font-weight:700;color:var(--success);">${typeof yieldPct==='number'?yieldPct+'%':'-'}</td>
@@ -2190,17 +2193,17 @@ function deleteIngStock(i){ if(!confirm('삭제하시겠습니까?'))return; ing
 
 // ===== ③ 설비 세팅값 =====
 function renderDevice(){
-  const sel=document.getElementById('dProduct');
-  sel.innerHTML=Object.keys(DB).map(c=>`<option value="${c}">${DB[c].name} (${c})</option>`).join('');
-  document.getElementById('deviceTbody').innerHTML=deviceSettings.length?
-    deviceSettings.map((d,i)=>`<tr>
+  if(!document.getElementById('deviceTbody')) return;
+  const settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
+  document.getElementById('deviceTbody').innerHTML=settings.length?
+    settings.map(d=>`<tr>
       <td><span class="badge badge-blue">${d.code}</span></td>
       <td style="font-weight:600">${DB[d.code]?DB[d.code].name:d.code}</td>
-      <td class="tc">${d.sealing}℃</td>
-      <td class="tc">${d.sealer}℃</td>
-      <td><button class="btn btn-sm btn-danger" onclick="deleteDevice(${i})">삭제</button></td>
+      <td class="tc">${d.sealingC1||'-'}℃ / ${d.sealingC2||'-'}℃</td>
+      <td class="tc">${d.sealingK1||'-'}℃ / ${d.sealingK2||'-'}℃</td>
+      <td class="tc">${d.sealerTemp||'-'}℃</td>
     </tr>`).join(''):
-    '<tr><td colspan="5" class="tc" style="padding:24px;color:var(--text3)">등록된 세팅값이 없습니다</td></tr>';
+    '<tr><td colspan="5" class="tc" style="padding:24px;color:var(--text3)">포장일지 → 설정 → 설비세팅값에서 등록하세요</td></tr>';
 }
 function openAddDevice(e){
   if(e){ e.preventDefault(); e.stopPropagation(); }
@@ -2231,6 +2234,7 @@ function deleteDevice(i){ if(!confirm('삭제하시겠습니까?'))return; devic
 
 // ===== ④ LOT 매핑 관리 =====
 function renderMapping(q=''){
+  if(!document.getElementById('mappingList')) return;
   const filtered=lotMapping.filter(m=>!q||m.pName.includes(q)||m.pLot.includes(q)||m.wLots.some(w=>w.lot.includes(q)||w.name.includes(q)||w.client.includes(q)));
   document.getElementById('mappingList').innerHTML=filtered.map((m,i)=>`
     <div class="mapping-item">
