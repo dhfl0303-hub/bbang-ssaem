@@ -204,67 +204,8 @@ function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
 function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
 
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-function closeAllModals(){ document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open')); }
+
 function closeModalOutside(e,id){ if(e.target===document.getElementById(id)) closeModal(id); }
-
-// 입고검사일지 → ledgerRecords에 in 타입으로 자동 반영
-function syncIncoming(){
-  try{
-    const recs = JSON.parse(localStorage.getItem('incomingRecords')||'[]');
-    recs.forEach(rec=>{
-      (rec.rows||[]).forEach(row=>{
-        if(!row.product||!row.qty) return;
-        const date = rec.date ? '20'+rec.date.slice(0,2)+'-'+rec.date.slice(2,4)+'-'+rec.date.slice(4,6) : '';
-        if(!date) return;
-        const key = 'incoming_'+rec.date+'_'+(row.lot||row.product);
-        const exists = ledgerRecords.find(r=>r._syncKey===key);
-        if(!exists){
-          const ing = getIngByName(row.product);
-          ledgerRecords.push({
-            date, name:row.product, code:ing?ing.code:'',
-            qty:parseFloat(row.qty)||0, lot:row.lot||'', exp:row.exp||'',
-            type:'in', _syncKey:key
-          });
-        }
-      });
-    });
-    saveLedger();
-  }catch(e){}
-}
-
-// 배합일지 → ledgerRecords에 out 타입으로 자동 반영
-function syncBatch(){
-  try{
-    const keys = Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
-    keys.forEach(k=>{
-      const dateKey = k.replace('batchRecords_',''); // YYMMDD
-      if(!dateKey||dateKey.length!==6) return;
-      const date = '20'+dateKey.slice(0,2)+'-'+dateKey.slice(2,4)+'-'+dateKey.slice(4,6);
-      const recs = JSON.parse(localStorage.getItem(k)||'[]');
-      recs.forEach(r=>{
-        (r.batchRecords||[]).forEach(b=>{
-          (b.ingredients||[]).forEach(ing=>{
-            (ing.exps||[]).forEach(e=>{
-              if(!ing.name||!e.amount) return;
-              const syncKey = 'batch_'+b.lot+'_'+ing.name+'_'+(e.lot||'');
-              const exists = ledgerRecords.find(r=>r._syncKey===syncKey);
-              if(!exists){
-                const ingDB = getIngByName(ing.name);
-                ledgerRecords.push({
-                  date, name:ing.name, code:ingDB?ingDB.code:'',
-                  qty:(e.amount||0)/1000, // g → kg
-                  lot:e.lot||'', exp:e.exp||'',
-                  type:'out', _syncKey:syncKey
-                });
-              }
-            });
-          });
-        });
-      });
-    });
-    saveLedger();
-  }catch(e){}
-}
 
 function showIngAC(inputId){
   const input=document.getElementById(inputId);
@@ -308,13 +249,11 @@ function renderLedger(){
   if(!ings.length){ tbody.innerHTML='<tr><td colspan="9" class="tc" style="padding:24px;color:var(--text3)">검색 결과가 없습니다</td></tr>'; return; }
 
   tbody.innerHTML=ings.map(ing=>{
-    // 전일재고: 선택날짜 전날까지의 마감재고 (init + 그 이전 in - 그 이전 out)
-    const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
-    // init이 없으면 date 무관 init 사용 (최초 등록분)
-    const initNoDate=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init'&&!r.date).reduce((s,r)=>s+r.qty,0);
+    // 전일재고: init은 날짜 무관, in/out은 selDate 이전
+    const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
     const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
     const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
-    const prevStock=Math.max(0,prevInit+initNoDate+prevIn-prevOut);
+    const prevStock=Math.max(0,prevInit+prevIn-prevOut);
 
     // 당일 입고/출고
     const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
@@ -353,39 +292,6 @@ function renderLedger(){
 function saveLedger(){
   localStorage.setItem('ledgerRecords', JSON.stringify(ledgerRecords));
   autoSyncToFirebase('ledgerRecords', ledgerRecords);
-}
-function autoSyncToFirebase(key, data){
-  if(!window._db) return;
-  try{
-    window._db.collection('autoSync').doc(key).set({
-      key, data:JSON.stringify(data), updatedAt:new Date().toISOString()
-    }).catch(e=>console.warn('Firebase 저장 실패:',key,e));
-  }catch(e){}
-}
-async function loadFromFirebaseAuto(){
-  if(!window._db) return;
-  try{
-    const snap = await window._db.collection('autoSync').get();
-    if(snap.empty) return;
-    snap.forEach(doc=>{
-      const d=doc.data();
-      if(!d.key || !d.data) return;
-      const localVal = localStorage.getItem(d.key);
-      if(!localVal){
-        try{ localStorage.setItem(d.key, d.data); }catch(e){}
-      } else {
-        try{
-          const fbUpdated = d.updatedAt || '0';
-          const localObj = JSON.parse(localVal);
-          const localUpdated = localObj._updatedAt || '0';
-          if(fbUpdated > localUpdated) localStorage.setItem(d.key, d.data);
-        }catch(e){}
-      }
-    });
-  }catch(e){ console.warn('Firebase 로드 실패',e); }
-}catch(e){}
-    });
-  }catch(e){ console.warn('Firebase 로드 실패',e); }
 }
 
 function fmtInitDate(input){
@@ -493,55 +399,40 @@ function printLedger(){
   });
   let bodyHtml='';
   ings.forEach(ing=>{
-    const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
-    const initNoDate=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init'&&!r.date).reduce((s,r)=>s+r.qty,0);
+    const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
     const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
     const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
-    const prevStock=Math.max(0,prevInit+initNoDate+prevIn-prevOut);
+    const prevStock=Math.max(0,prevInit+prevIn-prevOut);
     const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
     const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
     const closing=Math.max(0,prevStock+monthIn-monthOut);
     bodyHtml+=`<tr>
       <td>${ing.code}</td>
-      <td class="left" style="font-weight:600">${ing.name}</td>
-      <td class="left">${ing.origin||'-'}</td>
-      <td class="storage">${ing.storage||'-'}</td>
+      <td style="text-align:left;font-weight:600">${ing.name}</td>
+      <td style="text-align:left">${ing.origin||'-'}</td>
+      <td>${ing.storage||'-'}</td>
       <td>${ing.unit||'kg'}</td>
-      <td class="num">${prevStock>0?prevStock.toFixed(3):'-'}</td>
-      <td class="num">${monthIn>0?'+'+monthIn.toFixed(3):'-'}</td>
-      <td class="num">${monthOut>0?'-'+monthOut.toFixed(3):'-'}</td>
-      <td class="num" style="font-weight:700">${closing>0?closing.toFixed(3):'0.000'}</td>
+      <td>${prevStock>0?prevStock.toFixed(3):'-'}</td>
+      <td>${monthIn>0?'+'+monthIn.toFixed(3):'-'}</td>
+      <td>${monthOut>0?'-'+monthOut.toFixed(3):'-'}</td>
+      <td style="font-weight:700">${closing>0?closing.toFixed(3):'0.000'}</td>
     </tr>`;
   });
   const printWin=window.open('','_blank');
   printWin.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>원료수불부 ${selDate}</title>
   <style>
-    body{font-family:"Noto Sans KR",sans-serif;font-size:9px;padding:15px;}
-    h2{font-size:15px;margin-bottom:4px;}
-    .sub{font-size:11px;color:#666;margin-bottom:14px;}
-    table{width:100%;border-collapse:collapse;table-layout:fixed;}
-    th{background:#f0f0f0;border:1px solid #999;padding:4px 3px;text-align:center;font-weight:700;word-break:keep-all;}
-    td{border:1px solid #999;padding:4px 3px;text-align:center;word-break:break-all;}
-    td.left{text-align:left;}
-    td.storage{word-break:keep-all;white-space:normal;line-height:1.4;}
-    td.num{text-align:right;white-space:nowrap;font-size:9px;}
-    col.c-code{width:7%;}
-    col.c-name{width:16%;}
-    col.c-origin{width:8%;}
-    col.c-storage{width:17%;}
-    col.c-unit{width:4%;}
-    col.c-num{width:12%;}
-    @page{margin:10mm;size:A4;}
+    body{font-family:"Noto Sans KR",sans-serif;font-size:10px;padding:20px;}
+    h2{font-size:16px;margin-bottom:4px;}
+    .sub{font-size:12px;color:#666;margin-bottom:14px;}
+    table{width:100%;border-collapse:collapse;}
+    th{background:#f0f0f0;border:1px solid #999;padding:5px;text-align:center;font-weight:700;}
+    td{border:1px solid #999;padding:5px;text-align:center;}
+    @page{margin:10mm;size:A4 landscape;}
   </style></head><body>
   <h2>원료수불부</h2>
   <div class="sub">조회일자: ${selDate} / 출력일시: ${new Date().toLocaleString('ko-KR')}</div>
   <table>
-    <colgroup>
-      <col class="c-code"><col class="c-name"><col class="c-origin">
-      <col class="c-storage"><col class="c-unit">
-      <col class="c-num"><col class="c-num"><col class="c-num"><col class="c-num">
-    </colgroup>
     <thead><tr><th>코드</th><th>품목명</th><th>원산지</th><th>보관기준</th><th>단위</th><th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th></tr></thead>
     <tbody>${bodyHtml}</tbody>
   </table>
@@ -589,12 +480,42 @@ function saveOut(){
   saveLedger();closeModal('outModal');renderLedger();
 }
 
+// ===== Firebase 자동 동기화 =====
+function autoSyncToFirebase(key, data){
+  if(!window._db) return;
+  try{
+    window._db.collection('autoSync').doc(key).set({
+      key, data:JSON.stringify(data), updatedAt:new Date().toISOString()
+    }).catch(e=>console.warn('Firebase 저장 실패:',key,e));
+  }catch(e){}
+}
+async function loadFromFirebaseAuto(){
+  if(!window._db) return;
+  try{
+    const snap = await window._db.collection('autoSync').get();
+    if(snap.empty) return;
+    snap.forEach(doc=>{
+      const d=doc.data();
+      if(!d.key || !d.data) return;
+      const localVal = localStorage.getItem(d.key);
+      if(!localVal){
+        try{ localStorage.setItem(d.key, d.data); }catch(e){}
+      } else {
+        try{
+          const fbUpdated = d.updatedAt || '0';
+          const localObj = JSON.parse(localVal);
+          const localUpdated = localObj._updatedAt || '0';
+          if(fbUpdated > localUpdated) localStorage.setItem(d.key, d.data);
+        }catch(e){}
+      }
+    });
+  }catch(e){ console.warn('Firebase 로드 실패',e); }
+}
+
 // ===== 초기화 =====
 (async ()=>{
   await loadFromFirebaseAuto();
   initLedger();
-  syncIncoming();
-  syncBatch();
   document.getElementById('topbarDate').textContent=getToday();
   document.getElementById('ledgerDate').value=getTodayISO2();
   renderLedger();
