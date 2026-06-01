@@ -99,7 +99,7 @@ tr:hover td{background:var(--bg);}
       </div>
       <div class="card">
         <div class="card-hd"><div class="card-hd-title">📋 최근 출고 내역</div></div>
-        <div class="card-bd" style="padding:0"><div class="table-wrap"><table style="min-width:400px"><thead><tr><th>그룹LOT</th><th>품명</th><th>출고처</th><th>출고일</th><th>박스</th></tr></thead><tbody id="fl-outbound-tbody"></tbody></table></div></div>
+        <div class="card-bd" style="padding:0"><div class="table-wrap"><table style="min-width:400px"><thead><tr><th>그룹LOT</th><th>품명</th><th>출고처</th><th>출고일</th><th>박스</th><th></th></tr></thead><tbody id="fl-outbound-tbody"></tbody></table></div></div>
       </div>
     </div>
   </div>
@@ -115,7 +115,7 @@ tr:hover td{background:var(--bg);}
       <select class="search-input" id="fl-st-group" onchange="flRenderStock()"><option value="전체">전체 그룹</option></select>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="fl-st-hide-zero" onchange="flRenderStock()"> 재고있는것만</label>
     </div>
-    <div class="card"><div class="card-bd" style="padding:0"><div class="table-wrap"><table style="min-width:800px"><thead><tr><th>▸</th><th>그룹LOT</th><th>거래처</th><th>품명</th><th>제조일자</th><th>소비기한</th><th>입고</th><th>출고</th><th>잔량</th><th>완파렛트</th><th>잔여박스</th></tr></thead><tbody id="fl-stock-tbody"></tbody></table></div></div></div>
+    <div class="card"><div class="card-bd" style="padding:0"><div class="table-wrap"><table style="min-width:800px"><thead><tr><th>▸</th><th>그룹LOT</th><th>거래처</th><th>품명</th><th>제조일자</th><th>소비기한</th><th>입고</th><th>출고</th><th>잔량</th><th>완파렛트</th><th>잔여박스</th><th></th></tr></thead><tbody id="fl-stock-tbody"></tbody></table></div></div></div>
   </div>
 
   <div class="fl-panel" id="fl-panel-manage">
@@ -407,14 +407,31 @@ function flRenderOutbound(){
   const groups=flGetGroups().filter(g=>g.total_out>0).reverse();
   const tbody=document.getElementById('fl-outbound-tbody');
   if(!tbody) return;
-  if(!groups.length){tbody.innerHTML='<tr><td colspan="5" class="tc" style="padding:24px;color:var(--text3)">출고 내역이 없습니다</td></tr>';return;}
+  if(!groups.length){tbody.innerHTML='<tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">출고 내역이 없습니다</td></tr>';return;}
   let html='';
   for(const g of groups){
     const outbounds=[];
-    for(const l of g.lots) for(const o of l.outbound) outbounds.push({...o,lot:l.lot_number});
-    outbounds.forEach(o=>{html+=`<tr><td style="font-size:11px;color:var(--primary);font-weight:700">${g.key}</td><td style="font-weight:600">${g.name}</td><td style="font-size:12px">${o.client}</td><td style="font-size:12px">${o.date}</td><td class="tc" style="font-weight:700;color:var(--danger)">${o.box.toLocaleString()}</td></tr>`;});
+    for(const l of g.lots) for(let oi=0;oi<l.outbound.length;oi++) outbounds.push({...l.outbound[oi],lotNumber:l.lot_number,oi});
+    outbounds.forEach(o=>{html+=`<tr>
+      <td style="font-size:11px;color:var(--primary);font-weight:700">${g.key}</td>
+      <td style="font-weight:600">${g.name}</td>
+      <td style="font-size:12px">${o.client}</td>
+      <td style="font-size:12px">${o.date}</td>
+      <td class="tc" style="font-weight:700;color:var(--danger)">${o.box.toLocaleString()}</td>
+      <td class="tc"><button class="btn btn-sm btn-danger" onclick="flDeleteOutbound('${o.lotNumber}',${o.oi})">삭제</button></td>
+    </tr>`;});
   }
   tbody.innerHTML=html;
+}
+function flDeleteOutbound(lotNumber, oi){
+  if(!confirm('이 출고 내역을 삭제하시겠습니까?\n삭제 시 재고가 복원됩니다.')) return;
+  const lot = FL_STATE.lots.find(l=>l.lot_number===lotNumber);
+  if(!lot) return;
+  const ob = lot.outbound[oi];
+  if(!ob) return;
+  lot.remain_box += ob.box;
+  lot.outbound.splice(oi, 1);
+  flSave(); flRefreshOutboundCombos(); flRenderOutbound(); flRenderStock();
 }
 function flRenderStock(){
   const clientFilter=document.getElementById('fl-st-client')?.value||'전체';
@@ -456,12 +473,14 @@ function flRenderStock(){
       <td class="tc" style="font-weight:700;color:${g.remain_box>0?'var(--primary)':'var(--text3)'}">${g.remain_box.toLocaleString()}</td>
       <td class="tc">${palletStr}</td>
       <td class="tc">${remStr}</td>
+      <td class="tc" onclick="event.stopPropagation()"><button class="btn btn-sm btn-danger" onclick="flDeleteStockGroup('${g.key}')">삭제</button></td>
     </tr>`;
     if(exp){
       for(const l of g.lots){
         const totalOut=l.outbound.reduce((s,o)=>s+o.box,0);
         const lFull=palletQty>0?Math.floor(l.remain_box/palletQty):0;
         const lRem=palletQty>0?l.remain_box%palletQty:0;
+        const li=FL_STATE.lots.indexOf(l);
         html+=`<tr style="background:var(--bg);font-size:12px;">
           <td></td>
           <td colspan="3" style="color:var(--text2);padding-left:24px">${l.lot_number}</td>
@@ -471,6 +490,7 @@ function flRenderStock(){
           <td class="tc" style="color:${l.remain_box>0?'var(--success)':'var(--text3)'}">${l.remain_box}</td>
           <td class="tc" style="font-size:11px">${palletQty>0?lFull+'P':'-'}</td>
           <td class="tc" style="font-size:11px">${palletQty>0?lRem+'box':'-'}</td>
+          <td class="tc"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 8px" onclick="flDeleteStockLot(${li})">삭제</button></td>
         </tr>`;
       }
     }
@@ -478,6 +498,17 @@ function flRenderStock(){
   tbody.innerHTML=html;
 }
 function flToggleStock(gk){if(FL_STATE.expandedStock.has(gk))FL_STATE.expandedStock.delete(gk);else FL_STATE.expandedStock.add(gk);flRenderStock();}
+function flDeleteStockLot(idx){
+  if(!confirm('이 LOT를 삭제하시겠습니까?')) return;
+  FL_STATE.lots.splice(idx,1);
+  flSave(); flRefreshOutboundCombos(); flRenderStock(); flRenderOutbound();
+}
+function flDeleteStockGroup(gk){
+  if(!confirm(`"${gk}" 그룹 전체를 삭제하시겠습니까?\n해당 그룹의 모든 LOT와 출고내역이 삭제됩니다.`)) return;
+  FL_STATE.lots=FL_STATE.lots.filter(l=>flGroupKey(l.lot_number)!==gk);
+  FL_STATE.expandedStock.delete(gk);
+  flSave(); flRefreshOutboundCombos(); flRenderStock(); flRenderOutbound();
+}
 function flAddProduct(){
   const lotCode=document.getElementById('fl-pm-lot-code').value.trim();
   const client=document.getElementById('fl-pm-client').value.trim();
