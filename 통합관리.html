@@ -2036,7 +2036,7 @@ function findFinishedByPackLot(lot){ try{ const recs=JSON.parse(localStorage.get
 function findFinishedByLot(lot){ try{ const recs=JSON.parse(localStorage.getItem('완제품_lots')||'[]'); return recs.filter(r=>r.lot_number===lot||r.lot_number.startsWith(lot)).map(r=>`${r.lot_number} · ${r.name} · ${r.client} · 잔량:${r.remain_box}box`); }catch(e){ return []; } }
 
 // ===== 날짜별 데이터 삭제 =====
-function deleteBatchStatus(){
+async function deleteBatchStatus(){
   const dateVal = document.getElementById('batchStatusDate').value;
   if(!dateVal){ alert('날짜를 먼저 선택해주세요'); return; }
   const key = dateToYYMMDD(dateVal);
@@ -2044,10 +2044,11 @@ function deleteBatchStatus(){
   if(!recs.length){ alert('해당 날짜의 배합 데이터가 없습니다'); return; }
   if(!confirm(`${yymmddToDisplay(key)} 배합 데이터 ${recs.length}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
   localStorage.removeItem('batchRecords_'+key);
+  if(window._db){ try{ await window._db.collection('autoSync').doc('batchRecords_'+key).delete(); }catch(e){} }
   loadBatchStatus();
   alert('삭제 완료');
 }
-function deletePackStatus(){
+async function deletePackStatus(){
   const dateVal = document.getElementById('packStatusDate').value;
   if(!dateVal){ alert('날짜를 먼저 선택해주세요'); return; }
   const key = dateToYYMMDD(dateVal);
@@ -2055,10 +2056,11 @@ function deletePackStatus(){
   if(!recs.length){ alert('해당 날짜의 포장 데이터가 없습니다'); return; }
   if(!confirm(`${yymmddToDisplay(key)} 포장 데이터 ${recs.length}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
   localStorage.removeItem('packRecords_'+key);
+  if(window._db){ try{ await window._db.collection('autoSync').doc('packRecords_'+key).delete(); }catch(e){} }
   loadPackStatus();
   alert('삭제 완료');
 }
-function deleteYield(){
+async function deleteYield(){
   const dateVal = document.getElementById('yieldDate').value;
   if(!dateVal){ alert('날짜를 먼저 선택해주세요'); return; }
   const key = dateToYYMMDD(dateVal);
@@ -2068,6 +2070,7 @@ function deleteYield(){
   if(!confirm(`${yymmddToDisplay(key)} 배합(${batchRecs.length}건) + 포장(${packRecs.length}건) 데이터를 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
   localStorage.removeItem('batchRecords_'+key);
   localStorage.removeItem('packRecords_'+key);
+  if(window._db){ try{ await Promise.all([ window._db.collection('autoSync').doc('batchRecords_'+key).delete(), window._db.collection('autoSync').doc('packRecords_'+key).delete() ]); }catch(e){} }
   loadYield();
   alert('삭제 완료');
 }
