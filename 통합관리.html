@@ -768,6 +768,11 @@ function mgmtYYMMDDtoISO(v){
 }
 function todayYYMMDD(){ const d=new Date(); return String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
 function getTodayISO(){ return new Date().toISOString().slice(0,10); }
+function daysDiff(dateStr){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const exp=new Date(dateStr); exp.setHours(0,0,0,0);
+  return Math.floor((exp-today)/(1000*60*60*24));
+}
 function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
 
 function saveIncoming(){
