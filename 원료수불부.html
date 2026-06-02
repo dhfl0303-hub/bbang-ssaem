@@ -86,6 +86,7 @@ tr:hover td{background:var(--bg);}
     </select>
     <button class="btn btn-primary btn-sm" onclick="renderLedger()">조회</button>
     <button class="btn btn-outline btn-sm" onclick="printLedger()">🖨️ 출력</button>
+    <button class="btn btn-sm btn-primary" onclick="openNewIngModal()">+ 신규 원료 등록</button>
     <button class="btn btn-sm" style="background:var(--warning-light);color:var(--warning);border:1px solid #f0c080" onclick="openInitStock()">📋 전일재고 등록</button>
     <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="openDeleteCode()">🗑️ 코드 삭제</button>
 
@@ -137,6 +138,23 @@ tr:hover td{background:var(--bg);}
       </div>
     </div>
     <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('outModal')">취소</button><button class="btn btn-danger" onclick="saveOut()">출고 저장</button></div>
+  </div>
+</div>
+
+<!-- 신규 원료 등록 모달 -->
+<div class="modal-overlay" id="newIngModal" onclick="closeModalOutside(event,'newIngModal')">
+  <div class="modal" style="width:520px">
+    <div class="modal-hd"><div class="modal-title">➕ 신규 원료 등록</div><button class="modal-close" onclick="closeModal('newIngModal')">×</button></div>
+    <div class="modal-bd">
+      <div class="form-grid">
+        <div class="form-row"><label class="form-label">원료코드 (자동)</label><input class="form-input" id="newIngCode" readonly style="background:#f8f9fb;color:var(--primary);font-weight:700"></div>
+        <div class="form-row"><label class="form-label">원료명 <span style="color:var(--danger)">*</span></label><input class="form-input" id="newIngName" placeholder="예: 버터크림"></div>
+        <div class="form-row"><label class="form-label">원산지</label><input class="form-input" id="newIngOrigin" placeholder="예: 국내제조"></div>
+        <div class="form-row"><label class="form-label">단위</label><select class="form-input" id="newIngUnit"><option value="kg">kg</option><option value="g">g</option><option value="L">L</option><option value="EA">EA</option></select></div>
+        <div class="form-row" style="grid-column:1/-1"><label class="form-label">보관기준</label><input class="form-input" id="newIngStorage" placeholder="예: 1~35℃ 실온보관"></div>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('newIngModal')">취소</button><button class="btn btn-primary" onclick="saveNewIng()">저장</button></div>
   </div>
 </div>
 
@@ -452,6 +470,32 @@ function openEditIngredient(code){
   document.getElementById('editIngExp').value = initRec ? (initRec.exp||'') : '';
   document.getElementById('editIngMfg').value = initRec ? (initRec.mfg||'') : '';
   document.getElementById('editIngModal').classList.add('open');
+}
+
+function openNewIngModal(){
+  // 다음 코드 자동 생성
+  const nums = INGREDIENT_DB.map(i=>parseInt((i.code||'').replace('M',''))||0);
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  document.getElementById('newIngCode').value = 'M' + String(next).padStart(3,'0');
+  document.getElementById('newIngName').value = '';
+  document.getElementById('newIngOrigin').value = '';
+  document.getElementById('newIngStorage').value = '';
+  document.getElementById('newIngUnit').value = 'kg';
+  document.getElementById('newIngModal').classList.add('open');
+}
+function saveNewIng(){
+  const code = document.getElementById('newIngCode').value;
+  const name = document.getElementById('newIngName').value.trim();
+  const origin = document.getElementById('newIngOrigin').value.trim();
+  const storage = document.getElementById('newIngStorage').value.trim();
+  const unit = document.getElementById('newIngUnit').value;
+  if(!name){ alert('원료명을 입력해주세요'); return; }
+  if(INGREDIENT_DB.find(i=>i.name===name)){ alert('이미 존재하는 원료명입니다'); return; }
+  INGREDIENT_DB.push({code, name, origin, storage, unit});
+  saveIngredientDB();
+  closeModal('newIngModal');
+  renderLedger();
+  alert(`${name} (${code}) 등록 완료`);
 }
 
 function openDeleteCode(){
