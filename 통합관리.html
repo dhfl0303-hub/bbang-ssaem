@@ -2485,25 +2485,7 @@ function saveIngStock(){
   closeModal('ingStockModal'); renderIngStock();
 }
 function deleteIngStock(i){ if(!confirm('삭제하시겠습니까?'))return; ingStock.splice(i,1); saveData('ingStock',ingStock); renderIngStock(); }
-// openEditIngStock 제거
-  const s = ingStock[i];
-  if(!s) return;
-  document.getElementById('editIngStockIdx').value = i;
-  document.getElementById('editIngStockName').value = s.name;
-  document.getElementById('editIngStockQty').value = s.qty||0;
-  document.getElementById('editIngStockExp').value = s.expiry||'';
-  document.getElementById('editIngStockMfg').value = s.mfg||'';
-  document.getElementById('editIngStockModal').classList.add('open');
-}
-function saveEditIngStock(){
-  const i = parseInt(document.getElementById('editIngStockIdx').value);
-  if(isNaN(i)||!ingStock[i]) return;
-  ingStock[i].qty = parseFloat(document.getElementById('editIngStockQty').value)||0;
-  ingStock[i].expiry = document.getElementById('editIngStockExp').value;
-  ingStock[i].mfg = document.getElementById('editIngStockMfg').value;
-  saveData('ingStock', ingStock);
-  closeModal('editIngStockModal'); renderIngStock(); alert('수정 완료');
-}
+
 function openEditIncoming(i){
   const r = [...incomingRecords].sort((a,b)=>b.date.localeCompare(a.date))[i];
   if(!r) return;
