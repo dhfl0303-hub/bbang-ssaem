@@ -20,7 +20,7 @@ body{font-family:"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text
 
 /* 탭 */
 .tab-bar{display:flex;background:#fff;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:100;}
-.tab{flex:1;padding:14px;text-align:center;font-size:14px;font-weight:700;color:var(--text3);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
+.tab{flex:1;padding:14px;text-align:center;font-size:14px;font-weight:700;color:var(--text3);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;white-space:nowrap;}
 .tab.active{color:var(--primary);border-bottom-color:var(--primary);}
 
 .page{display:none;padding:16px;}
@@ -167,7 +167,6 @@ select.td-input{cursor:pointer;}
     <div class="tab active" onclick="switchTab('write')">✏️ 작성</div>
     <div class="tab" onclick="switchTab('history')">📁 저장내역</div>
   </div>
-  <button id="syncBtn" onclick="syncToServer()" style="align-self:center;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>
 </div>
 
 <!-- ===== 작성 탭 ===== -->
@@ -457,8 +456,8 @@ const INGREDIENT_DB = [{"code":"M001","name":"가당연유"},{"code":"M002","nam
 const DEFAULT_SUPPLIERS = ['에이스유통','엠즈푸드','덕풍','내추럴쿡','남원원예농협','SPC','밤마을','맑은들','제원인터내쇼날','하나푸드','CJ제일제당','대선제분'];
 
 // ===== 데이터 =====
-let suppliers = JSON.parse(localStorage.getItem('suppliers_incoming') || JSON.stringify(DEFAULT_SUPPLIERS));
-let records = JSON.parse(localStorage.getItem('incomingRecords') || '[]');
+let suppliers = [...DEFAULT_SUPPLIERS];
+let records = [];
 let slashState = { write: false, approve: false };
 let rowCount = 0;
 
@@ -879,7 +878,7 @@ function delRow(id){
 }
 
 // ===== 저장 =====
-function saveRecord(){
+async function saveRecord(){
   const date = document.getElementById('inDate').value;
   if(!date){ alert('입고일자를 선택해주세요'); return; }
 
@@ -929,7 +928,7 @@ function saveRecord(){
   };
 
   records.unshift(record);
-  localStorage.setItem('incomingRecords', JSON.stringify(records)); autoSyncToFirebase('incomingRecords', records);
+  await saveRecordsToFirebase();
   alert('저장됐습니다!');
   switchTab('history');
 }
@@ -1018,10 +1017,10 @@ function toggleHistory(i){
   arrow.textContent = isOpen ? '▼' : '▲';
 }
 
-function deleteRecord(i){
+async function deleteRecord(i){
   if(!confirm('이 기록을 삭제하시겠습니까?')) return;
   records.splice(i,1);
-  localStorage.setItem('incomingRecords', JSON.stringify(records)); autoSyncToFirebase('incomingRecords', records);
+  await saveRecordsToFirebase();
   renderHistory();
 }
 
@@ -1142,7 +1141,7 @@ function getEditOX(field, rowId){
   return '-';
 }
 
-function saveEditRecord(){
+async function saveEditRecord(){
   const i = parseInt(document.getElementById('editRecordIdx').value);
   const date = document.getElementById('edit-date').value;
   if(!date){ alert('입고일자를 선택해주세요'); return; }
@@ -1181,7 +1180,7 @@ function saveEditRecord(){
     updatedAt: new Date().toISOString()
   };
 
-  localStorage.setItem('incomingRecords', JSON.stringify(records)); autoSyncToFirebase('incomingRecords', records);
+  await saveRecordsToFirebase();
   closeModal('editRecordModal');
   renderHistory();
   alert('수정됐습니다!');
@@ -1393,7 +1392,7 @@ function addSupplier(){
   if(!name){ alert('거래처명을 입력해주세요'); return; }
   if(suppliers.includes(name)){ alert('이미 존재하는 거래처입니다'); return; }
   suppliers.push(name);
-  localStorage.setItem('suppliers_incoming', JSON.stringify(suppliers));
+  saveSuppliersToFirebase();
   document.getElementById('newSupplierName').value = '';
   renderSupplierList();
   updateSupplierSelects();
@@ -1402,7 +1401,7 @@ function addSupplier(){
 function deleteSupplier(i){
   if(!confirm(`"${suppliers[i]}"을 삭제하시겠습니까?`)) return;
   suppliers.splice(i,1);
-  localStorage.setItem('suppliers_incoming', JSON.stringify(suppliers));
+  saveSuppliersToFirebase();
   renderSupplierList();
   updateSupplierSelects();
 }
@@ -1418,7 +1417,7 @@ function saveEditSupplier(){
   const name = document.getElementById('editSupplierName').value.trim();
   if(!name) return;
   suppliers[i] = name;
-  localStorage.setItem('suppliers_incoming', JSON.stringify(suppliers));
+  saveSuppliersToFirebase();
   closeModal('editSupplierModal');
   renderSupplierList();
   updateSupplierSelects();
@@ -1440,60 +1439,32 @@ function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 function closeModalOutside(e,id){ if(e.target===document.getElementById(id)) closeModal(id); }
 
 // ===== Firebase 자동 동기화 =====
-function autoSyncToFirebase(key, data){
+// ===== Firebase 직접 읽기/쓰기 =====
+async function saveRecordsToFirebase(){
   if(!window._db) return;
   try{
-    window._db.collection('autoSync').doc(key).set({
-      key, data:JSON.stringify(data), updatedAt:new Date().toISOString()
-    }).catch(e=>console.warn('Firebase 저장 실패:',key,e));
-  }catch(e){}
+    await window._db.collection('appData').doc('incomingRecords').set({ data: JSON.stringify(records), updatedAt: new Date().toISOString() });
+  }catch(e){ console.warn('Firebase 저장 실패', e); alert('저장 실패: 네트워크를 확인해주세요'); }
 }
-async function loadFromFirebaseAuto(){
+function saveSuppliersToFirebase(){
+  if(!window._db) return;
+  window._db.collection('appData').doc('suppliers_incoming').set({ data: JSON.stringify(suppliers), updatedAt: new Date().toISOString() })
+    .catch(e=>console.warn('거래처 저장 실패', e));
+}
+async function loadFromFirebase(){
   if(!window._db) return;
   try{
-    const snap = await window._db.collection('autoSync').get();
-    if(snap.empty) return;
-    snap.forEach(doc=>{
-      const d=doc.data();
-      if(!d.key || !d.data) return;
-      const localVal = localStorage.getItem(d.key);
-      if(!localVal){
-        try{ localStorage.setItem(d.key, d.data); }catch(e){}
-      } else {
-        try{
-          const fbUpdated = d.updatedAt || '0';
-          const localObj = JSON.parse(localVal);
-          const localUpdated = localObj._updatedAt || '0';
-          if(fbUpdated > localUpdated) localStorage.setItem(d.key, d.data);
-        }catch(e){}
-      }
-    });
-  }catch(e){ console.warn('Firebase 로드 실패',e); }
-}catch(e){}
-    });
-  }catch(e){ console.warn('Firebase 로드 실패',e); }
+    const [recSnap, supSnap] = await Promise.all([
+      window._db.collection('appData').doc('incomingRecords').get(),
+      window._db.collection('appData').doc('suppliers_incoming').get()
+    ]);
+    if(recSnap.exists && recSnap.data().data) records = JSON.parse(recSnap.data().data);
+    if(supSnap.exists && supSnap.data().data) suppliers = JSON.parse(supSnap.data().data);
+  }catch(e){ console.warn('Firebase 로드 실패', e); }
 }
 
 // ===== 실행 =====
-(async ()=>{ await loadFromFirebaseAuto(); init(); })();
-
-// ===== 동기화 =====
-async function syncToServer(){
-  const btn = document.getElementById('syncBtn');
-  btn.textContent = '⏳ 동기화 중...';
-  btn.disabled = true;
-  try {
-    const allData=JSON.parse(localStorage.getItem('incomingRecords')||'[]');
-    if(!allData.length){btn.textContent='⚠️ 데이터 없음';setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000);return;}
-    const db=window._db; let count=0;
-    for(const r of allData){await db.collection('incomingRecords').doc(String(r.id||r.date||Date.now()+count)).set({...r,_syncedAt:new Date().toISOString()});count++;}
-    btn.textContent='✅ '+count+'건 완료';
-    setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2500);
-  } catch(e) {
-    btn.textContent = '❌ 실패';
-    setTimeout(()=>{ btn.textContent='🔄 동기화'; btn.disabled=false; }, 2000);
-  }
-}
+(async ()=>{ await loadFromFirebase(); init(); })();
 </script>
 </body>
 </html>

@@ -75,7 +75,7 @@ tr:hover td{background:var(--bg);}
   <div class="filter-row">
     <div>
       <label style="font-size:12px;font-weight:700;color:var(--text2);margin-right:6px">조회 날짜</label>
-      <input type="date" class="search-input" id="ledgerDate" style="min-width:160px" onchange="renderLedger()">
+      <input type="text" class="search-input" id="ledgerDate" style="min-width:140px" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtLedgerDate(this)">
     </div>
     <input class="search-input" placeholder="원료명 검색..." id="ledgerSearch" oninput="renderLedger()">
     <select class="search-input" id="ledgerFilter" onchange="renderLedger()" style="min-width:140px">
@@ -87,8 +87,8 @@ tr:hover td{background:var(--bg);}
     <button class="btn btn-primary btn-sm" onclick="renderLedger()">조회</button>
     <button class="btn btn-outline btn-sm" onclick="printLedger()">🖨️ 출력</button>
     <button class="btn btn-sm" style="background:var(--warning-light);color:var(--warning);border:1px solid #f0c080" onclick="openInitStock()">📋 전일재고 등록</button>
-    <button class="btn btn-outline btn-sm" onclick="openInModal()">+ 입고 등록</button>
-    <button class="btn btn-danger btn-sm" onclick="openOutModal()">- 출고 등록</button>
+    <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="openDeleteCode()">🗑️ 코드 삭제</button>
+
   </div>
   <div class="card">
     <div class="card-hd">
@@ -98,7 +98,7 @@ tr:hover td{background:var(--bg);}
     <div class="card-bd" style="padding:0">
       <div class="table-wrap">
         <table>
-          <thead><tr><th>코드</th><th>품목명</th><th>원산지</th><th>보관기준</th><th>단위</th><th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th></tr></thead>
+          <thead><tr><th>코드</th><th>품목명</th><th>원산지</th><th>보관기준</th><th>단위</th><th>전일<br>재고</th><th>입고</th><th>출고</th><th>마감<br>재고</th></tr></thead>
           <tbody id="ledgerTbody"></tbody>
         </table>
       </div>
@@ -140,6 +140,40 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
+<!-- 코드 삭제 모달 -->
+<div class="modal-overlay" id="deleteCodeModal" onclick="closeModalOutside(event,'deleteCodeModal')">
+  <div class="modal" style="width:400px">
+    <div class="modal-hd"><div class="modal-title">🗑️ 코드 삭제</div><button class="modal-close" onclick="closeModal('deleteCodeModal')">×</button></div>
+    <div class="modal-bd">
+      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">⚠️ 삭제하면 해당 원료 코드와 수불 내역이 모두 삭제됩니다.</div>
+      <div class="form-row"><label class="form-label">원료 선택</label><div class="autocomplete-wrap"><input class="form-input" id="deleteCodeName" placeholder="원료명 입력/검색" autocomplete="off" oninput="showIngAC('deleteCodeName')" onfocus="showIngAC('deleteCodeName')" onblur="setTimeout(()=>hideIngAC('deleteCodeName'),150)"><div class="autocomplete-list" id="ac-deleteCodeName"></div></div></div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('deleteCodeModal')">취소</button><button class="btn btn-danger" onclick="confirmDeleteCode()">삭제</button></div>
+  </div>
+</div>
+
+<!-- 수정 모달 -->
+<div class="modal-overlay" id="editIngModal" onclick="closeModalOutside(event,'editIngModal')">
+  <div class="modal" style="width:480px">
+    <div class="modal-hd"><div class="modal-title">✏️ 원료 수정</div><button class="modal-close" onclick="closeModal('editIngModal')">×</button></div>
+    <div class="modal-bd">
+      <input type="hidden" id="editIngCode">
+      <div class="form-row"><label class="form-label">원료명</label><input class="form-input" id="editIngNameDisplay" disabled style="background:#f4f6fa;color:var(--text2)"></div>
+      <div class="form-row"><label class="form-label">원산지</label><input class="form-input" id="editIngOrigin" placeholder="예: 국산"></div>
+      <div class="form-row"><label class="form-label">보관기준</label><input class="form-input" id="editIngStorage" placeholder="예: 1~35℃ 실온보관"></div>
+      <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:12px;">전일재고 수정</div>
+        <div class="form-grid">
+          <div class="form-row"><label class="form-label">재고량 (kg)</label><input class="form-input" id="editIngQty" type="number" step="0.001" placeholder="0"></div>
+          <div class="form-row"><label class="form-label">소비기한 YYMMDD</label><input class="form-input" id="editIngExp" placeholder="예: 270518" maxlength="6" inputmode="numeric" oninput="fmtInitDate(this)"></div>
+          <div class="form-row"><label class="form-label">제조일자 YYMMDD <span style="color:var(--text3);font-weight:400">(선택)</span></label><input class="form-input" id="editIngMfg" placeholder="예: 260101" maxlength="6" inputmode="numeric" oninput="fmtInitDate(this)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('editIngModal')">취소</button><button class="btn btn-primary" onclick="saveEditIngredient()">저장</button></div>
+  </div>
+</div>
+
 <!-- 전일재고 모달 -->
 <div class="modal-overlay" id="initStockModal" onclick="closeModalOutside(event,'initStockModal')">
   <div class="modal" style="width:720px">
@@ -151,12 +185,10 @@ tr:hover td{background:var(--bg);}
         <div class="form-row"><label class="form-label">원료 선택</label><div class="autocomplete-wrap"><input class="form-input" id="initIngName" placeholder="원료명 입력/검색" autocomplete="off" oninput="showIngAC('initIngName')" onfocus="showIngAC('initIngName')" onblur="setTimeout(()=>hideIngAC('initIngName'),150)"><div class="autocomplete-list" id="ac-initIngName"></div></div></div>
         <div class="form-row"><label class="form-label">재고량 (kg)</label><input class="form-input" id="initQty" type="number" placeholder="0" step="0.001"></div>
         <div class="form-row"><label class="form-label">소비기한 YYMMDD</label><input class="form-input" id="initExp" placeholder="예: 270518" maxlength="6" inputmode="numeric" oninput="fmtInitDate(this)"></div>
+        <div class="form-row"><label class="form-label">제조일자 YYMMDD <span style="color:var(--text3);font-weight:400">(선택)</span></label><input class="form-input" id="initMfg" placeholder="예: 260101" maxlength="6" inputmode="numeric" oninput="fmtInitDate(this)"></div>
       </div>
       <button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="addInitRow()">+ 추가</button>
-      <div style="font-size:12px;font-weight:700;margin-bottom:6px;">신규 추가</div>
-      <div class="table-wrap" style="margin-bottom:16px;"><table><thead><tr><th>원료명</th><th>코드</th><th>재고량(kg)</th><th>소비기한</th><th>기준일</th><th></th></tr></thead><tbody id="initStockTbody"></tbody></table></div>
-      <div style="font-size:12px;font-weight:700;margin-bottom:6px;">기존 전일재고</div>
-      <div class="table-wrap"><table><thead><tr><th>원료명</th><th>코드</th><th>재고량</th><th>소비기한</th><th>기준일</th><th>관리</th></tr></thead><tbody id="savedInitStockTbody"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>원료명</th><th>코드</th><th>재고량(kg)</th><th>소비기한</th><th>기준일</th><th></th></tr></thead><tbody id="initStockTbody"></tbody></table></div>
     </div>
     <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('initStockModal')">취소</button><button class="btn btn-primary" onclick="saveInitStock()">전체 저장</button></div>
   </div>
@@ -176,14 +208,15 @@ firebase.initializeApp({
 window._db = firebase.firestore();
 </script>
 <script>
-const INGREDIENT_DB = [{"code": "M001", "name": "가당연유", "origin": "국내제조", "storage": "1~35℃ 실온보관 /  / 개봉후 0~10℃냉장보관"}, {"code": "M002", "name": "가루찹쌀", "origin": "국산", "storage": "1~35℃ 실온보관"}, {"code": "M003", "name": "갈릭소스", "origin": "국내제조", "storage": "-18℃이하 냉동보관  /  / 개봉후 0~10℃ 냉장보관"}, {"code": "M004", "name": "감자다이스", "origin": "", "storage": "-18℃이하 냉동보관  /  / 개봉후 0~10℃ 냉장보관"}, {"code": "M005", "name": "강력쌀가루", "origin": "외국산", "storage": "1~35℃ 실온보관"}, {"code": "M006", "name": "건조블루베리", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M007", "name": "건조크랜베리", "origin": "미국", "storage": "1~35℃ 실온보관"}, {"code": "M008", "name": "검은깨분말", "origin": "중국산", "storage": "1~35℃ 실온보관"}, {"code": "M009", "name": "고메버터", "origin": "프랑스", "storage": "-18℃이하 냉동보관  /  / 개봉후 0~10℃ 냉장보관"}, {"code": "M010", "name": "고메버터(플로리)", "origin": "프랑스", "storage": "-18℃이하 냉동보관  /  / 개봉후 0~10℃ 냉장보관"}, {"code": "M011", "name": "공주밤다이스", "origin": "국산", "storage": ""}, {"code": "M012", "name": "그랜드500-프리", "origin": "말레이시아", "storage": "0~10℃ 냉장보관"}, {"code": "M013", "name": "난황액", "origin": "국산", "storage": "0~10℃냉장보관"}, {"code": "M014", "name": "냉동블루베리", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M015", "name": "냉동삼색피망", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M016", "name": "냉동양파", "origin": "중국산", "storage": "-18℃이하 냉동보관"}, {"code": "M017", "name": "다목적박력분", "origin": "미국산", "storage": "1~35℃ 실온보관"}, {"code": "M018", "name": "다크초콜릿칩", "origin": "", "storage": ""}, {"code": "M019", "name": "당적밤 다이스", "origin": "국산", "storage": "-18℃이하 냉동보관"}, {"code": "M020", "name": "데리야끼소스", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M021", "name": "럼", "origin": "베트남", "storage": "1~35℃ 실온보관"}, {"code": "M022", "name": "마가린(노블)", "origin": "국내제조", "storage": "-18℃이하 냉동보관"}, {"code": "M023", "name": "로즈버드크리머", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M024", "name": "마리네이트\n체리토마토", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M025", "name": "마요네즈(롯데)", "origin": "국내제조", "storage": "1~35℃ 실온보관 /  / 개봉후 0~10℃냉장보관"}, {"code": "M026", "name": "마요네즈(오뚜기)", "origin": "국내제조", "storage": "1~35℃ 실온보관 /  / 개봉후 0~10℃냉장보관"}, {"code": "M027", "name": "멀티그레인", "origin": "", "storage": ""}, {"code": "M028", "name": "메이플시럽", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M029", "name": "모짜렐라치즈", "origin": "독일,\n오스트리아,\n미국", "storage": "-18℃이하 냉동보관"}, {"code": "M030", "name": "몰트액기스", "origin": "덴마크", "storage": "1~25℃ /  / 개봉후 0~10℃냉장보관"}, {"code": "M031", "name": "물엿(큐원)", "origin": "국산", "storage": "1~35℃ 실온보관"}, {"code": "M032", "name": "미니페파로니", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M033", "name": "밀크웨이분말", "origin": "", "storage": ""}, {"code": "M034", "name": "바닐프로200", "origin": "프랑스", "storage": "1~35℃ 실온보관"}, {"code": "M035", "name": "바닐프로T", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M036", "name": "바질", "origin": "이집트", "storage": "1~35℃ 실온보관"}, {"code": "M037", "name": "바질페스토", "origin": "", "storage": "0~10℃ 냉장보관"}, {"code": "M038", "name": "바통브랑제 \n베이킹스틱", "origin": "프랑스", "storage": "1~35℃ 실온보관"}, {"code": "M039", "name": "반건조무화과", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M040", "name": "버터", "origin": "미국", "storage": "-18℃이하 냉동보관"}, {"code": "M041", "name": "베사멜소스", "origin": "국내제조", "storage": "-18℃이하 냉동보관"}, {"code": "M042", "name": "베이컨칩", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M043", "name": "롤치즈", "origin": "국내제조", "storage": "0~10℃ 냉장보관"}, {"code": "M044", "name": "베이킹파우더 \n포뮬러2", "origin": "러시아,\n헝가리,\n세르비아", "storage": "1~35℃ 실온보관"}, {"code": "M045", "name": "볶음검정깨가루", "origin": "외국산", "storage": "1~35℃ 실온보관"}, {"code": "M046", "name": "분당", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M047", "name": "블랙올리브슬라이스", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M048", "name": "빙수애콩가루", "origin": "", "storage": "1~36℃ 실온보관"}, {"code": "M049", "name": "빵가루", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M050", "name": "사프르방LV", "origin": "프랑스", "storage": "-18℃이하 냉동보관"}, {"code": "M051", "name": "세몰리나", "origin": "", "storage": ""}, {"code": "M052", "name": "세미드라이이스트 골드", "origin": "프랑스", "storage": "-18℃이하 냉동보관"}, {"code": "M053", "name": "세미드라이이스트 레드", "origin": "프랑스", "storage": "-18℃이하 냉동보관"}, {"code": "M054", "name": "소불고기", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M055", "name": "스모크햄슬라이스", "origin": "국내제조", "storage": "0~5℃ 냉장보관"}, {"code": "M056", "name": "스크럼블에그", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M057", "name": "스위트콘", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M058", "name": "식용유", "origin": "아르헨티나,\n미국,\n베트남", "storage": "1~35℃ 실온보관"}, {"code": "M059", "name": "아몬드분말", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M060", "name": "아바론밀가루", "origin": "일본", "storage": "15~25℃ 상온보관"}, {"code": "M061", "name": "아뺑드밀가루 T45", "origin": "미국,캐나다", "storage": "1~35℃ 실온보관"}, {"code": "M062", "name": "아카시아청", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M063", "name": "안데스트레샬소금", "origin": "아르헨티나", "storage": "1~35℃ 실온보관"}, {"code": "M064", "name": "앵커버터", "origin": "뉴질랜드", "storage": "-18℃이하 냉동보관"}, {"code": "M065", "name": "애플턴오버", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M066", "name": "에멘탈치즈", "origin": "국내제조", "storage": "-18℃이하 냉동보관"}, {"code": "M067", "name": "에버휩", "origin": "국내제조", "storage": "-18℃이하 냉동보관  /  / 개봉후 0~10℃ 냉장보관"}, {"code": "M068", "name": "에스500키모", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M069", "name": "오버나이트", "origin": "이탈리아", "storage": "1~35℃ 실온보관"}, {"code": "M070", "name": "올리브유", "origin": "이탈리아", "storage": "1~35℃ 실온보관"}, {"code": "M071", "name": "우유", "origin": "국산", "storage": "0~10℃냉장보관"}, {"code": "M072", "name": "우유버터화이트", "origin": "국산", "storage": "0~10℃냉장보관"}, {"code": "M073", "name": "왁시브레드KC", "origin": "국산", "storage": "1~35℃ 실온보관"}, {"code": "M074", "name": "월드콤파운드\n버터", "origin": "뉴질랜드", "storage": "-18℃이하 냉동보관"}, {"code": "M075", "name": "유기농밀가루 강력", "origin": "터키", "storage": "1~35℃ 실온보관"}, {"code": "M076", "name": "유기농밀가루 박력", "origin": "터키", "storage": "1~35℃ 실온보관"}, {"code": "M077", "name": "으깬삶은감자", "origin": "국산", "storage": "0~10℃ 냉장보관"}, {"code": "M078", "name": "으깬삶은고구마", "origin": "국산", "storage": "-18℃이하 냉동보관"}, {"code": "M079", "name": "이즈니버터", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M080", "name": "이지마요", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M081", "name": "자색고구마분말", "origin": "중국", "storage": "1~35℃ 실온보관"}, {"code": "M082", "name": "잣분말", "origin": "국산", "storage": "1~35℃ 실온보관"}, {"code": "M083", "name": "전란분말", "origin": "덴마크", "storage": "1~35℃ 실온보관"}, {"code": "M084", "name": "전란액", "origin": "국산", "storage": "0~5℃냉장보관(축산물)"}, {"code": "M085", "name": "제빵용고급밀가루", "origin": "미국,캐나다", "storage": "1~35℃ 실온보관"}, {"code": "M086", "name": "제빵용밀가루", "origin": "미국,캐나다", "storage": "1~35℃ 실온보관"}, {"code": "M087", "name": "제빵용탕종분", "origin": "미국,캐나다", "storage": "1~35℃ 실온보관"}, {"code": "M088", "name": "체다치즈", "origin": "", "storage": "0~10℃ 냉장보관"}, {"code": "M089", "name": "초코믹스파우더", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M090", "name": "초코칩", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M091", "name": "커피분말", "origin": "베트남", "storage": "1~35℃ 실온보관"}, {"code": "M092", "name": "코코아분말", "origin": "싱가포르", "storage": "1~35℃ 실온보관"}, {"code": "M093", "name": "코코아분말", "origin": "프랑스", "storage": "1~35℃ 실온보관"}, {"code": "M094", "name": "콩고물", "origin": "중국산", "storage": "1~35℃ 실온보관"}, {"code": "M095", "name": "크리미 \n땅콩버터", "origin": "인도네시아", "storage": "15~25℃ 상온보관"}, {"code": "M096", "name": "크리미비트", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M097", "name": "탈지분유", "origin": "국산", "storage": "1~35℃ 실온보관"}, {"code": "M098", "name": "파슬리", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M099", "name": "파인소프트202", "origin": "태국", "storage": "1~35℃ 실온보관"}, {"code": "M100", "name": "파인소프트C", "origin": "태국", "storage": "1~35℃ 실온보관"}, {"code": "M101", "name": "파인소프트T", "origin": "태국", "storage": "1~35℃ 실온보관"}, {"code": "M102", "name": "펄솔트", "origin": "독일", "storage": "1~35℃ 실온보관"}, {"code": "M103", "name": "펍스(해쉬브라운)", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M104", "name": "페파로니다이스", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M105", "name": "포테이토샐러드", "origin": "국내제조", "storage": "0~10℃냉장보관"}, {"code": "M106", "name": "프레즐소다", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M107", "name": "플레인 식빵", "origin": "국내제조", "storage": "-18℃이하 냉동보관"}, {"code": "M108", "name": "플레인요거트", "origin": "국산", "storage": "0~10℃ 냉장보관"}, {"code": "M109", "name": "피자소스", "origin": "", "storage": "0~10℃ 냉장보관"}, {"code": "M110", "name": "피칸분테", "origin": "미국", "storage": "1~35℃ 실온보관"}, {"code": "M111", "name": "하얀설탕", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M112", "name": "할라피뇨다이스", "origin": "", "storage": "0~10℃ 냉장보관"}, {"code": "M113", "name": "핫케이크믹스", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M114", "name": "허니머스타드", "origin": "", "storage": "0~10℃ 냉장보관"}, {"code": "M115", "name": "호두분태", "origin": "미국", "storage": "1~35℃ 실온보관"}, {"code": "M116", "name": "화미고백당", "origin": "중국", "storage": "1~35℃ 실온보관"}, {"code": "M117", "name": "황등앙금", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M118", "name": "황치즈분말", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M119", "name": "휘핑크림", "origin": "프랑스", "storage": "2~8℃ 냉장보관"}, {"code": "M120", "name": "자색고구마분말", "origin": "국산", "storage": "1~35℃ 실온보관"}, {"code": "M121", "name": "잣파이", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M122", "name": "버터향", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M123", "name": "치자황색소", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M124", "name": "슈가파우더", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M125", "name": "마늘분말", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M126", "name": "양파분태", "origin": "국내제조", "storage": "1~35℃ 실온보관"}];
+let INGREDIENT_DB = [{"code": "M001", "name": "가당연유", "origin": "국내제조", "storage": "1~35℃ 실온보관 /  / 개봉후 0~10℃냉장보관"}, {"code": "M002", "name": "가루찹쌀", "origin": "국산", "storage": "1~35℃ 실온보관"}, {"code": "M003", "name": "갈릭소스", "origin": "국내제조", "storage": "-18℃이하 냉동보관  /  / 개봉후 0~10℃ 냉장보관"}, {"code": "M004", "name": "감자다이스", "origin": "", "storage": "-18℃이하 냉동보관  /  / 개봉후 0~10℃ 냉장보관"}, {"code": "M005", "name": "강력쌀가루", "origin": "외국산", "storage": "1~35℃ 실온보관"}, {"code": "M006", "name": "건조블루베리", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M007", "name": "건조크랜베리", "origin": "미국", "storage": "1~35℃ 실온보관"}, {"code": "M008", "name": "검은깨분말", "origin": "중국산", "storage": "1~35℃ 실온보관"}, {"code": "M009", "name": "고메버터", "origin": "프랑스", "storage": "-18℃이하 냉동보관  /  / 개봉후 0~10℃ 냉장보관"}, {"code": "M010", "name": "고메버터(플로리)", "origin": "프랑스", "storage": "-18℃이하 냉동보관  /  / 개봉후 0~10℃ 냉장보관"}, {"code": "M011", "name": "공주밤다이스", "origin": "국산", "storage": ""}, {"code": "M012", "name": "그랜드500-프리", "origin": "말레이시아", "storage": "0~10℃ 냉장보관"}, {"code": "M013", "name": "난황액", "origin": "국산", "storage": "0~10℃냉장보관"}, {"code": "M014", "name": "냉동블루베리", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M015", "name": "냉동삼색피망", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M016", "name": "냉동양파", "origin": "중국산", "storage": "-18℃이하 냉동보관"}, {"code": "M017", "name": "다목적박력분", "origin": "미국산", "storage": "1~35℃ 실온보관"}, {"code": "M018", "name": "다크초콜릿칩", "origin": "", "storage": ""}, {"code": "M019", "name": "당적밤 다이스", "origin": "국산", "storage": "-18℃이하 냉동보관"}, {"code": "M020", "name": "데리야끼소스", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M021", "name": "럼", "origin": "베트남", "storage": "1~35℃ 실온보관"}, {"code": "M022", "name": "마가린(노블)", "origin": "국내제조", "storage": "-18℃이하 냉동보관"}, {"code": "M023", "name": "로즈버드크리머", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M024", "name": "마리네이트\n체리토마토", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M025", "name": "마요네즈(롯데)", "origin": "국내제조", "storage": "1~35℃ 실온보관 /  / 개봉후 0~10℃냉장보관"}, {"code": "M026", "name": "마요네즈(오뚜기)", "origin": "국내제조", "storage": "1~35℃ 실온보관 /  / 개봉후 0~10℃냉장보관"}, {"code": "M027", "name": "멀티그레인", "origin": "", "storage": ""}, {"code": "M028", "name": "메이플시럽", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M029", "name": "모짜렐라치즈", "origin": "독일,\n오스트리아,\n미국", "storage": "-18℃이하 냉동보관"}, {"code": "M030", "name": "몰트액기스", "origin": "덴마크", "storage": "1~25℃ /  / 개봉후 0~10℃냉장보관"}, {"code": "M031", "name": "물엿(큐원)", "origin": "국산", "storage": "1~35℃ 실온보관"}, {"code": "M032", "name": "미니페파로니", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M033", "name": "밀크웨이분말", "origin": "", "storage": ""}, {"code": "M034", "name": "바닐프로200", "origin": "프랑스", "storage": "1~35℃ 실온보관"}, {"code": "M035", "name": "바닐프로T", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M036", "name": "바질", "origin": "이집트", "storage": "1~35℃ 실온보관"}, {"code": "M037", "name": "바질페스토", "origin": "", "storage": "0~10℃ 냉장보관"}, {"code": "M038", "name": "바통브랑제 \n베이킹스틱", "origin": "프랑스", "storage": "1~35℃ 실온보관"}, {"code": "M039", "name": "반건조무화과", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M040", "name": "버터", "origin": "미국", "storage": "-18℃이하 냉동보관"}, {"code": "M041", "name": "베사멜소스", "origin": "국내제조", "storage": "-18℃이하 냉동보관"}, {"code": "M042", "name": "베이컨칩", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M043", "name": "롤치즈", "origin": "국내제조", "storage": "0~10℃ 냉장보관"}, {"code": "M044", "name": "베이킹파우더 \n포뮬러2", "origin": "러시아,\n헝가리,\n세르비아", "storage": "1~35℃ 실온보관"}, {"code": "M045", "name": "볶음검정깨가루", "origin": "외국산", "storage": "1~35℃ 실온보관"}, {"code": "M046", "name": "분당", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M047", "name": "블랙올리브슬라이스", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M048", "name": "빙수애콩가루", "origin": "", "storage": "1~36℃ 실온보관"}, {"code": "M049", "name": "빵가루", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M050", "name": "사프르방LV", "origin": "프랑스", "storage": "-18℃이하 냉동보관"}, {"code": "M051", "name": "세몰리나", "origin": "", "storage": ""}, {"code": "M052", "name": "세미드라이이스트 골드", "origin": "프랑스", "storage": "-18℃이하 냉동보관"}, {"code": "M053", "name": "세미드라이이스트 레드", "origin": "프랑스", "storage": "-18℃이하 냉동보관"}, {"code": "M054", "name": "소불고기", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M055", "name": "스모크햄슬라이스", "origin": "국내제조", "storage": "0~5℃ 냉장보관"}, {"code": "M056", "name": "스크럼블에그", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M057", "name": "스위트콘", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M058", "name": "식용유", "origin": "아르헨티나,\n미국,\n베트남", "storage": "1~35℃ 실온보관"}, {"code": "M059", "name": "아몬드분말", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M060", "name": "아바론밀가루", "origin": "일본", "storage": "15~25℃ 상온보관"}, {"code": "M061", "name": "아뺑드밀가루 T45", "origin": "미국,캐나다", "storage": "1~35℃ 실온보관"}, {"code": "M062", "name": "아카시아청", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M063", "name": "안데스트레샬소금", "origin": "아르헨티나", "storage": "1~35℃ 실온보관"}, {"code": "M064", "name": "앵커버터", "origin": "뉴질랜드", "storage": "-18℃이하 냉동보관"}, {"code": "M065", "name": "애플턴오버", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M066", "name": "에멘탈치즈", "origin": "국내제조", "storage": "-18℃이하 냉동보관"}, {"code": "M067", "name": "에버휩", "origin": "국내제조", "storage": "-18℃이하 냉동보관  /  / 개봉후 0~10℃ 냉장보관"}, {"code": "M068", "name": "에스500키모", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M069", "name": "오버나이트", "origin": "이탈리아", "storage": "1~35℃ 실온보관"}, {"code": "M070", "name": "올리브유", "origin": "이탈리아", "storage": "1~35℃ 실온보관"}, {"code": "M071", "name": "우유", "origin": "국산", "storage": "0~10℃냉장보관"}, {"code": "M072", "name": "우유버터화이트", "origin": "국산", "storage": "0~10℃냉장보관"}, {"code": "M073", "name": "왁시브레드KC", "origin": "국산", "storage": "1~35℃ 실온보관"}, {"code": "M074", "name": "월드콤파운드\n버터", "origin": "뉴질랜드", "storage": "-18℃이하 냉동보관"}, {"code": "M075", "name": "유기농밀가루 강력", "origin": "터키", "storage": "1~35℃ 실온보관"}, {"code": "M076", "name": "유기농밀가루 박력", "origin": "터키", "storage": "1~35℃ 실온보관"}, {"code": "M077", "name": "으깬삶은감자", "origin": "국산", "storage": "0~10℃ 냉장보관"}, {"code": "M078", "name": "으깬삶은고구마", "origin": "국산", "storage": "-18℃이하 냉동보관"}, {"code": "M079", "name": "이즈니버터", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M080", "name": "이지마요", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M081", "name": "자색고구마분말", "origin": "중국", "storage": "1~35℃ 실온보관"}, {"code": "M082", "name": "잣분말", "origin": "국산", "storage": "1~35℃ 실온보관"}, {"code": "M083", "name": "전란분말", "origin": "덴마크", "storage": "1~35℃ 실온보관"}, {"code": "M084", "name": "전란액", "origin": "국산", "storage": "0~5℃냉장보관(축산물)"}, {"code": "M085", "name": "제빵용고급밀가루", "origin": "미국,캐나다", "storage": "1~35℃ 실온보관"}, {"code": "M086", "name": "제빵용밀가루", "origin": "미국,캐나다", "storage": "1~35℃ 실온보관"}, {"code": "M087", "name": "제빵용탕종분", "origin": "미국,캐나다", "storage": "1~35℃ 실온보관"}, {"code": "M088", "name": "체다치즈", "origin": "", "storage": "0~10℃ 냉장보관"}, {"code": "M089", "name": "초코믹스파우더", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M090", "name": "초코칩", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M091", "name": "커피분말", "origin": "베트남", "storage": "1~35℃ 실온보관"}, {"code": "M092", "name": "코코아분말", "origin": "싱가포르", "storage": "1~35℃ 실온보관"}, {"code": "M093", "name": "코코아분말", "origin": "프랑스", "storage": "1~35℃ 실온보관"}, {"code": "M094", "name": "콩고물", "origin": "중국산", "storage": "1~35℃ 실온보관"}, {"code": "M095", "name": "크리미 \n땅콩버터", "origin": "인도네시아", "storage": "15~25℃ 상온보관"}, {"code": "M096", "name": "크리미비트", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M097", "name": "탈지분유", "origin": "국산", "storage": "1~35℃ 실온보관"}, {"code": "M098", "name": "파슬리", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M099", "name": "파인소프트202", "origin": "태국", "storage": "1~35℃ 실온보관"}, {"code": "M100", "name": "파인소프트C", "origin": "태국", "storage": "1~35℃ 실온보관"}, {"code": "M101", "name": "파인소프트T", "origin": "태국", "storage": "1~35℃ 실온보관"}, {"code": "M102", "name": "펄솔트", "origin": "독일", "storage": "1~35℃ 실온보관"}, {"code": "M103", "name": "펍스(해쉬브라운)", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M104", "name": "페파로니다이스", "origin": "", "storage": "-18℃이하 냉동보관"}, {"code": "M105", "name": "포테이토샐러드", "origin": "국내제조", "storage": "0~10℃냉장보관"}, {"code": "M106", "name": "프레즐소다", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M107", "name": "플레인 식빵", "origin": "국내제조", "storage": "-18℃이하 냉동보관"}, {"code": "M108", "name": "플레인요거트", "origin": "국산", "storage": "0~10℃ 냉장보관"}, {"code": "M109", "name": "피자소스", "origin": "", "storage": "0~10℃ 냉장보관"}, {"code": "M110", "name": "피칸분테", "origin": "미국", "storage": "1~35℃ 실온보관"}, {"code": "M111", "name": "하얀설탕", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M112", "name": "할라피뇨다이스", "origin": "", "storage": "0~10℃ 냉장보관"}, {"code": "M113", "name": "핫케이크믹스", "origin": "", "storage": "1~35℃ 실온보관"}, {"code": "M114", "name": "허니머스타드", "origin": "", "storage": "0~10℃ 냉장보관"}, {"code": "M115", "name": "호두분태", "origin": "미국", "storage": "1~35℃ 실온보관"}, {"code": "M116", "name": "화미고백당", "origin": "중국", "storage": "1~35℃ 실온보관"}, {"code": "M117", "name": "황등앙금", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M118", "name": "황치즈분말", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M119", "name": "휘핑크림", "origin": "프랑스", "storage": "2~8℃ 냉장보관"}, {"code": "M120", "name": "자색고구마분말", "origin": "국산", "storage": "1~35℃ 실온보관"}, {"code": "M121", "name": "잣파이", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M122", "name": "버터향", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M123", "name": "치자황색소", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M124", "name": "슈가파우더", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M125", "name": "마늘분말", "origin": "국내제조", "storage": "1~35℃ 실온보관"}, {"code": "M126", "name": "양파분태", "origin": "국내제조", "storage": "1~35℃ 실온보관"}];
 let ledgerRecords = [];
 let initRows = [];
+let ingStock = [];
 
 function initLedger(){
-  ledgerRecords = JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
+  // ledgerRecords는 Firebase에서 로드
   try{
-    const recs=JSON.parse(localStorage.getItem('incomingRecords')||'[]');
+    const recs = window._incomingRecords||[];
     recs.forEach(rec=>{
       (rec.rows||[]).forEach(row=>{
         if(!row.product||!row.qty) return;
@@ -195,7 +228,6 @@ function initLedger(){
         }
       });
     });
-    localStorage.setItem('ledgerRecords',JSON.stringify(ledgerRecords));
   }catch(e){}
 }
 
@@ -204,6 +236,7 @@ function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
 function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
 
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function closeAllModals(){ document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open')); }
 
 function closeModalOutside(e,id){ if(e.target===document.getElementById(id)) closeModal(id); }
 
@@ -221,13 +254,33 @@ function showIngAC(inputId){
 }
 
 function hideIngAC(inputId){ const el=document.getElementById('ac-'+inputId); if(el) el.classList.remove('open'); }
+function selectIngAC(inputId, name){
+  const el=document.getElementById(inputId);
+  if(el) el.value=name;
+  hideIngAC(inputId);
+}
 
 function getIngByName(name){ return INGREDIENT_DB.find(i=>i.name===name); }
 
 function getIngByCode(code){ return INGREDIENT_DB.find(i=>i.code===code); }
 
+function yymmddToISO(v){
+  if(!v||v.length!==6) return getTodayISO2();
+  return '20'+v.slice(0,2)+'-'+v.slice(2,4)+'-'+v.slice(4,6);
+}
+function fmtLedgerDate(input){
+  const v=input.value.replace(/\D/g,'').slice(0,6);
+  input.value=v;
+  if(v.length===6){ input.style.color='var(--primary)'; input.style.fontWeight='700'; }
+  else{ input.style.color=''; input.style.fontWeight=''; }
+  renderLedger();
+}
+function getLedgerDateISO(){
+  const v=document.getElementById('ledgerDate').value.replace(/\D/g,'');
+  return yymmddToISO(v);
+}
 function renderLedger(){
-  const selDate=document.getElementById('ledgerDate').value||getTodayISO2();
+  const selDate=getLedgerDateISO();
   const q=document.getElementById('ledgerSearch').value.trim().toLowerCase();
   const stor=document.getElementById('ledgerFilter').value;
   document.getElementById('ledgerDateDisplay').textContent=selDate;
@@ -289,11 +342,11 @@ function renderLedger(){
   }).join('');
 }
 
-function saveLedger(){
-  const ts = new Date().toISOString();
-  const data = ledgerRecords.map(r=>({...r, _updatedAt:ts}));
-  localStorage.setItem('ledgerRecords', JSON.stringify(data));
-  autoSyncToFirebase('ledgerRecords', data);
+async function saveLedger(){
+  if(!window._db){ console.warn('DB 없음'); return; }
+  try{
+    await window._db.collection('appData').doc('ledgerRecords').set({ data: JSON.stringify(ledgerRecords), updatedAt: new Date().toISOString() });
+  }catch(e){ console.warn('Firebase 저장 실패', e); alert('저장 실패: 네트워크를 확인해주세요'); }
 }
 
 function fmtInitDate(input){
@@ -312,7 +365,23 @@ function getInitDateVal(id){
 function openInitStock(e){
   if(e){e.preventDefault();e.stopPropagation();}
   closeAllModals();
+  // 전일 마감재고 자동 계산해서 initRows에 채움
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  const yISO = yesterday.toISOString().slice(0,10);
   initRows = [];
+  const hasInit = ledgerRecords.some(r=>r.type==='init');
+  if(hasInit){
+    // 전일 마감재고 계산
+    const autoRows = [];
+    INGREDIENT_DB.forEach(ing=>{
+      const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
+      const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<=yISO).reduce((s,r)=>s+r.qty,0);
+      const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date<=yISO).reduce((s,r)=>s+r.qty,0);
+      const closing=prevInit+prevIn-prevOut;
+      if(closing>0) autoRows.push({date:yISO,name:ing.name,code:ing.code,qty:closing,exp:'',type:'init',_auto:true});
+    });
+    if(autoRows.length) initRows = autoRows;
+  }
   const tb=document.getElementById('initStockTbody');
   if(tb) tb.innerHTML='';
   const initDate=document.getElementById('initDate');
@@ -323,6 +392,8 @@ function openInitStock(e){
   if(initQty) initQty.value='';
   const initExp=document.getElementById('initExp');
   if(initExp) initExp.value='';
+  const initMfg=document.getElementById('initMfg');
+  if(initMfg) initMfg.value='';
   const modal=document.getElementById('initStockModal');
   if(modal) modal.classList.add('open');
   else alert('모달을 찾을 수 없습니다. 페이지를 새로고침해주세요.');
@@ -332,15 +403,17 @@ function addInitRow(){
   const name = document.getElementById('initIngName').value.trim();
   const qty = parseFloat(document.getElementById('initQty').value)||0;
   const exp = document.getElementById('initExp').value;
+  const mfg = document.getElementById('initMfg').value||'';
   const date = document.getElementById('initDate').value||getTodayISO2();
   if(!name||!qty||!exp){ alert('원료명, 재고량, 소비기한을 모두 입력해주세요'); return; }
   const ing = getIngByName(name);
-  const row = {date, name, code:ing?ing.code:'', qty, exp, type:'init'};
+  const row = {date, name, code:ing?ing.code:'', qty, exp, mfg, type:'init'};
   initRows.push(row);
   renderInitRows();
   document.getElementById('initIngName').value='';
   document.getElementById('initQty').value='';
   document.getElementById('initExp').value='';
+  document.getElementById('initMfg').value='';
 }
 
 function renderInitRows(){
@@ -357,12 +430,78 @@ function renderInitRows(){
 
 function removeInitRow(i){ initRows.splice(i,1); renderInitRows(); }
 
-function saveInitStock(){
+function openAddLedgerRecord(name, code){
+  document.getElementById('inIngName').value = name;
+  document.getElementById('inDate').value = getTodayISO2();
+  document.getElementById('inQty').value = '';
+  document.getElementById('inLot').value = '';
+  document.getElementById('inExp').value = '';
+  document.getElementById('inModal').classList.add('open');
+}
+
+function openEditIngredient(code){
+  const ing = getIngByCode(code);
+  if(!ing){ alert('원료 정보를 찾을 수 없습니다'); return; }
+  // 기존 전일재고 찾기
+  const initRec = ledgerRecords.find(r=>r.name===ing.name && r.type==='init');
+  document.getElementById('editIngCode').value = code;
+  document.getElementById('editIngNameDisplay').value = ing.name;
+  document.getElementById('editIngOrigin').value = ing.origin||'';
+  document.getElementById('editIngStorage').value = ing.storage||'';
+  document.getElementById('editIngQty').value = initRec ? initRec.qty : '';
+  document.getElementById('editIngExp').value = initRec ? (initRec.exp||'') : '';
+  document.getElementById('editIngMfg').value = initRec ? (initRec.mfg||'') : '';
+  document.getElementById('editIngModal').classList.add('open');
+}
+
+function openDeleteCode(){
+  document.getElementById('deleteCodeName').value='';
+  document.getElementById('deleteCodeModal').classList.add('open');
+}
+function confirmDeleteCode(){
+  const name = document.getElementById('deleteCodeName').value.trim();
+  if(!name){ alert('원료명을 입력해주세요'); return; }
+  const idx = INGREDIENT_DB.findIndex(i=>i.name===name);
+  if(idx===-1){ alert('해당 원료를 찾을 수 없습니다'); return; }
+  if(!confirm(`'${name}' 코드와 관련 수불 내역을 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  INGREDIENT_DB.splice(idx,1);
+  ledgerRecords = ledgerRecords.filter(r=>r.name!==name);
+  saveIngredientDB();
+  saveLedger();
+  closeModal('deleteCodeModal');
+  renderLedger();
+  alert('삭제 완료');
+}
+
+function saveEditIngredient(){
+  const code = document.getElementById('editIngCode').value;
+  const ing = getIngByCode(code);
+  if(!ing) return;
+  // 원산지, 보관기준 업데이트
+  ing.origin = document.getElementById('editIngOrigin').value.trim();
+  ing.storage = document.getElementById('editIngStorage').value.trim();
+  // 전일재고 업데이트
+  const qty = parseFloat(document.getElementById('editIngQty').value)||0;
+  const exp = document.getElementById('editIngExp').value;
+  const mfg = document.getElementById('editIngMfg').value||'';
+  if(qty>0){
+    ledgerRecords = ledgerRecords.filter(r=>!(r.name===ing.name&&r.type==='init'));
+    const today = getLedgerDateISO();
+    ledgerRecords.push({date:today, name:ing.name, code:ing.code, qty, exp, mfg, type:'init'});
+    saveLedger();
+  }
+  saveIngredientDB();
+  closeModal('editIngModal');
+  renderLedger();
+  alert('수정 완료');
+}
+
+async function saveInitStock(){
   if(!initRows.length){ alert('등록할 재고가 없습니다'); return; }
   // init 타입으로 ledgerRecords에 추가
   ledgerRecords = ledgerRecords.filter(r=>r.type!=='init');
   initRows.forEach(r=>ledgerRecords.push(r));
-  saveLedger();
+  await saveLedger();
   // ingStock에도 자동 반영
   initRows.forEach(r=>{
     const exists = ingStock.find(s=>s.name===r.name && s.expiry===r.exp);
@@ -370,7 +509,7 @@ function saveInitStock(){
       ingStock.push({name:r.name, code:r.code||'', qty:r.qty*1000, expiry:r.exp});
     }
   });
-  saveData('ingStock', ingStock);
+  if(window._db) window._db.collection('appData').doc('ingStock').set({ data: JSON.stringify(ingStock), updatedAt: new Date().toISOString() }).catch(e=>console.warn(e));
   closeModal('initStockModal');
   renderLedger();
   alert(`초기재고 ${initRows.length}건 저장 완료`);
@@ -384,6 +523,13 @@ function renderSavedInitStock(){
   tbody.innerHTML=saved.map(r=>`<tr><td style="font-weight:600">${r.name}</td><td><span class="badge badge-blue" style="font-size:10px">${r.code||'-'}</span></td><td class="tc">${r.qty}</td><td class="tc">${r.exp||'-'}</td><td class="tc">${r.date}</td><td><button class="btn btn-sm btn-danger" onclick="deleteSavedInitRow('${r._initKey||r.name+r.date}')">삭제</button></td></tr>`).join('');
 }
 
+function deleteLedgerByName(name){
+  if(!confirm(`'${name}' 수불 내역을 모두 삭제하시겠습니까?`)) return;
+  ledgerRecords = ledgerRecords.filter(r=>r.name!==name);
+  saveLedger(); renderLedger();
+  alert('삭제 완료');
+}
+
 function deleteSavedInitRow(key){
   if(!confirm('삭제하시겠습니까?'))return;
   ledgerRecords=ledgerRecords.filter(r=>!(r.type==='init'&&(r._initKey===key||r.name+r.date===key)));
@@ -391,7 +537,7 @@ function deleteSavedInitRow(key){
 }
 
 function printLedger(){
-  const selDate=document.getElementById('ledgerDate').value||getTodayISO2();
+  const selDate=getLedgerDateISO();
   const q=document.getElementById('ledgerSearch').value.trim().toLowerCase();
   const stor=document.getElementById('ledgerFilter').value;
   let ings=INGREDIENT_DB.filter(i=>{
@@ -411,13 +557,13 @@ function printLedger(){
     bodyHtml+=`<tr>
       <td>${ing.code}</td>
       <td style="text-align:left;font-weight:600">${ing.name}</td>
-      <td style="text-align:left">${ing.origin||'-'}</td>
-      <td>${ing.storage||'-'}</td>
+      <td style="text-align:center">${ing.origin||'-'}</td>
+      <td style="white-space:normal;word-break:keep-all;font-size:9px;">${(ing.storage||'-').split('/').map(s=>s.trim()).filter(s=>s).join('<br>')}</td>
       <td>${ing.unit||'kg'}</td>
-      <td>${prevStock>0?prevStock.toFixed(3):'-'}</td>
-      <td>${monthIn>0?'+'+monthIn.toFixed(3):'-'}</td>
-      <td>${monthOut>0?'-'+monthOut.toFixed(3):'-'}</td>
-      <td style="font-weight:700">${closing>0?closing.toFixed(3):'0.000'}</td>
+      <td class="num">${prevStock>0?prevStock.toFixed(3):'0.000'}</td>
+      <td class="num">${monthIn>0?monthIn.toFixed(3):'0.000'}</td>
+      <td class="num">${monthOut>0?monthOut.toFixed(3):'0.000'}</td>
+      <td class="num" style="font-weight:700">${closing.toFixed(3)}</td>
     </tr>`;
   });
   const printWin=window.open('','_blank');
@@ -427,15 +573,26 @@ function printLedger(){
     body{font-family:"Noto Sans KR",sans-serif;font-size:10px;padding:20px;}
     h2{font-size:16px;margin-bottom:4px;}
     .sub{font-size:12px;color:#666;margin-bottom:14px;}
-    table{width:100%;border-collapse:collapse;}
-    th{background:#f0f0f0;border:1px solid #999;padding:5px;text-align:center;font-weight:700;}
-    td{border:1px solid #999;padding:5px;text-align:center;}
-    @page{margin:10mm;size:A4 landscape;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    th{background:#f0f0f0;border:1px solid #999;padding:5px;text-align:center;font-weight:700;word-break:keep-all;}
+    td{border:1px solid #999;padding:5px;text-align:center;word-break:break-all;}
+    .col-code{width:6%;}
+    .col-name{width:15%;}
+    .col-origin{width:12%;}
+    .col-storage{width:16%;word-break:keep-all;white-space:normal;}
+    .col-unit{width:4%;}
+    .col-num{width:9.25%;}
+    td.num{font-family:monospace;font-size:10px;text-align:right;padding-right:6px;}
+    @page{margin:10mm;size:A4 portrait;}
   </style></head><body>
   <h2>원료수불부</h2>
   <div class="sub">조회일자: ${selDate} / 출력일시: ${new Date().toLocaleString('ko-KR')}</div>
   <table>
-    <thead><tr><th>코드</th><th>품목명</th><th>원산지</th><th>보관기준</th><th>단위</th><th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th></tr></thead>
+    <colgroup>
+      <col class="col-code"><col class="col-name"><col class="col-origin"><col class="col-storage"><col class="col-unit">
+      <col class="col-num"><col class="col-num"><col class="col-num"><col class="col-num">
+    </colgroup>
+    <thead><tr><th>코드</th><th>품목명</th><th>원산지</th><th>보관기준</th><th>단위</th><th>전일<br>재고</th><th>입고</th><th>출고</th><th>마감<br>재고</th></tr></thead>
     <tbody>${bodyHtml}</tbody>
   </table>
   </body></html>`);
@@ -451,7 +608,7 @@ function openInModal(){
   document.getElementById('inExp').value='';
   document.getElementById('inModal').classList.add('open');
 }
-function saveIn(){
+async function saveIn(){
   const name=document.getElementById('inIngName').value.trim();
   const qty=parseFloat(document.getElementById('inQty').value)||0;
   const date=document.getElementById('inDate').value||getTodayISO2();
@@ -460,7 +617,7 @@ function saveIn(){
   if(!name||!qty){alert('원료명과 수량을 입력해주세요');return;}
   const ing=getIngByName(name);
   ledgerRecords.push({date,name,code:ing?ing.code:'',qty,lot,exp,type:'in'});
-  saveLedger();closeModal('inModal');renderLedger();
+  await saveLedger();closeModal('inModal');renderLedger();
 }
 function openOutModal(){
   document.getElementById('outIngName').value='';
@@ -470,7 +627,7 @@ function openOutModal(){
   document.getElementById('outNote').value='';
   document.getElementById('outModal').classList.add('open');
 }
-function saveOut(){
+async function saveOut(){
   const name=document.getElementById('outIngName').value.trim();
   const qty=parseFloat(document.getElementById('outQty').value)||0;
   const date=document.getElementById('outDate').value||getTodayISO2();
@@ -479,47 +636,38 @@ function saveOut(){
   if(!name||!qty){alert('원료명과 수량을 입력해주세요');return;}
   const ing=getIngByName(name);
   ledgerRecords.push({date,name,code:ing?ing.code:'',qty,lot,note,type:'out'});
-  saveLedger();closeModal('outModal');renderLedger();
+  await saveLedger();closeModal('outModal');renderLedger();
 }
 
-// ===== Firebase 자동 동기화 =====
-function autoSyncToFirebase(key, data){
+// ===== Firebase 직접 읽기/쓰기 =====
+function saveIngredientDB(){
   if(!window._db) return;
-  try{
-    window._db.collection('autoSync').doc(key).set({
-      key, data:JSON.stringify(data), updatedAt:new Date().toISOString()
-    }).catch(e=>console.warn('Firebase 저장 실패:',key,e));
-  }catch(e){}
+  window._db.collection('appData').doc('ingredientDB').set({ data: JSON.stringify(INGREDIENT_DB), updatedAt: new Date().toISOString() })
+    .catch(e=>console.warn('ingredientDB 저장 실패', e));
 }
-async function loadFromFirebaseAuto(){
+async function loadFromFirebase(){
   if(!window._db) return;
   try{
-    const snap = await window._db.collection('autoSync').get();
-    if(snap.empty) return;
-    snap.forEach(doc=>{
-      const d=doc.data();
-      if(!d.key || !d.data) return;
-      const localVal = localStorage.getItem(d.key);
-      if(!localVal){
-        try{ localStorage.setItem(d.key, d.data); }catch(e){}
-      } else {
-        try{
-          const fbUpdated = d.updatedAt || '0';
-          const localObj = JSON.parse(localVal);
-          const localUpdated = localObj._updatedAt || '0';
-          if(fbUpdated > localUpdated) localStorage.setItem(d.key, d.data);
-        }catch(e){}
-      }
-    });
-  }catch(e){ console.warn('Firebase 로드 실패',e); }
+    const [ledgerSnap, incomingSnap, ingSnap] = await Promise.all([
+      window._db.collection('appData').doc('ledgerRecords').get(),
+      window._db.collection('appData').doc('incomingRecords').get(),
+      window._db.collection('appData').doc('ingredientDB').get()
+    ]);
+    if(ledgerSnap.exists && ledgerSnap.data().data) ledgerRecords = JSON.parse(ledgerSnap.data().data);
+    if(incomingSnap.exists && incomingSnap.data().data) window._incomingRecords = JSON.parse(incomingSnap.data().data);
+    else window._incomingRecords = [];
+    if(ingSnap.exists && ingSnap.data().data) INGREDIENT_DB = JSON.parse(ingSnap.data().data);
+    else saveIngredientDB(); // 최초 1회 Firebase에 업로드
+  }catch(e){ console.warn('Firebase 로드 실패', e); }
 }
 
 // ===== 초기화 =====
 (async ()=>{
-  await loadFromFirebaseAuto();
+  await loadFromFirebase();
   initLedger();
   document.getElementById('topbarDate').textContent=getToday();
-  document.getElementById('ledgerDate').value=getTodayISO2();
+  const _td=new Date(); const _yy=String(_td.getFullYear()).slice(2); const _mm=String(_td.getMonth()+1).padStart(2,'0'); const _dd=String(_td.getDate()).padStart(2,'0');
+  const _ldEl=document.getElementById('ledgerDate'); if(_ldEl){_ldEl.value=_yy+_mm+_dd; _ldEl.style.color='var(--primary)'; _ldEl.style.fontWeight='700';}
   renderLedger();
 })();
 </script>

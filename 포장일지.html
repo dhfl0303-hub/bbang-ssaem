@@ -470,8 +470,8 @@ function fmtDate(input){
 }
 
 // 작업자 관리
-function loadWorkers(){ return JSON.parse(localStorage.getItem('workerList')||'[]'); }
-function saveWorkers(list){ localStorage.setItem('workerList', JSON.stringify(list)); }
+function loadWorkers(){ return window._workerList||[]; }
+function saveWorkers(list){ window._workerList=list; if(window._db) window._db.collection('appData').doc('workerList').set({data:JSON.stringify(list),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e)); }
 function renderWorkerSelect(){
   const workers=loadWorkers();
   const cur=loadSettings().workerName;
@@ -520,10 +520,10 @@ function deleteWorker(){
 
 // 배합LOT 셀렉트 채우기
 function loadBatchLots(){
-  const keys=Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
+  const keys=Object.keys(window._fbBatchCache||{});
   const lots=[];
   keys.forEach(k=>{
-    const recs=JSON.parse(localStorage.getItem(k)||'[]');
+    const recs=window._fbBatchCache[k]||[];
     recs.forEach(r=>{
       if(r.batchRecords) r.batchRecords.forEach(br=>{ if(br.lot) lots.push({lot:br.lot,product:r.product,code:r.productCode}); });
       else if(r.lot) lots.push({lot:r.lot,product:r.product||'',code:r.productCode||''});
@@ -542,7 +542,7 @@ function onBatchLotSelect(){
   S.batchLot=sel.value;
   // 해당 제품 설비세팅값 불러오기
   if(S.product){
-    const settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
+    const settings=window._deviceSettings||[];
     const dev=settings.find(d=>d.code===S.product);
     if(dev){
       document.getElementById('sealingC1').value=dev.sealingC1||'';
@@ -556,14 +556,14 @@ function onBatchLotSelect(){
 
 // 부자재 LOT 셀렉트 채우기
 function loadSubLots(){
-  const recs=JSON.parse(localStorage.getItem('subLedgerRecords')||'[]');
+  const recs=window._subLedgerRecords||[];
   const catMap={
     'filmLot':'필름포장지',
     'bulkLot':'벌크비닐',
     'boxLot':'박스',
     'pkgBoxLot':'패키지박스'
   };
-  const itemDB=JSON.parse(localStorage.getItem('subItemDB')||'[]');
+  const itemDB=window._subItemDB||[];
   Object.entries(catMap).forEach(([selId,cat])=>{
     const sel=document.getElementById(selId);
     if(!sel) return;
@@ -584,11 +584,12 @@ function saveDeviceFromForm(){
   const sealingK1=parseFloat(document.getElementById('sealingK1').value)||0;
   const sealingK2=parseFloat(document.getElementById('sealingK2').value)||0;
   const sealerTemp=parseFloat(document.getElementById('sealerTemp').value)||0;
-  let settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
+  let settings=window._deviceSettings||[];
   const idx=settings.findIndex(d=>d.code===S.product);
   const setting={code:S.product,sealingC1,sealingC2,sealingK1,sealingK2,sealerTemp};
   if(idx>=0) settings[idx]=setting; else settings.push(setting);
-  localStorage.setItem('deviceSettings',JSON.stringify(settings));
+  window._deviceSettings=settings;
+  if(window._db) window._db.collection('appData').doc('deviceSettings').set({data:JSON.stringify(settings),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
 }
 
 // 포장 입력 화면 초기화
@@ -606,7 +607,7 @@ function initFormPage(){
   if(packLotEl) packLotEl.textContent=lot;
   // 설비세팅값 불러오기
   if(S.product){
-    const settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
+    const settings=window._deviceSettings||[];
     const dev=settings.find(d=>d.code===S.product);
     if(dev){
       document.getElementById('sealingC1').value=dev.sealingC1||'';
@@ -630,11 +631,12 @@ function saveDeviceSetting(){
   const sealingK1=parseFloat(document.getElementById('dSealingK1').value)||0;
   const sealingK2=parseFloat(document.getElementById('dSealingK2').value)||0;
   const sealerTemp=parseFloat(document.getElementById('dSealerTemp').value)||0;
-  let settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
+  let settings=window._deviceSettings||[];
   const idx=settings.findIndex(d=>d.code===code);
   const setting={code,sealingC1,sealingC2,sealingK1,sealingK2,sealerTemp};
   if(idx>=0) settings[idx]=setting; else settings.push(setting);
-  localStorage.setItem('deviceSettings',JSON.stringify(settings));
+  window._deviceSettings=settings;
+  if(window._db) window._db.collection('appData').doc('deviceSettings').set({data:JSON.stringify(settings),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
   // PACK_DEVICE_SETTINGS도 갱신
   PACK_DEVICE_SETTINGS[code]=setting;
   alert('저장 완료!');
@@ -645,7 +647,7 @@ function saveDeviceSetting(){
 function loadDeviceForProduct(){
   const code=document.getElementById('devProductSel').value;
   if(!code) return;
-  const settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
+  const settings=window._deviceSettings||[];
   const s=settings.find(d=>d.code===code)||{};
   document.getElementById('dSealingC1').value=s.sealingC1||'';
   document.getElementById('dSealingC2').value=s.sealingC2||'';
@@ -655,7 +657,7 @@ function loadDeviceForProduct(){
 }
 
 function renderDeviceSettingsList(){
-  const settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
+  const settings=window._deviceSettings||[];
   const el=document.getElementById('deviceSettingsList');
   if(!settings.length){ el.innerHTML='<div style="color:var(--text3);text-align:center;padding:8px;">등록된 세팅값 없음</div>'; return; }
   el.innerHTML='<div style="font-weight:700;margin-bottom:4px;color:var(--text2);">등록된 세팅값</div>'+
@@ -668,14 +670,14 @@ function renderDeviceSettingsList(){
 
 function loadDeviceSettings(){
   // 기존 통합관리 연동 (호환용)
-  const settings=JSON.parse(localStorage.getItem('deviceSettings')||'[]');
+  const settings=window._deviceSettings||[];
   settings.forEach(d=>{ PACK_DEVICE_SETTINGS[d.code]={sealingC1:d.sealingC1||0,sealingC2:d.sealingC2||0,sealingK1:d.sealingK1||0,sealingK2:d.sealingK2||0,sealerTemp:d.sealerTemp||0}; });
   renderDeviceSettingsList();
 }
 
 // 부자재 불러오기 (sub_packagingDB 연동)
 function loadPackagingDB(){
-  const db=JSON.parse(localStorage.getItem('sub_packagingDB')||'null');
+  const db=window._subPackagingDB||null;
   const el=document.getElementById('packagingDBStatus');
   if(!db){
     el.innerHTML='<div style="color:var(--text3)">부자재 목록이 없습니다.<br>부자재입고검사일지에서 먼저 등록해주세요.</div>';
@@ -721,8 +723,8 @@ function initSettings(){
 }
 
 // 설정 로드 - 포장일지 전용 (배합일지와 별도)
-function loadSettings(){ return JSON.parse(localStorage.getItem('packSettings')||'{"workerName":""}'); }
-function savePackSettings(s){ localStorage.setItem('packSettings', JSON.stringify(s)); }
+function loadSettings(){ return window._packSettings||{workerName:''}; }
+function savePackSettings(s){ window._packSettings=s; if(window._db) window._db.collection('appData').doc('packSettings').set({data:JSON.stringify(s),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e)); }
 
 // 로컬 저장
 function saveLocal(){ localStorage.setItem('packRecords_'+getTodayKey(),JSON.stringify(S.todayRecords)); updateStats(); }
@@ -776,7 +778,7 @@ function renderBatchLotList(){
   if(!el) return;
   // 오늘 날짜 키로 배합 기록 가져오기
   const todayKey=getTodayKey();
-  const recs=JSON.parse(localStorage.getItem('batchRecords_'+todayKey)||'[]');
+  const recs=(window._fbBatchCache&&window._fbBatchCache['batchRecords_'+todayKey])||[];
   if(!recs.length){
     el.innerHTML='<div class="tc txs" style="padding:24px 0;color:var(--text3)">오늘 완료된 배합 LOT가 없습니다<br><span style="font-size:11px">배합일지에서 배합을 완료해주세요</span></div>';
     return;
@@ -1178,22 +1180,76 @@ function completePackaging(signImg=''){
   showPage('done');
 }
 
-initMain();
+(async ()=>{ await loadFromFirebase(); initMain(); })();
 
 // ===== 동기화 =====
+// ===== Firebase 로드 =====
+async function loadFromFirebase(){
+  if(!window._db) return;
+  try{
+    const [workerSnap, packSnap, devSnap, subRecSnap, subItemSnap, subPkgSnap] = await Promise.all([
+      window._db.collection('appData').doc('workerList').get(),
+      window._db.collection('appData').doc('packSettings').get(),
+      window._db.collection('appData').doc('deviceSettings').get(),
+      window._db.collection('appData').doc('subLedgerRecords').get(),
+      window._db.collection('appData').doc('subItemDB').get(),
+      window._db.collection('appData').doc('sub_packagingDB').get()
+    ]);
+    if(workerSnap.exists && workerSnap.data().data) window._workerList = JSON.parse(workerSnap.data().data);
+    if(packSnap.exists && packSnap.data().data) window._packSettings = JSON.parse(packSnap.data().data);
+    if(devSnap.exists && devSnap.data().data) window._deviceSettings = JSON.parse(devSnap.data().data);
+    if(subRecSnap.exists && subRecSnap.data().data) window._subLedgerRecords = JSON.parse(subRecSnap.data().data);
+    if(subItemSnap.exists && subItemSnap.data().data) window._subItemDB = JSON.parse(subItemSnap.data().data);
+    if(subPkgSnap.exists && subPkgSnap.data().data) window._subPackagingDB = JSON.parse(subPkgSnap.data().data);
+    // batchRecords 로드 (최근 7일)
+    window._fbBatchCache = {};
+    const today = new Date();
+    const batchPromises = [];
+    for(let i=0;i<7;i++){
+      const d = new Date(today); d.setDate(d.getDate()-i);
+      const key = 'batchRecords_'+String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+      batchPromises.push(window._db.collection('appData').doc(key).get().then(snap=>{ if(snap.exists&&snap.data().data) window._fbBatchCache[key]=JSON.parse(snap.data().data); }));
+    }
+    await Promise.all(batchPromises);
+  }catch(e){ console.warn('Firebase 로드 실패',e); }
+}
+
 async function syncToServer(){
   const btn = document.getElementById('syncBtn');
   btn.textContent = '⏳ 동기화 중...';
   btn.disabled = true;
   try {
-    const keys=Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
-    let recs=[]; keys.forEach(k=>{recs=recs.concat(JSON.parse(localStorage.getItem(k)||'[]'));});
-    if(!recs.length){btn.textContent='⚠️ 데이터 없음';setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000);return;}
-    const db=window._db; let count=0;
-    for(const r of recs){await db.collection('packRecords').doc(r.lot||String(Date.now()+count)).set({...r,_syncedAt:new Date().toISOString()});count++;}
-    btn.textContent='✅ '+count+'건 완료';
-    setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2500);
+    if(!window._db) throw new Error('Firebase 연결 없음');
+    const db = window._db;
+
+    // 1. packRecords localStorage → Firebase
+    const keys = Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
+    let recs = []; keys.forEach(k=>{ recs = recs.concat(JSON.parse(localStorage.getItem(k)||'[]')); });
+    if(!recs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
+
+    for(const key of keys){
+      const dayRecs = JSON.parse(localStorage.getItem(key)||'[]');
+      if(dayRecs.length) await db.collection('appData').doc(key).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
+    }
+
+    // 2. 부자재수불부 출고 반영
+    let subSnap = await db.collection('appData').doc('subLedgerRecords').get();
+    let subRecs = (subSnap.exists && subSnap.data().data) ? JSON.parse(subSnap.data().data) : [];
+    recs.forEach(rec=>{
+      const filmLot=rec.filmLot||''; const bulkLot=rec.bulkLot||''; const boxLot=rec.boxLot||''; const pkgBoxLot=rec.pkgBoxLot||'';
+      [{lot:filmLot,cat:'필름포장지'},{lot:bulkLot,cat:'벌크비닐'},{lot:boxLot,cat:'박스'},{lot:pkgBoxLot,cat:'패키지박스'}]
+        .filter(x=>x.lot)
+        .forEach(x=>{
+          const exists = subRecs.find(r=>r.type==='out'&&r.lot===x.lot&&r.packLot===rec.lot);
+          if(!exists) subRecs.push({date:rec.date||new Date().toISOString().slice(0,10),name:x.cat,lot:x.lot,qty:1,packLot:rec.lot,type:'out'});
+        });
+    });
+    await db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subRecs),updatedAt:new Date().toISOString()});
+
+    btn.textContent = '✅ '+recs.length+'건 완료';
+    setTimeout(()=>{ btn.textContent='🔄 동기화'; btn.disabled=false; }, 2500);
   } catch(e) {
+    console.error('동기화 실패', e);
     btn.textContent = '❌ 실패';
     setTimeout(()=>{ btn.textContent='🔄 동기화'; btn.disabled=false; }, 2000);
   }

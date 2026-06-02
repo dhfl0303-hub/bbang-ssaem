@@ -197,7 +197,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
   </div>
   <div style="margin-left:auto;display:flex;gap:8px;">
     <button onclick="openAdmin()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⚙️ 설정</button>
-    <button id="syncBtn" onclick="syncToServer()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>
+    <button onclick="downloadRecipeDB()" style="background:rgba(255,255,255,0.15);color:#fff;border:1.5px solid rgba(255,255,255,0.4);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;margin-right:6px;">⬇️ 배합비</button><button id="syncBtn" onclick="syncToServer()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>
   </div>
 </div>
 
@@ -311,8 +311,6 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
     <div class="admin-title">⚙️ 관리자 설정</div>
     <div class="tab-bar">
       <div class="tab-btn active" onclick="switchTab('settings',this)">기본설정</div>
-      <div class="tab-btn" onclick="switchTab('products',this)">제품관리</div>
-      <div class="tab-btn" onclick="switchTab('logs',this)">배합기록</div>
     </div>
     <div id="tab-settings">
       <label class="a-label">작업자 선택</label>
@@ -326,32 +324,11 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <button class="a-btn a-cancel" onclick="closeAdmin()">닫기</button>
       </div>
     </div>
-    <div id="tab-products" style="display:none">
-      <div id="productMgmtList"></div>
-      <button class="btn btn-outline mt-12" onclick="openAddProduct()">+ 새 제품 추가</button>
-    </div>
-    <div id="tab-logs" style="display:none">
-      <div id="adminLogList"></div>
-    </div>
+
   </div>
 </div>
 
-<!-- 제품 편집 -->
-<div class="admin-overlay" id="prodEditOverlay" onclick="closeProdEditOutside(event)">
-  <div class="admin-sheet">
-    <div class="admin-handle"></div>
-    <div class="admin-title" id="prodEditTitle">제품 추가</div>
-    <label class="a-label">품목코드</label>
-    <input class="a-input" id="editCode" placeholder="예: P050">
-    <label class="a-label">제품명</label>
-    <input class="a-input" id="editName" placeholder="제품명 입력">
-    <div class="a-btn-row">
-      <button class="a-btn a-save" onclick="saveProduct()">저장</button>
-      <button class="a-btn a-del" id="delProdBtn" onclick="deleteProduct()" style="display:none">삭제</button>
-      <button class="a-btn a-cancel" onclick="closeProdEdit()">취소</button>
-    </div>
-  </div>
-</div>
+
 
 <div class="print-area" id="printArea"></div>
 
@@ -436,6 +413,7 @@ function initDB(){
   const s=localStorage.getItem('recipeDB');
   DB = s ? JSON.parse(s) : JSON.parse(JSON.stringify(RECIPE_DB_INIT));
   if(!s) localStorage.setItem('recipeDB',JSON.stringify(DB));
+  // recipeDB는 동기화 버튼으로 Firebase 업로드, 배합비 버튼으로 다운로드
 }
 
 // 로컬 저장
@@ -1108,60 +1086,14 @@ function genPrint(){
 function printReport(){ window.print(); }
 
 // 관리자
-function openAdmin(){ renderWorkerSelect(); renderProdMgmt(); renderAdminLogs(); document.getElementById('adminOverlay').classList.add('open'); }
+function openAdmin(){ renderWorkerSelect(); document.getElementById('adminOverlay').classList.add('open'); }
 function closeAdmin(){ document.getElementById('adminOverlay').classList.remove('open'); }
 function closeAdminOutside(e){ if(e.target===document.getElementById('adminOverlay')) closeAdmin(); }
 function switchTab(tab,btn){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
   ['settings','products','logs'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'':'none');
 }
-function renderProdMgmt(){
-  document.getElementById('productMgmtList').innerHTML=Object.keys(DB).map(code=>`
-    <div class="log-item">
-      <div><div class="log-lot">${DB[code].name}</div><div class="log-time">${code}</div></div>
-      <button class="log-del" onclick="openEditProduct('${code}')">편집</button>
-    </div>`).join('');
-}
-function openAddProduct(){ S.editCode=null; document.getElementById('prodEditTitle').textContent='제품 추가'; document.getElementById('editCode').value=''; document.getElementById('editName').value=''; document.getElementById('delProdBtn').style.display='none'; document.getElementById('prodEditOverlay').classList.add('open'); }
-function openEditProduct(code){ S.editCode=code; document.getElementById('prodEditTitle').textContent='제품 편집'; document.getElementById('editCode').value=code; document.getElementById('editName').value=DB[code].name; document.getElementById('delProdBtn').style.display=''; document.getElementById('prodEditOverlay').classList.add('open'); }
-function saveProduct(){
-  const code=document.getElementById('editCode').value.trim().toUpperCase();
-  const name=document.getElementById('editName').value.trim();
-  if(!code||!name){ alert('코드와 이름을 입력해주세요'); return; }
-  if(S.editCode&&S.editCode!==code) delete DB[S.editCode];
-  if(!DB[code]) DB[code]={name,code,batches:{'1':null,'2':null,'3':null}};
-  else { DB[code].name=name; DB[code].code=code; }
-  localStorage.setItem('recipeDB',JSON.stringify(DB));
-  renderProductList(Object.keys(DB)); renderProdMgmt(); closeProdEdit(); alert('저장되었습니다');
-}
-function deleteProduct(){
-  if(!S.editCode)return;
-  if(!confirm(DB[S.editCode].name+'을 삭제하시겠습니까?'))return;
-  delete DB[S.editCode]; localStorage.setItem('recipeDB',JSON.stringify(DB));
-  renderProductList(Object.keys(DB)); renderProdMgmt(); closeProdEdit();
-}
-function closeProdEdit(){ document.getElementById('prodEditOverlay').classList.remove('open'); }
-function closeProdEditOutside(e){ if(e.target===document.getElementById('prodEditOverlay')) closeProdEdit(); }
-function renderAdminLogs(){
-  const keys=Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_')).sort().reverse();
-  const el=document.getElementById('adminLogList');
-  if(!keys.length){ el.innerHTML='<div class="tc txs" style="padding:16px 0">저장된 기록이 없습니다</div>'; return; }
-  let html='';
-  keys.forEach(key=>{
-    const recs=JSON.parse(localStorage.getItem(key)||'[]');
-    const d=key.replace('batchRecords_','');
-    html+=`<div style="font-size:12px;font-weight:700;color:var(--text2);padding:8px 0 4px;border-bottom:2px solid var(--border)">20${d.slice(0,2)}.${d.slice(2,4)}.${d.slice(4,6)}</div>`;
-    recs.forEach(r=>{ html+=`<div class="log-item"><div><div class="log-lot">${r.lot}</div><div class="log-time">${r.product} · ${r.time}</div></div><button class="log-del" onclick="delLog('${key}','${r.lot}')">삭제</button></div>`; });
-  });
-  el.innerHTML=html;
-}
-function delLog(key,lot){
-  if(!confirm('이 기록을 삭제하시겠습니까?'))return;
-  let recs=JSON.parse(localStorage.getItem(key)||'[]').filter(r=>r.lot!==lot);
-  if(recs.length) localStorage.setItem(key,JSON.stringify(recs)); else localStorage.removeItem(key);
-  if(key==='batchRecords_'+getTodayKey()){ S.todayRecords=recs; renderTodayList(); updateStats(); }
-  renderAdminLogs();
-}
+
 
 // 서명 캔버스
 let signCtx=null, signing=false, hasSign=false, signImg='';
@@ -1200,21 +1132,66 @@ async function syncToServer(){
   btn.textContent = '⏳ 동기화 중...';
   btn.disabled = true;
   try {
-    // localStorage의 모든 배합 기록 수집
-    const keys=Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
-    let recs=[]; keys.forEach(k=>{recs=recs.concat(JSON.parse(localStorage.getItem(k)||'[]'));});
-    if(!recs.length){btn.textContent='⚠️ 데이터 없음';setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000);return;}
-    const db=window._db; let count=0;
-    for(const r of recs){
-      await db.collection('batchRecords').doc(r.sessionKey||String(Date.now()+count)).set({...r,_syncedAt:new Date().toISOString()});
-      count++;
+    if(!window._db) throw new Error('Firebase 연결 없음');
+    const db = window._db;
+
+    // 1. localStorage의 모든 배합 기록 수집
+    const keys = Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
+    let recs = []; keys.forEach(k=>{ recs = recs.concat(JSON.parse(localStorage.getItem(k)||'[]')); });
+    if(!recs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
+
+    // 2. 배합기록 Firebase 업로드 (날짜별 키로 저장)
+    for(const key of keys){
+      const dayRecs = JSON.parse(localStorage.getItem(key)||'[]');
+      if(dayRecs.length){
+        await db.collection('appData').doc(key).set({ data: JSON.stringify(dayRecs), updatedAt: new Date().toISOString() });
+      }
     }
-    btn.textContent='✅ '+count+'건 완료';
-    setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2500);
+
+    // 3. 원료수불부 출고 반영 (ledgerRecords Firebase 업데이트)
+    let ledgerSnap = await db.collection('appData').doc('ledgerRecords').get();
+    let ledgerRecords = (ledgerSnap.exists && ledgerSnap.data().data) ? JSON.parse(ledgerSnap.data().data) : [];
+    recs.forEach(rec=>{
+      (rec.batchRecords||[]).forEach(br=>{
+        br.ingredients.forEach(ing=>{
+          (ing.exps||[ing]).forEach(e=>{
+            const exists = ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===br.lot&&r.exp===e.exp);
+            if(!exists){
+              const code = INGREDIENT_DB_STATIC[ing.name]||'';
+              ledgerRecords.push({ date:rec.date||getTodayKey(), name:ing.name, code, qty:(e.qty||ing.amount||0)/1000, lot:e.lot||'', exp:e.exp||'', batchLot:br.lot, type:'out' });
+            }
+          });
+        });
+      });
+    });
+    await db.collection('appData').doc('ledgerRecords').set({ data: JSON.stringify(ledgerRecords), updatedAt: new Date().toISOString() });
+
+    // 4. 배합비(recipeDB) Firebase 업로드
+    await db.collection('appData').doc('recipeDB').set({ data: JSON.stringify(DB), updatedAt: new Date().toISOString() });
+
+    btn.textContent = '✅ '+recs.length+'건 완료';
+    setTimeout(()=>{ btn.textContent='🔄 동기화'; btn.disabled=false; }, 2500);
   } catch(e) {
+    console.error('동기화 실패', e);
     btn.textContent = '❌ 실패';
     setTimeout(()=>{ btn.textContent='🔄 동기화'; btn.disabled=false; }, 2000);
   }
+}
+
+// 배합비 Firebase에서 다운로드
+async function downloadRecipeDB(){
+  if(!window._db){ alert('인터넷 연결을 확인해주세요'); return; }
+  try{
+    const snap = await window._db.collection('appData').doc('recipeDB').get();
+    if(snap.exists && snap.data().data){
+      DB = JSON.parse(snap.data().data);
+      localStorage.setItem('recipeDB', JSON.stringify(DB));
+      renderProductList(Object.keys(DB));
+      alert('배합비 다운로드 완료!');
+    } else {
+      alert('Firebase에 저장된 배합비가 없습니다');
+    }
+  }catch(e){ alert('다운로드 실패: 네트워크를 확인해주세요'); }
 }
 </script>
 </body>

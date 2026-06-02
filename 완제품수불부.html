@@ -68,7 +68,6 @@ tr:hover td{background:var(--bg);}
   <div class="topbar-title">📦 완제품수불부</div>
   <div style="display:flex;gap:8px;align-items:center;">
     <button class="btn btn-outline btn-sm" style="color:#fff;border-color:rgba(255,255,255,0.5)" onclick="printFinishedLedger()">🖨️ PDF출력</button>
-    <button class="btn btn-outline btn-sm" style="color:#fff;border-color:rgba(255,255,255,0.5)" onclick="flSyncFromPack()">🔄 동기화</button>
   </div>
 </div>
 <div class="content">
@@ -126,7 +125,7 @@ tr:hover td{background:var(--bg);}
       </div>
       <div>
         <div class="card"><div class="card-hd"><div class="card-hd-title">🏢 출고처 관리</div></div><div class="card-bd"><div style="display:flex;gap:8px;margin-bottom:10px;"><input class="form-input" id="fl-cl-new" placeholder="출고처명 입력"><button class="btn btn-primary btn-sm" onclick="flAddClient()">추가</button></div><div class="table-wrap"><table style="min-width:200px"><thead><tr><th>출고처명</th><th></th></tr></thead><tbody id="fl-client-tbody"></tbody></table></div></div></div>
-        <div class="card"><div class="card-hd"><div class="card-hd-title">⚙ 데이터 관리</div></div><div class="card-bd" style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-outline btn-sm" style="width:100%" onclick="flSyncFromPack()">🔄 포장일지 동기화</button><button class="btn btn-danger btn-sm" style="width:100%" onclick="flResetData()">🗑 전체 데이터 초기화</button></div></div>
+        <div class="card"><div class="card-hd"><div class="card-hd-title">⚙ 데이터 관리</div></div><div class="card-bd" style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-danger btn-sm" style="width:100%" onclick="flResetData()">🗑 전체 데이터 초기화</button></div></div>
       </div>
     </div>
   </div>
@@ -271,54 +270,50 @@ let FL_STATE={lots:[],products:[],clients:[],expandedStock:new Set()};
 function flSave(){
   const ts = new Date().toISOString();
   const lots = FL_STATE.lots.map(l=>({...l, _updatedAt:ts}));
-  localStorage.setItem('완제품_lots', JSON.stringify(lots));
-  localStorage.setItem('완제품_products', JSON.stringify(FL_STATE.products));
-  localStorage.setItem('완제품_clients', JSON.stringify(FL_STATE.clients));
-  autoSyncToFirebase('완제품_lots', lots);
-  autoSyncToFirebase('완제품_products', FL_STATE.products);
-  autoSyncToFirebase('완제품_clients', FL_STATE.clients);
+  if(window._db){
+    const upd = new Date().toISOString();
+    window._db.collection('appData').doc('완제품_lots').set({data:JSON.stringify(lots),updatedAt:upd}).catch(e=>console.warn(e));
+    window._db.collection('appData').doc('완제품_products').set({data:JSON.stringify(FL_STATE.products),updatedAt:upd}).catch(e=>console.warn(e));
+    window._db.collection('appData').doc('완제품_clients').set({data:JSON.stringify(FL_STATE.clients),updatedAt:upd}).catch(e=>console.warn(e));
+  }
 }
-function autoSyncToFirebase(key, data){
+// ===== Firebase 직접 읽기/쓰기 =====
+async function loadFromFirebase(){
   if(!window._db) return;
   try{
-    window._db.collection('autoSync').doc(key).set({
-      key, data:JSON.stringify(data), updatedAt:new Date().toISOString()
-    }).catch(e=>console.warn('Firebase 저장 실패:',key,e));
-  }catch(e){}
-}
-async function loadFromFirebaseAuto(){
-  if(!window._db) return;
-  try{
-    const snap = await window._db.collection('autoSync').get();
-    if(snap.empty) return;
-    snap.forEach(doc=>{
-      const d=doc.data();
-      if(!d.key || !d.data) return;
-      const localVal = localStorage.getItem(d.key);
-      if(!localVal){
-        try{ localStorage.setItem(d.key, d.data); }catch(e){}
-      } else {
-        try{
-          const fbUpdated = d.updatedAt || '0';
-          const localObj = JSON.parse(localVal);
-          const localUpdated = localObj._updatedAt || '0';
-          if(fbUpdated > localUpdated) localStorage.setItem(d.key, d.data);
-        }catch(e){}
-      }
-    });
+    const [lotsSnap, prodSnap, clientSnap, delSnap, lotMapSnap] = await Promise.all([
+      window._db.collection('appData').doc('완제품_lots').get(),
+      window._db.collection('appData').doc('완제품_products').get(),
+      window._db.collection('appData').doc('완제품_clients').get(),
+      window._db.collection('appData').doc('완제품_deleted_lots').get(),
+      window._db.collection('appData').doc('lotMapping').get()
+    ]);
+    if(lotsSnap.exists && lotsSnap.data().data) window._flLots = JSON.parse(lotsSnap.data().data);
+    if(prodSnap.exists && prodSnap.data().data) window._flProducts = JSON.parse(prodSnap.data().data);
+    if(clientSnap.exists && clientSnap.data().data) window._flClients = JSON.parse(clientSnap.data().data);
+    if(delSnap.exists && delSnap.data().data) window._deletedLots = JSON.parse(delSnap.data().data);
+    if(lotMapSnap.exists && lotMapSnap.data().data) window._lotMapping = JSON.parse(lotMapSnap.data().data);
+    // packRecords 전체 로드
+    window._fbPackCache = {};
+    const allSnap = await window._db.collection('appData').get();
+    allSnap.forEach(doc=>{ if(doc.id.startsWith('packRecords_')&&doc.data().data) window._fbPackCache[doc.id]=JSON.parse(doc.data().data); });
   }catch(e){ console.warn('Firebase 로드 실패',e); }
 }
 function flLoad(){
-  FL_STATE.lots=JSON.parse(localStorage.getItem('완제품_lots')||'[]');
-  FL_STATE.products=JSON.parse(localStorage.getItem('완제품_products')||'null')||FL_DEFAULT_PRODUCTS;
-  FL_STATE.clients=JSON.parse(localStorage.getItem('완제품_clients')||'null')||FL_DEFAULT_CLIENTS;
+  FL_STATE.lots=window._flLots||[];
+  FL_STATE.products=window._flProducts||FL_DEFAULT_PRODUCTS;
+  FL_STATE.clients=window._flClients||FL_DEFAULT_CLIENTS;
 }function flGroupKey(lotNum){const p=lotNum.split('-');return p.length>=2?`${p[0]}-${p[1]}`:lotNum;}
 
 // 삭제된 pkg_lot 목록 관리
-function flGetDeletedLots(){ return JSON.parse(localStorage.getItem('완제품_deleted_lots')||'[]'); }
+function flGetDeletedLots(){ return window._deletedLots||[]; }
 function flAddDeletedLot(pkgLot){
   const deleted = flGetDeletedLots();
-  if(!deleted.includes(pkgLot)){ deleted.push(pkgLot); localStorage.setItem('완제품_deleted_lots', JSON.stringify(deleted)); autoSyncToFirebase('완제품_deleted_lots', deleted); }
+  if(!deleted.includes(pkgLot)){
+    deleted.push(pkgLot);
+    window._deletedLots=deleted;
+    if(window._db) window._db.collection('appData').doc('완제품_deleted_lots').set({data:JSON.stringify(deleted),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  }
 }
 function flGetGroups(hideZero=false,clientFilter='전체',groupFilter='전체'){
   const map={},order=[];
@@ -335,12 +330,12 @@ function flGetGroups(hideZero=false,clientFilter='전체',groupFilter='전체'){
 }
 function flFmtDate6(d6){if(!d6||d6.length!==6)return d6||'-';return `20${d6.slice(0,2)}.${d6.slice(2,4)}.${d6.slice(4,6)}`;}
 function flSyncFromPack(silent=false){
-  const keys=Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
-  const lotMapping=JSON.parse(localStorage.getItem('lotMapping')||'[]');
+  const keys=Object.keys(window._fbPackCache||{});
+  const lotMapping=window._lotMapping||[];
   const deletedLots=flGetDeletedLots();
   let count=0;
   keys.forEach(k=>{
-    const recs=JSON.parse(localStorage.getItem(k)||'[]');
+    const recs=(window._fbPackCache&&window._fbPackCache[k])||[];
     recs.forEach(r=>{
       if(!r.lot||!r.productCode) return;
       if(deletedLots.includes(r.lot)) return; // 삭제된 것 건너뜀
@@ -673,7 +668,7 @@ function printFinishedLedger(){
 
 // ===== 초기화 =====
 (async ()=>{
-  await loadFromFirebaseAuto();
+  await loadFromFirebase();
   initFinishedLedger();
   const _todayRaw=new Date();
   const _yy=String(_todayRaw.getFullYear()).slice(2);
