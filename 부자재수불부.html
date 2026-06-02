@@ -222,7 +222,9 @@ async function initSubLedger(){
         const exists=subLedgerRecords.find(r=>r.lot===lot&&r.name===row.item&&r.type==='in');
         if(!exists){
           const isoDate=rec.date||getTodayISO2();
-          subLedgerRecords.push({date:isoDate,name:row.item,code:row.lot||'',qty:parseFloat(row.qty)||0,mfg:row.mfg||'',lot,supplier:row.supplier||'',type:'in'});
+          const subCat=Object.keys({'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>row.item.includes(k))||'박스';
+          const subCode=autoSubCode(subCat);
+          subLedgerRecords.push({date:isoDate,name:row.item,code:subCode,qty:parseFloat(row.qty)||0,mfg:row.mfg||'',lot,supplier:row.supplier||'',type:'in'});
         }
       });
     });
@@ -231,7 +233,7 @@ async function initSubLedger(){
   subLedgerRecords.forEach(r=>{
     if(r.name&&!SUB_ITEM_DB.find(i=>i.name===r.name)){
       const cat=Object.keys({'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>r.name.includes(k))||'박스';
-      SUB_ITEM_DB.push({code:r.code||autoSubCode(cat),name:r.name,category:cat,spec:'',unit:'EA',supplier:r.supplier||''});
+      const newCode=autoSubCode(cat); SUB_ITEM_DB.push({code:newCode,name:r.name,category:cat,spec:'',unit:'EA',supplier:r.supplier||''});
     }
   });
   if(window._db) window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
