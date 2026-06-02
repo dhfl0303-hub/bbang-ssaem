@@ -1578,199 +1578,191 @@ function searchTrace(){
   const result = document.getElementById('traceResult');
   if(!input){ result.innerHTML='<div style="text-align:center;padding:24px;color:var(--text3);">LOT번호를 입력해주세요</div>'; return; }
 
-  let html = `<div style="margin-bottom:20px;padding:12px 16px;background:var(--primary-light);border-radius:8px;font-size:14px;font-weight:700;color:var(--primary);">
-    🔍 "${input}" ${traceMode==='forward'?'순방향':'역방향'} 추적 결과</div>`;
-
   if(traceMode === 'forward'){
-    if(input.startsWith('M')){
-      // 원료LOT 순방향
-      const rawItems = findRawMaterialData(input);
-      html += buildTraceTable('사용원료', ['원료LOT','원료명','소비기한or제조일자','사용량(g)'],
-        rawItems.map(r=>[r.lot||input, r.name||'-', r.exp||'-', r.qty||'-']));
-      const batchItems = findBatchByIngredientData(input);
-      if(batchItems.length){
-        html += buildTraceArrowHtml();
-        html += buildTraceTable('배합 공정', ['LOT','품명','제조일자','배합수'],
-          batchItems.map(b=>[b.lot, b.product, b.date, b.batches+'번']));
-        const packItems = batchItems.flatMap(b=>findPackByBatchLotData(b.lot));
-        if(packItems.length){
-          html += buildTraceArrowHtml();
-          html += buildTraceTable('포장 공정', ['LOT','품명','소비기한','수량'],
-            packItems.map(p=>[p.lot, p.product, p.expiry||'-', (p.qtyPcs||0)+'개']));
-          const finItems = packItems.flatMap(p=>findFinishedByPackLotData(p.lot));
-          if(finItems.length){
-            html += buildTraceArrowHtml();
-            html += buildTraceTable('완제품', ['LOT','품명','소비기한','잔량'],
-              finItems.map(f=>[f.lot_number, f.name, f.exp_date||'-', f.remain_box+'BOX']));
-          }
-        }
-      }
-    } else if(/^포장-/.test(input)){
-      // 포장LOT 직접 입력 (포장-P037-260601-001)
-      const packItems = findPackRecordData(input);
-      html += buildTraceTable('포장 공정', ['LOT','품명','소비기한','수량'],
-        packItems.map(p=>[p.lot, p.product, p.expiry||'-', (p.qtyPcs||0)+'개']));
-      const finItems = packItems.flatMap(p=>findFinishedByPackLotData(p.lot));
-      if(finItems.length){
-        html += buildTraceArrowHtml();
-        html += buildTraceTable('완제품', ['LOT','품명','소비기한','잔량'],
-          finItems.map(f=>[f.lot_number, f.name, f.exp_date||'-', f.remain_box+'BOX']));
-      }
-    } else {
-      // 배합LOT 직접 입력 (P037-260601-001 형식)
-      const batchItems = findBatchByLotData(input);
-      if(batchItems.length){
-        html += buildTraceTable('배합 공정', ['LOT','품명','제조일자','배합수'],
-          batchItems.map(b=>[b.lot, b.product, b.date, b.batches+'번']));
-        const packItems = batchItems.flatMap(b=>findPackByBatchLotData(b.lot));
-        if(packItems.length){
-          html += buildTraceArrowHtml();
-          html += buildTraceTable('포장 공정', ['LOT','품명','소비기한','수량'],
-            packItems.map(p=>[p.lot, p.product, p.expiry||'-', (p.qtyPcs||0)+'개']));
-          const finItems = packItems.flatMap(p=>findFinishedByPackLotData(p.lot));
-          if(finItems.length){
-            html += buildTraceArrowHtml();
-            html += buildTraceTable('완제품', ['LOT','품명','소비기한','잔량'],
-              finItems.map(f=>[f.lot_number, f.name, f.exp_date||'-', f.remain_box+'BOX']));
-          }
-        }
-      } else {
-        html += `<div style="text-align:center;padding:24px;color:var(--text3);">해당 LOT 번호를 찾을 수 없습니다.<br><span style="font-size:12px;">원료LOT(M001-...), 포장LOT(포장-P037-...), 배합LOT(P037-...) 형식으로 입력해주세요</span></div>`;
-      }
-    }
+    searchTraceForward(input, result);
   } else {
-    // ===== 역방향: 완제품LOT → 포장LOT → 배합LOT → 원료LOT =====
+    searchTraceReverse(input, result);
+  }
+}
 
-    const finLots = (window._fbCache&&window._fbCache['완제품_lots'])||[];
+function searchTraceForward(input, result){
+  let topRows = [];
 
-    // 1단계: 완제품LOT 찾기
-    // 입력값이 "N6-260601-01" 형식 → lotMapping에서 wLots.lot("N6")이 입력값 앞부분인지 startsWith로 매칭
-    // 또는 완제품_lots에서 lot_number 직접 매칭 (P037-260601-01 형식 직접 입력시)
-
-    // lotMapping에서 매칭되는 wLot 코드 찾기 (N6, B1, P037 등)
-    let matchedWLot = null;
-    let matchedMapping = null;
-    for(const m of lotMapping){
-      for(const w of (m.wLots||[])){
-        // "N6-260601-01".startsWith("N6") 또는 완전 일치
-        if(input === w.lot || input.startsWith(w.lot+'-')){
-          matchedWLot = w;
-          matchedMapping = m;
-          break;
-        }
+  if(input.startsWith('M')){
+    const rawItems = findRawMaterialData(input);
+    topRows = rawItems.map(r=>({
+      cols: [r.lot||input, r.name||'-', r.exp||'-', r.qty||'-'],
+      title: '원료LOT',
+      getChildren: ()=>{
+        const batchItems = findBatchByIngredientData(r.lot||input);
+        return buildForwardChildren(batchItems);
       }
-      if(matchedMapping) break;
-    }
-
-    // 완제품_lots에서 해당 완제품LOT 레코드 찾기
-    // lot_code_base(P037)가 lotMapping의 pLot와 일치하는 것 + 날짜 추출
-    let matchedFinLots = [];
-
-    // 직접 lot_number 매칭 (P037-260601-01 형식 직접 입력)
-    matchedFinLots = finLots.filter(f => f.lot_number === input);
-
-    // 못 찾았으면 lotMapping 경유 → lot_code_base로 매칭
-    if(!matchedFinLots.length && matchedMapping){
-      // 입력값에서 날짜 추출 (N6-260601-01 → 260601)
-      const datePart = input.split('-')[1]; // "260601"
-      matchedFinLots = finLots.filter(f =>
-        f.lot_code_base === matchedMapping.pLot &&
-        (datePart ? f.mfg_date === datePart : true)
-      );
-    }
-
-    // 완제품 테이블 출력
-    const finRows = matchedFinLots.map(f => {
-      // lotMapping에서 거래처 정보 보강
-      const wInfo = matchedWLot || (matchedMapping ? matchedMapping.wLots.find(w => input.startsWith(w.lot)) : null);
-      // 완제품LOT은 사용자가 입력한 값(N6-260601-01) 표시, 내부코드(P037-260601-01)는 괄호로
-      const displayLot = input + (f.lot_number !== input ? ` (${f.lot_number})` : '');
-      return [displayLot, f.name||'-', wInfo ? wInfo.client : (f.client||'-'), f.exp_date||'-'];
-    });
-    if(!finRows.length && matchedWLot){
-      // 완제품_lots에 없어도 lotMapping 정보로 표시
-      finRows.push([input, matchedWLot.name||'-', matchedWLot.client||'-', '-']);
-    }
-    html += buildTraceTable('완제품', ['완제품LOT','제품명','거래처','소비기한'], finRows);
-
-    // 2단계: 포장LOT 찾기 → 완제품_lots의 pkg_lot 사용
-    const pkgLots = [...new Set(matchedFinLots.map(f=>f.pkg_lot).filter(Boolean))];
-    let packItems = [];
-    pkgLots.forEach(pl=>{
-      const found = findPackRecordData(pl);
-      found.forEach(p=>{ if(!packItems.find(x=>x.lot===p.lot)) packItems.push(p); });
-    });
-
-    // pkg_lot으로 못 찾았으면 productCode로 보완 검색
-    if(!packItems.length && matchedMapping){
-      const pCode = matchedMapping.pLot;
-      const datePart = input.split('-')[1];
-      const packKeys = Object.keys(window._fbCache||{}).filter(k=>k.startsWith('packRecords_'));
-      packKeys.forEach(k=>{
-        try{
-          const recs = (window._fbCache&&window._fbCache[k])||[];
-          recs.forEach(r=>{
-            const keyDate = k.replace('packRecords_','');
-            if(r.productCode===pCode && (!datePart || keyDate===datePart)){
-              if(!packItems.find(x=>x.lot===r.lot))
-                packItems.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot});
-            }
-          });
-        }catch(e){}
-      });
-    }
-
-    if(packItems.length){
-      html += buildTraceArrowHtml();
-      html += buildTraceTable('포장 공정', ['포장LOT','품명','소비기한','수량(개)'],
-        packItems.map(p=>[p.lot||'-', p.product||'-', p.expiry||'-', (p.qtyPcs||0)+'개']));
-
-      // 3단계: 배합LOT 찾기
-      const batchLots = [...new Set(packItems.map(p=>p.batchLot).filter(Boolean))];
-      const batchItems = batchLots.flatMap(bl=>findBatchByLotData(bl));
-
-      if(batchItems.length){
-        html += buildTraceArrowHtml();
-        html += buildTraceTable('배합 공정', ['배합LOT','품명','제조일자','배합수'],
-          batchItems.map(b=>[b.lot, b.product, b.date, b.batches+'번']));
-
-        // 4단계: 원료LOT 찾기
-        const ingItems = batchItems.flatMap(b=>findIngredientByBatchLotData(b.lot));
-        if(ingItems.length){
-          html += buildTraceArrowHtml();
-          html += buildTraceTable('사용원료', ['원료LOT','원료명','제조일자 or 소비기한','사용량(g)'],
-            ingItems.map(i=>[i.lot||'-', i.name, i.expType+': '+i.exp, Number(i.qty).toLocaleString()]));
-        }
-      }
-    }
+    }));
+  } else {
+    const batchItems = findBatchByLotData(input);
+    topRows = batchItems.map(b=>({
+      cols: [b.lot, b.product, b.date, b.batches+'번'],
+      title: '배합LOT',
+      getChildren: ()=>buildForwardChildren([b])
+    }));
   }
 
+  if(!topRows.length){
+    result.innerHTML=`<div style="text-align:center;padding:24px;color:var(--text3);">해당 LOT를 찾을 수 없습니다</div>`; return;
+  }
+
+  let html = `<div style="margin-bottom:16px;padding:10px 14px;background:var(--primary-light);border-radius:8px;font-size:13px;font-weight:700;color:var(--primary);">🔍 "${input}" 순방향 추적 결과</div>`;
+  topRows.forEach((row,i)=>{
+    const childHtml = row.getChildren();
+    html += buildAccordionRow(i, row.cols, childHtml, '순방향');
+  });
   result.innerHTML = html;
 }
 
-function buildTraceTable(title, headers, rows){
-  const sectionColors = {
-    '완제품':'#e8f0fb','포장 공정':'#e8f5ef','배합 공정':'#fff3e0','사용원료':'#fce8e8'
-  };
-  const headerColors = {
-    '완제품':'#1a5fa8','포장 공정':'#1e9e6e','배합 공정':'#e07b1a','사용원료':'#c0392b'
-  };
-  const bgColor = sectionColors[title]||'#f4f6fa';
-  const hColor = headerColors[title]||'#555';
-  const colWidth = `width:25%;`;
-  const emptyRow = rows.length===0
-    ? `<tr><td colspan="${headers.length}" style="padding:12px;text-align:center;color:#999;">관련 기록 없음</td></tr>`
-    : rows.map(r=>`<tr>${r.map(c=>`<td style="padding:8px 12px;border:1px solid #e0e4ea;font-size:12px;${colWidth}">${c}</td>`).join('')}</tr>`).join('');
-  return `<div style="margin-bottom:20px;">
-    <div style="font-size:13px;font-weight:700;margin-bottom:8px;">${title}</div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;">
-      <thead><tr>${headers.map(h=>`<th style="padding:8px 12px;background:${bgColor};border:1px solid #e0e4ea;font-weight:700;text-align:left;color:${hColor};${colWidth}">${h}</th>`).join('')}</tr></thead>
-      <tbody>${emptyRow}</tbody>
-    </table>
+function buildForwardChildren(batchItems){
+  let html = '';
+  const packItems = batchItems.flatMap(b=>findPackByBatchLotData(b.lot));
+  if(packItems.length){
+    html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 6px;">↓ 포장 공정</div>`;
+    html += buildInnerTable(['포장LOT','품명','소비기한','수량'], packItems.map(p=>[p.lot,p.product,p.expiry||'-',(p.qtyPcs||0)+'개']), '#e8f5ef', '#1e9e6e');
+    const finItems = packItems.flatMap(p=>findFinishedByPackLotData(p.lot));
+    if(finItems.length){
+      html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 6px;">↓ 완제품</div>`;
+      html += buildInnerTable(['완제품LOT','품명','소비기한','잔량'], finItems.map(f=>[f.lot_number,f.name,f.exp_date||'-',f.remain_box+'BOX']), '#e8f0fb', '#1a5fa8');
+    }
+  }
+  return html;
+}
+
+function searchTraceReverse(input, result){
+  const finLots = (window._fbCache&&window._fbCache['완제품_lots'])||[];
+  let matchedWLot=null, matchedMapping=null;
+  for(const m of lotMapping){
+    for(const w of (m.wLots||[])){
+      if(input===w.lot||input.startsWith(w.lot+'-')){ matchedWLot=w; matchedMapping=m; break; }
+    }
+    if(matchedMapping) break;
+  }
+
+  let matchedFinLots = finLots.filter(f=>f.lot_number===input);
+  if(!matchedFinLots.length && matchedMapping){
+    const datePart=input.split('-')[1];
+    matchedFinLots=finLots.filter(f=>f.lot_code_base===matchedMapping.pLot&&(!datePart||f.mfg_date===datePart));
+  }
+
+  // 완제품 행 구성
+  let topRows = matchedFinLots.map(f=>{
+    const wInfo=matchedWLot||(matchedMapping?matchedMapping.wLots.find(w=>input.startsWith(w.lot)):null);
+    const displayLot=input+(f.lot_number!==input?` (${f.lot_number})`:'');
+    return { cols:[displayLot, f.name||'-', wInfo?wInfo.client:(f.client||'-'), f.exp_date||'-'], finLot:f };
+  });
+  if(!topRows.length && matchedWLot){
+    topRows=[{ cols:[input, matchedWLot.name||'-', matchedWLot.client||'-', '-'], finLot:null }];
+  }
+
+  if(!topRows.length){
+    result.innerHTML=`<div style="text-align:center;padding:24px;color:var(--text3);">해당 LOT를 찾을 수 없습니다</div>`; return;
+  }
+
+  let html = `<div style="margin-bottom:16px;padding:10px 14px;background:var(--primary-light);border-radius:8px;font-size:13px;font-weight:700;color:var(--primary);">🔍 "${input}" 역방향 추적 결과</div>`;
+  topRows.forEach((row,i)=>{
+    const childHtml = buildReverseChildren(row.finLot, matchedMapping, input);
+    html += buildAccordionRow(i, row.cols, childHtml, '역방향');
+  });
+  result.innerHTML = html;
+}
+
+function buildReverseChildren(finLot, matchedMapping, input){
+  let html = '';
+  let pkgLots = finLot ? [...new Set([finLot.pkg_lot].filter(Boolean))] : [];
+  let packItems = [];
+  pkgLots.forEach(pl=>{ findPackRecordData(pl).forEach(p=>{ if(!packItems.find(x=>x.lot===p.lot)) packItems.push(p); }); });
+  if(!packItems.length && matchedMapping){
+    const pCode=matchedMapping.pLot, datePart=input.split('-')[1];
+    Object.keys(window._fbCache||{}).filter(k=>k.startsWith('packRecords_')).forEach(k=>{
+      const recs=(window._fbCache&&window._fbCache[k])||[];
+      recs.forEach(r=>{ const keyDate=k.replace('packRecords_',''); if(r.productCode===pCode&&(!datePart||keyDate===datePart)&&!packItems.find(x=>x.lot===r.lot)) packItems.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot}); });
+    });
+  }
+  if(packItems.length){
+    html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 6px;">↑ 포장 공정</div>`;
+    html += buildInnerTable(['포장LOT','품명','소비기한','수량(개)'], packItems.map(p=>[p.lot||'-',p.product||'-',p.expiry||'-',(p.qtyPcs||0)+'개']), '#e8f5ef', '#1e9e6e');
+    const batchLots=[...new Set(packItems.map(p=>p.batchLot).filter(Boolean))];
+    const batchItems=batchLots.flatMap(bl=>findBatchByLotData(bl));
+    if(batchItems.length){
+      html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 6px;">↑ 배합 공정</div>`;
+      html += buildInnerTable(['배합LOT','품명','제조일자','배합수'], batchItems.map(b=>[b.lot,b.product,b.date,b.batches+'번']), '#fff3e0', '#e07b1a');
+      const ingItems=batchItems.flatMap(b=>findIngredientByBatchLotData(b.lot));
+      if(ingItems.length){
+        html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 6px;">↑ 사용원료</div>`;
+        html += buildInnerTable(['원료LOT','원료명','제조일자 or 소비기한','사용량(g)'], ingItems.map(i=>[i.lot||'-',i.name,i.expType+': '+i.exp,Number(i.qty).toLocaleString()]), '#fce8e8', '#c0392b');
+      }
+    }
+  }
+  return html;
+}
+
+function buildAccordionRow(idx, cols, childHtml, mode){
+  const uid = 'trace_acc_'+idx+'_'+Date.now();
+  const headerBg = mode==='역방향'?'#e8f0fb':'#e8f5ef';
+  const headerColor = mode==='역방향'?'#1a5fa8':'#1e9e6e';
+  return `<div style="margin-bottom:10px;border:1px solid #e0e4ea;border-radius:8px;overflow:hidden;">
+    <div onclick="toggleTraceAcc('${uid}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:${headerBg};cursor:pointer;">
+      <div style="display:flex;gap:16px;">
+        ${cols.map((c,i)=>`<span style="font-size:13px;${i===0?'font-weight:700;color:'+headerColor+';':''}">${c}</span>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="${uid}_icon" style="font-size:14px;color:${headerColor};">▼</span>
+        <button onclick="event.stopPropagation();deleteTraceAccRow('${uid}','${cols[0]}')" style="background:#fff0f0;color:#d63031;border:1px solid #f5a0a0;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer;">삭제</button>
+      </div>
+    </div>
+    <div id="${uid}" style="display:none;padding:14px;background:#fff;">
+      ${childHtml||'<div style="color:var(--text3);font-size:12px;">관련 기록 없음</div>'}
+    </div>
   </div>`;
 }
 
-function buildTraceArrowHtml(){ return '<div style="text-align:center;font-size:18px;color:#aaa;margin:4px 0;">↓</div>'; }
+function toggleTraceAcc(uid){
+  const el=document.getElementById(uid);
+  const icon=document.getElementById(uid+'_icon');
+  if(!el) return;
+  const open=el.style.display==='none';
+  el.style.display=open?'block':'none';
+  if(icon) icon.textContent=open?'▲':'▼';
+}
+
+function deleteTraceAccRow(uid, input){
+  if(!confirm('이 추적 결과를 삭제하시겠습니까?\n완제품_lots 및 lotMapping에서도 제거됩니다.')) return;
+  // 1. 화면에서 제거
+  const el=document.getElementById(uid);
+  if(el) el.closest('div[style*="margin-bottom:10px"]').remove();
+  if(!input) return;
+  // 2. 완제품_lots Firebase에서 해당 항목 제거
+  if(window._fbCache&&window._fbCache['완제품_lots']){
+    window._fbCache['완제품_lots'] = window._fbCache['완제품_lots'].filter(f=>f.lot_number!==input&&!input.startsWith(f.lot_code_base));
+    if(window._db) window._db.collection('appData').doc('완제품_lots').set({data:JSON.stringify(window._fbCache['완제품_lots']),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  }
+  // 3. lotMapping Firebase에서 해당 wLot 제거
+  const wLotCode = input.split('-')[0];
+  let changed = false;
+  lotMapping.forEach(m=>{
+    const before = m.wLots.length;
+    m.wLots = m.wLots.filter(w=>w.lot!==wLotCode&&!input.startsWith(w.lot+'-'));
+    if(m.wLots.length!==before) changed=true;
+  });
+  if(changed) saveData('lotMapping', lotMapping);
+}
+
+function buildInnerTable(headers, rows, bgColor, hColor){
+  if(!rows.length) return '<div style="color:var(--text3);font-size:12px;padding:6px 0;">관련 기록 없음</div>';
+  return `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px;">
+    <thead><tr>${headers.map(h=>`<th style="padding:6px 10px;background:${bgColor};border:1px solid #e0e4ea;font-weight:700;text-align:left;color:${hColor};">${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td style="padding:6px 10px;border:1px solid #e0e4ea;">${c}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>`;
+}
+
+
+
 function printTrace(){
   const result = document.getElementById('traceResult');
   const input = document.getElementById('traceInput').value.trim();
