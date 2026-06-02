@@ -81,11 +81,13 @@ tr:hover td{background:var(--bg);}
       <option value="벌크비닐">벌크비닐</option>
       <option value="박스">박스</option>
       <option value="패키지박스">패키지박스</option>
+      <option value="기타">기타</option>
     </select>
     <button class="btn btn-primary btn-sm" onclick="renderSubLedger()">조회</button>
     <button class="btn btn-outline btn-sm" onclick="printSubLedger()">🖨️ 출력</button>
     <button class="btn btn-primary btn-sm" onclick="openNewSubItemModal()">+ 신규등록</button>
     <button class="btn btn-sm" style="background:var(--warning-light);color:var(--warning);border:1px solid #f0c080" onclick="openSubInitStock()">📋 초기재고 등록</button>
+    <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="openDeleteSubCode()">🗑️ 코드 삭제</button>
   </div>
   <div class="card">
     <div class="card-hd">
@@ -128,13 +130,29 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
+<!-- 코드 삭제 모달 -->
+<div class="modal-overlay" id="deleteSubCodeModal" onclick="closeModalOutside(event,'deleteSubCodeModal')">
+  <div class="modal" style="width:400px">
+    <div class="modal-hd"><div class="modal-title">🗑️ 코드 삭제</div><button class="modal-close" onclick="closeModal('deleteSubCodeModal')">×</button></div>
+    <div class="modal-bd">
+      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">⚠️ 해당 품목 코드와 수불 내역이 모두 삭제됩니다.</div>
+      <div class="form-row"><label class="form-label">품목 선택</label>
+        <select class="form-input" id="deleteSubCodeSelect">
+          <option value="">-- 품목 선택 --</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('deleteSubCodeModal')">취소</button><button class="btn btn-danger" onclick="confirmDeleteSubCode()">삭제</button></div>
+  </div>
+</div>
+
 <!-- 신규등록 모달 -->
 <div class="modal-overlay" id="newSubItemModal" onclick="closeModalOutside(event,'newSubItemModal')">
   <div class="modal" style="width:480px">
     <div class="modal-hd"><div class="modal-title">➕ 부자재 신규 등록</div><button class="modal-close" onclick="closeModal('newSubItemModal')">×</button></div>
     <div class="modal-bd">
       <div class="form-grid">
-        <div class="form-row"><label class="form-label">품목 분류</label><select class="form-input" id="nsiCategory" onchange="updateNsiCode()"><option value="필름포장지">필름포장지</option><option value="벌크비닐">벌크비닐</option><option value="박스">박스</option><option value="패키지박스">패키지박스</option></select></div>
+        <div class="form-row"><label class="form-label">품목 분류</label><select class="form-input" id="nsiCategory" onchange="updateNsiCode()"><option value="필름포장지">필름포장지</option><option value="벌크비닐">벌크비닐</option><option value="박스">박스</option><option value="패키지박스">패키지박스</option><option value="기타">기타</option></select></div>
         <div class="form-row"><label class="form-label">품목코드 (자동)</label><input class="form-input" id="nsiCode" readonly style="background:#f8f9fb;color:var(--primary);font-weight:700"></div>
         <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="nsiName" placeholder="품목명 입력"></div>
         <div class="form-row"><label class="form-label">규격</label><input class="form-input" id="nsiSpec" placeholder="규격 입력"></div>
@@ -205,8 +223,8 @@ function closeModalOutside(e,id){ if(e.target.id===id) closeModal(id); }
 function closeAllModals(){ document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open')); }
 
 // ===== 부자재수불부 =====
-const SUB_CATEGORIES=['필름포장지','벌크비닐','박스','패키지박스'];
-const SUB_CAT_ICONS={'필름포장지':'🎞️','벌크비닐':'🗂️','박스':'📦','패키지박스':'🎁'};
+const SUB_CATEGORIES=['필름포장지','벌크비닐','박스','패키지박스','기타'];
+const SUB_CAT_ICONS={'필름포장지':'🎞️','벌크비닐':'🗂️','박스':'📦','패키지박스':'🎁','기타':'📋'};
 let SUB_ITEM_DB=[];
 let subLedgerRecords=[];
 
@@ -222,7 +240,7 @@ async function initSubLedger(){
         const exists=subLedgerRecords.find(r=>r.lot===lot&&r.name===row.item&&r.type==='in');
         if(!exists){
           const isoDate=rec.date||getTodayISO2();
-          const subCat=Object.keys({'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>row.item.includes(k))||'박스';
+          const subCat=Object.keys({'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>row.item.includes(k))||'기타';
           const subCode=autoSubCode(subCat);
           subLedgerRecords.push({date:isoDate,name:row.item,code:subCode,qty:parseFloat(row.qty)||0,mfg:row.mfg||'',lot,supplier:row.supplier||'',type:'in'});
         }
@@ -232,7 +250,7 @@ async function initSubLedger(){
   }catch(e){}
   subLedgerRecords.forEach(r=>{
     if(r.name&&!SUB_ITEM_DB.find(i=>i.name===r.name)){
-      const cat=Object.keys({'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>r.name.includes(k))||'박스';
+      const cat=Object.keys({'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>r.name.includes(k))||'기타';
       const newCode=autoSubCode(cat); SUB_ITEM_DB.push({code:newCode,name:r.name,category:cat,spec:'',unit:'EA',supplier:r.supplier||''});
     }
   });
@@ -240,7 +258,7 @@ async function initSubLedger(){
 }
 
 function autoSubCode(category){
-  const prefixMap={'필름포장지':'F','벌크비닐':'G','박스':'H','패키지박스':'P'};
+  const prefixMap={'필름포장지':'F','벌크비닐':'G','박스':'H','패키지박스':'P','기타':'Z'};
   const prefix=prefixMap[category]||'Z';
   const nums=SUB_ITEM_DB.filter(i=>i.category===category).map(i=>parseInt((i.code||'').replace(prefix,''))||0);
   const next=(nums.length?Math.max(...nums):0)+1;
@@ -310,6 +328,28 @@ function isoToYYMMDD(iso){
   if(!iso||iso.length<10) return '';
   return iso.slice(2,4)+iso.slice(5,7)+iso.slice(8,10);
 }
+function openDeleteSubCode(){
+  const sel = document.getElementById('deleteSubCodeSelect');
+  sel.innerHTML = '<option value="">-- 품목 선택 --</option>' +
+    SUB_ITEM_DB.map(i=>`<option value="${i.code}">[${i.code}] ${i.name}</option>`).join('');
+  document.getElementById('deleteSubCodeModal').classList.add('open');
+}
+function confirmDeleteSubCode(){
+  const code = document.getElementById('deleteSubCodeSelect').value;
+  if(!code){ alert('품목을 선택해주세요'); return; }
+  const item = SUB_ITEM_DB.find(i=>i.code===code);
+  if(!confirm(`'${item.name}' 코드와 수불 내역을 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  SUB_ITEM_DB = SUB_ITEM_DB.filter(i=>i.code!==code);
+  subLedgerRecords = subLedgerRecords.filter(r=>r.name!==item.name);
+  if(window._db){
+    window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+    window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  }
+  closeModal('deleteSubCodeModal');
+  renderSubLedger();
+  alert('삭제 완료');
+}
+
 function openEditSubItem(code){
   const item = SUB_ITEM_DB.find(i=>i.code===code);
   if(!item){ alert('품목 정보를 찾을 수 없습니다'); return; }
