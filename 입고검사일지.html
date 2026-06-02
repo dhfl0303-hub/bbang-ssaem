@@ -20,7 +20,7 @@ body{font-family:"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text
 
 /* 탭 */
 .tab-bar{display:flex;background:#fff;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:100;}
-.tab{flex:1;padding:14px;text-align:center;font-size:14px;font-weight:700;color:var(--text3);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;white-space:nowrap;}
+.tab{flex:1;padding:14px;text-align:center;font-size:14px;font-weight:700;color:var(--text3);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
 .tab.active{color:var(--primary);border-bottom-color:var(--primary);}
 
 .page{display:none;padding:16px;}
@@ -841,11 +841,11 @@ function makeOX(field, rowId){
     return `
       <button class="ox-btn" id="ox-${field}-${rowId}-O" onclick="setOX('${field}',${rowId},'O')">O</button>
       <button class="ox-btn" id="ox-${field}-${rowId}-X" onclick="setOX('${field}',${rowId},'X')">X</button>
-      <button class="ox-btn" id="ox-${field}-${rowId}-N" onclick="setOX('${field}',${rowId},'-')" style="font-size:11px;">-</button>
+      <button class="ox-btn n-active" id="ox-${field}-${rowId}-N" onclick="setOX('${field}',${rowId},'-')" style="font-size:11px;">-</button>
     `;
   }
   return `
-    <button class="ox-btn" id="ox-${field}-${rowId}-O" onclick="setOX('${field}',${rowId},'O')">O</button>
+    <button class="ox-btn o-active" id="ox-${field}-${rowId}-O" onclick="setOX('${field}',${rowId},'O')">O</button>
     <button class="ox-btn" id="ox-${field}-${rowId}-X" onclick="setOX('${field}',${rowId},'X')">X</button>
   `;
 }
