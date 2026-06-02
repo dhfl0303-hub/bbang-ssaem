@@ -755,6 +755,8 @@ function onLrNameInput(){
   else if(codeEl) codeEl.value='';
 }
 
+function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
+function getTodayISO(){ return new Date().toISOString().slice(0,10); }
 function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
 
 function saveIncoming(){
@@ -1060,7 +1062,13 @@ function initData(){
     });
   }catch(e){}
   initLedger();
-  // 모두 Firebase에서 로드
+  // DB, lotMapping, ingStock, deviceSettings는 loadFromFirebase에서 전역변수에 이미 반영됨
+  // Firebase에서 못 받은 경우 기본값 사용
+  if(!DB || !Object.keys(DB).length) DB = JSON.parse(JSON.stringify(RECIPE_DB_INIT));
+  if(!lotMapping || !lotMapping.length) lotMapping = JSON.parse(JSON.stringify(LOT_MAPPING_INIT));
+  if(!ingStock) ingStock = [];
+  if(!deviceSettings) deviceSettings = [];
+  if(!subsidiaryStock) subsidiaryStock = [];
 }
 function saveData(key, data){
   if(window._db) window._db.collection('appData').doc(key).set({data:JSON.stringify(data),updatedAt:new Date().toISOString()}).catch(e=>console.warn('저장 실패:',key,e));
@@ -2490,7 +2498,7 @@ function renderMapping(q=''){
       </div>`:''}
     </div>`).join('');
   // pLot 셀렉트 채우기
-  document.getElementById('mPLot').innerHTML=Object.keys(DB).map(c=>`<option value="${c}">${c} - ${DB[c].name}</option>`).join('');
+  const mPLotEl=document.getElementById('mPLot'); if(mPLotEl) mPLotEl.innerHTML=Object.keys(DB).map(c=>`<option value="${c}">${c} - ${DB[c].name}</option>`).join('');
 }
 function filterMapping(){ renderMapping(document.getElementById('mappingSearch').value.trim()); }
 function openAddMapping(){
