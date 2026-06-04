@@ -220,11 +220,24 @@ function initForm(){
 // ===== 원료 행 =====
 function addIngRow(){
   const id = Date.now();
-  S.ingRows.push({id, name:'', qty:'', lot:'', exp:''});
+  S.ingRows.push({id, name:'', lots:[{lotId:Date.now()+1, lot:'', qty:'', exp:''}]});
   renderIngList();
 }
 function removeIngRow(id){
   S.ingRows = S.ingRows.filter(r=>r.id!==id);
+  renderIngList();
+}
+function addLotRow(ingId){
+  const row = S.ingRows.find(r=>r.id===ingId);
+  if(!row) return;
+  if(row.lots.length>=5){ alert('LOT는 최대 5개까지 입력 가능합니다'); return; }
+  row.lots.push({lotId:Date.now(), lot:'', qty:'', exp:''});
+  renderIngList();
+}
+function removeLotRow(ingId, lotId){
+  const row = S.ingRows.find(r=>r.id===ingId);
+  if(!row||row.lots.length<=1) return;
+  row.lots = row.lots.filter(l=>l.lotId!==lotId);
   renderIngList();
 }
 function getIngLots(ingName){
@@ -274,27 +287,41 @@ function getIngLots(ingName){
     return lots;
   }catch(e){ return []; }
 }
-function onIngLotSelect(id){
-  const sel = document.getElementById('ing_lot_sel_'+id);
-  if(!sel) return;
-  const exp = sel.options[sel.selectedIndex]?.dataset.exp||'';
-  const lotInput = document.getElementById('ing_lot_'+id);
-  if(lotInput) lotInput.value = sel.value;
-  const expInput = document.getElementById('ing_exp_'+id);
-  if(expInput) expInput.value = exp;
-  updateIngRow(id);
-}
+
 
 function renderIngList(){
   const el = document.getElementById('ingList');
   if(!S.ingRows.length){ el.innerHTML=''; return; }
   el.innerHTML = S.ingRows.map((row,i)=>{
-    const lots = getIngLots(row.name||'');
-    const lotOptions = lots.length
-      ? `<select class="ing-input" id="ing_lot_sel_${row.id}" onchange="onIngLotSelect(${row.id})" style="margin-bottom:6px;">
-          <option value="">-- LOT 선택 --</option>
-          ${lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===row.lot?'selected':''}>${l.lot} ${l.isOI?'(초기재고 소비:'+l.exp+')':'('+l.label+')'}</option>`).join('')}
-         </select>` : '';
+    const availLots = getIngLots(row.name||'');
+    const lotRowsHtml = (row.lots||[{lotId:0,lot:'',qty:'',exp:''}]).map(lr=>{
+      const lotOptions = availLots.length
+        ? `<select class="ing-input" id="lot_sel_${lr.lotId}" onchange="onLotSelChange(${row.id},${lr.lotId})" style="margin-bottom:4px;">
+            <option value="">-- LOT 선택 --</option>
+            ${availLots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===lr.lot?'selected':''}>${l.lot} ${l.isOI?'(초기재고 소비:'+l.exp+')':'('+l.label+')'}</option>`).join('')}
+           </select>` : '';
+      return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+        ${lotOptions}
+        <div style="display:grid;grid-template-columns:1fr 1fr 34px;gap:6px;align-items:end;">
+          <div>
+            <label class="ing-label">수량 (kg)</label>
+            <input class="ing-input" id="lot_qty_${lr.lotId}" value="${lr.qty}" type="number" step="0.001" placeholder="0.000"
+              oninput="onLotQtyInput(${row.id},${lr.lotId})">
+          </div>
+          <div>
+            <label class="ing-label">LOT번호 (직접입력)</label>
+            <input class="ing-input" id="lot_lot_${lr.lotId}" value="${lr.lot}" placeholder="M001-260101-01"
+              onchange="onLotInputChange(${row.id},${lr.lotId})">
+          </div>
+          <button class="del-btn" onclick="removeLotRow(${row.id},${lr.lotId})" style="margin-bottom:0;">×</button>
+        </div>
+        <div style="margin-top:4px;">
+          <label class="ing-label">소비기한 YYMMDD</label>
+          <input class="ing-input" id="lot_exp_${lr.lotId}" value="${lr.exp}" placeholder="예: 270518" maxlength="6" inputmode="numeric"
+            onchange="onLotExpChange(${row.id},${lr.lotId})">
+        </div>
+      </div>`;
+    }).join('');
     return `<div class="ing-block">
       <div class="ing-hd">
         <span class="ing-name">원료 ${i+1}</span>
@@ -305,44 +332,64 @@ function renderIngList(){
           <label class="ing-label">원료명</label>
           <div class="autocomplete-wrap">
             <input class="ing-input" id="ing_name_${row.id}" value="${row.name}" placeholder="원료명 검색..." autocomplete="off"
-              oninput="showIngAC(${row.id})" onfocus="showIngAC(${row.id})" onblur="setTimeout(()=>{ hideIngAC(${row.id}); updateIngRow(${row.id}); },150)"
-              onchange="updateIngRow(${row.id})">
+              oninput="showIngAC(${row.id})" onfocus="showIngAC(${row.id})" onblur="setTimeout(()=>{ hideIngAC(${row.id}); updateIngName(${row.id}); },150)"
+              onchange="updateIngName(${row.id})">
             <div class="autocomplete-list" id="ac_${row.id}"></div>
           </div>
         </div>
-        ${lotOptions}
-        <div class="ing-row">
-          <div>
-            <label class="ing-label">수량 (kg)</label>
-            <input class="ing-input" id="ing_qty_${row.id}" value="${row.qty}" type="number" step="0.001" placeholder="0.000"
-              oninput="updateIngRow(${row.id});calcTotal()">
-          </div>
-          <div>
-            <label class="ing-label">LOT번호 (직접입력)</label>
-            <input class="ing-input" id="ing_lot_${row.id}" value="${row.lot}" placeholder="M001-260101-01"
-              onchange="updateIngRow(${row.id})">
-          </div>
-        </div>
-        <div class="form-row" style="padding:0 0 4px;">
-          <label class="ing-label">소비기한 YYMMDD</label>
-          <input class="ing-input" id="ing_exp_${row.id}" value="${row.exp}" placeholder="예: 270518" maxlength="6" inputmode="numeric"
-            onchange="updateIngRow(${row.id})">
-        </div>
+        <div style="margin-top:8px;">${lotRowsHtml}</div>
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 0 2px;font-size:13px;color:var(--primary);cursor:pointer;border-top:1px dashed #b3cef0;margin-top:4px;" onclick="addLotRow(${row.id})">＋ LOT 추가</div>
       </div>
     </div>`;
   }).join('');
   calcTotal();
 }
-function updateIngRow(id){
+function updateIngName(id){
   const row = S.ingRows.find(r=>r.id===id);
   if(!row) return;
   row.name = document.getElementById('ing_name_'+id)?.value||'';
-  row.qty  = document.getElementById('ing_qty_'+id)?.value||'';
-  row.lot  = document.getElementById('ing_lot_'+id)?.value||'';
-  row.exp  = document.getElementById('ing_exp_'+id)?.value||'';
+  renderIngList();
+}
+function onLotSelChange(ingId, lotId){
+  const row = S.ingRows.find(r=>r.id===ingId);
+  if(!row) return;
+  const lr = row.lots.find(l=>l.lotId===lotId);
+  if(!lr) return;
+  const sel = document.getElementById('lot_sel_'+lotId);
+  if(!sel) return;
+  lr.lot = sel.value;
+  lr.exp = sel.options[sel.selectedIndex]?.dataset.exp||'';
+  document.getElementById('lot_lot_'+lotId).value = lr.lot;
+  document.getElementById('lot_exp_'+lotId).value = lr.exp;
+  calcTotal();
+}
+function onLotQtyInput(ingId, lotId){
+  const row = S.ingRows.find(r=>r.id===ingId);
+  if(!row) return;
+  const lr = row.lots.find(l=>l.lotId===lotId);
+  if(lr) lr.qty = document.getElementById('lot_qty_'+lotId)?.value||'';
+  calcTotal();
+}
+function onLotInputChange(ingId, lotId){
+  const row = S.ingRows.find(r=>r.id===ingId);
+  if(!row) return;
+  const lr = row.lots.find(l=>l.lotId===lotId);
+  if(lr) lr.lot = document.getElementById('lot_lot_'+lotId)?.value||'';
+}
+function onLotExpChange(ingId, lotId){
+  const row = S.ingRows.find(r=>r.id===ingId);
+  if(!row) return;
+  const lr = row.lots.find(l=>l.lotId===lotId);
+  if(lr) lr.exp = document.getElementById('lot_exp_'+lotId)?.value||'';
+}
+function updateIngRow(id){
+  // 하위 호환용 - lots 배열 최신화
+  const row = S.ingRows.find(r=>r.id===id);
+  if(!row) return;
+  row.name = document.getElementById('ing_name_'+id)?.value||'';
 }
 function calcTotal(){
-  const total = S.ingRows.reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
+  const total = S.ingRows.reduce((s,r)=>s+(r.lots||[]).reduce((ss,l)=>ss+(parseFloat(l.qty)||0),0),0);
   document.getElementById('totalWeight').textContent = `총 ${total.toFixed(3)}kg`;
 }
 
@@ -368,17 +415,23 @@ function selectIng(id, name, code){
 
 // ===== 저장 =====
 function saveInputRecord(){
-  S.ingRows.forEach(r=>updateIngRow(r.id));
-  const validRows = S.ingRows.filter(r=>r.name&&r.qty);
-  if(!validRows.length){ alert('원료를 최소 1개 이상 입력해주세요'); return; }
+  // ingredients: 원료별 lots 배열 펼쳐서 저장
+  const ingredients = [];
+  S.ingRows.forEach(row=>{
+    if(!row.name) return;
+    (row.lots||[]).forEach(lr=>{
+      if(!lr.qty) return;
+      ingredients.push({name:row.name, qty:parseFloat(lr.qty)||0, lot:lr.lot||'', exp:lr.exp||''});
+    });
+  });
+  if(!ingredients.length){ alert('원료와 수량을 입력해주세요'); return; }
   const lot = document.getElementById('inputLot').textContent;
   const record = {
     lot,
     product: document.getElementById('inputProduct').value.trim()||'',
     worker: S.workerName,
     date: getTodayKey(),
-
-    ingredients: validRows.map(r=>({name:r.name, qty:parseFloat(r.qty)||0, lot:r.lot, exp:r.exp})),
+    ingredients,
     savedAt: new Date().toISOString()
   };
   S.todayRecords.push(record);
@@ -593,7 +646,7 @@ function selectInputProduct(code){
   // ingRows 먼저 세팅
   S.ingRows = [];
   (p.ingredients||[]).forEach(ing=>{
-    S.ingRows.push({id:Date.now()+Math.random(), name:ing.name, qty:'', lot:'', exp:''});
+    S.ingRows.push({id:Date.now()+Math.random(), name:ing.name, lots:[{lotId:Date.now()+Math.random(), lot:'', qty:'', exp:''}]});
   });
   // initForm 건너뛰고 폼으로 이동
   S._skipInit = true;
