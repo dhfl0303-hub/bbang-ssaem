@@ -229,19 +229,49 @@ function removeIngRow(id){
 }
 function getIngLots(ingName){
   try{
+    const lots=[];
+    const seen=new Set();
+
+    // 1. ledgerRecords type:'init' → OI LOT 우선
+    const ledger = window._ledgerRecords||[];
+    ledger.forEach(r=>{
+      if(r.type!=='init') return;
+      const recName=r.name.trim(); const ingN=ingName.trim();
+      if(recName===ingN||recName.includes(ingN)||ingN.includes(recName)){
+        if(r.lot && !seen.has(r.lot)){
+          seen.add(r.lot);
+          lots.push({lot:r.lot, exp:r.exp||'', date:'', isOI:true});
+        }
+      }
+    });
+
+    // 2. incomingRecords → 입고 LOT
     const recs = window._incomingRecords||[];
-    const lots = [];
     recs.forEach(rec=>{
       (rec.rows||[]).forEach(row=>{
         if(!row.product) return;
         const recName=row.product.trim(); const ingN=ingName.trim();
         if(recName===ingN||recName.includes(ingN)||ingN.includes(recName)){
-          if(row.lot) lots.push({lot:row.lot, exp:row.exp||row.expVal||'', date:rec.date||''});
+          if(row.lot && !seen.has(row.lot)){
+            seen.add(row.lot);
+            const hasExp = !!(row.expVal||row.exp);
+            const expDisp = row.expVal||row.exp||'';
+            const mfgDisp = row.mfg||'';
+            const datePart = `입고:${rec.date||''}`;
+            const dateLbl = hasExp ? `${datePart} 소비:${expDisp}` : `${datePart} 제조:${mfgDisp}`;
+            lots.push({lot:row.lot, exp:expDisp, date:rec.date||'', isOI:false, label:dateLbl});
+          }
         }
       });
     });
-    const seen=new Set();
-    return lots.filter(l=>{ if(seen.has(l.lot)) return false; seen.add(l.lot); return true; });
+
+    // OI 먼저, 그 다음 입고일 오래된 순
+    lots.sort((a,b)=>{
+      if(a.isOI && !b.isOI) return -1;
+      if(!a.isOI && b.isOI) return 1;
+      return (a.date||'') < (b.date||'') ? -1 : 1;
+    });
+    return lots;
   }catch(e){ return []; }
 }
 function onIngLotSelect(id){
@@ -263,7 +293,7 @@ function renderIngList(){
     const lotOptions = lots.length
       ? `<select class="ing-input" id="ing_lot_sel_${row.id}" onchange="onIngLotSelect(${row.id})" style="margin-bottom:6px;">
           <option value="">-- LOT 선택 --</option>
-          ${lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===row.lot?'selected':''}>${l.lot} (소비:${l.exp||'-'})</option>`).join('')}
+          ${lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===row.lot?'selected':''}>${l.lot} ${l.isOI?'(초기재고 소비:'+l.exp+')':'('+l.label+')'}</option>`).join('')}
          </select>` : '';
     return `<div class="ing-block">
       <div class="ing-hd">
@@ -510,15 +540,18 @@ function renderAdminLogs(){
 async function loadFromFirebase(){
   if(!window._db) return;
   try{
-    const [ingSnap, inputDBSnap, incomingSnap] = await Promise.all([
+    const [ingSnap, inputDBSnap, incomingSnap, ledgerSnap] = await Promise.all([
       window._db.collection('appData').doc('ingredientDB').get(),
       window._db.collection('appData').doc('inputDB').get(),
-      window._db.collection('appData').doc('incomingRecords').get()
+      window._db.collection('appData').doc('incomingRecords').get(),
+      window._db.collection('appData').doc('ledgerRecords').get()
     ]);
     if(ingSnap.exists && ingSnap.data().data) INGREDIENT_DB = JSON.parse(ingSnap.data().data);
     if(inputDBSnap.exists && inputDBSnap.data().data) INPUT_DB = JSON.parse(inputDBSnap.data().data);
     if(incomingSnap.exists && incomingSnap.data().data) window._incomingRecords = JSON.parse(incomingSnap.data().data);
     else window._incomingRecords = [];
+    if(ledgerSnap.exists && ledgerSnap.data().data) window._ledgerRecords = JSON.parse(ledgerSnap.data().data);
+    else window._ledgerRecords = [];
   }catch(e){ console.warn('Firebase 로드 실패',e); }
 }
 
