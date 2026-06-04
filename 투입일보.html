@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>투입일보</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+:root{--primary:#1a5fa8;--primary-light:#e8f0fb;--primary-dark:#0d3f75;--success:#1e9e6e;--success-light:#e6f5ef;--border:#e0e4ea;--bg:#f4f6fa;--bg2:#fff;--text:#1a1d23;--text2:#5a6070;--text3:#9aa0ad;--danger:#d63031;--radius:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text);}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--primary);height:56px;display:flex;align-items:center;padding:0 14px;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.15);}
+.back-btn{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.18);border:none;cursor:pointer;color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.tb-main{color:#fff;font-size:18px;font-weight:700;}
+.content{padding-top:56px;min-height:100vh;}
+.page{display:none;padding:16px;}
+.page.active{display:block;}
+.card{background:var(--bg2);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden;}
+.card-hd{padding:10px 16px;background:var(--bg);border-bottom:1px solid var(--border);font-size:13px;font-weight:700;color:var(--text2);}
+.card-bd{padding:14px;}
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:10px;cursor:pointer;font-family:"Noto Sans KR",sans-serif;font-weight:700;transition:all 0.15s;width:100%;}
+.btn:active{transform:scale(0.97);}
+.btn-primary{background:var(--primary);color:#fff;padding:16px;font-size:18px;}
+.btn-success{background:var(--success);color:#fff;padding:16px;font-size:18px;}
+.btn-outline{background:transparent;color:var(--primary);border:1.5px solid var(--primary);padding:14px;font-size:16px;}
+.main-hd{background:var(--primary);padding:20px 16px;margin:-16px -16px 16px;}
+.main-date{color:rgba(255,255,255,0.75);font-size:15px;margin-bottom:4px;}
+.main-worker{color:#fff;font-size:24px;font-weight:700;}
+.main-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;}
+.stat-box{background:rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;}
+.stat-lbl{font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:3px;}
+.stat-val{font-size:22px;font-weight:700;color:#fff;}
+.product-item{display:flex;align-items:center;justify-content:space-between;padding:16px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all 0.15s;margin-bottom:8px;}
+.product-item:active{background:var(--primary-light);border-color:var(--primary);}
+.product-name{font-size:18px;font-weight:700;}
+.product-code{font-size:13px;color:var(--text3);margin-top:2px;}
+.lot-box{background:var(--primary-light);border:1px solid #b3cef0;border-radius:10px;padding:10px 14px;margin-bottom:12px;}
+.lot-lbl{font-size:12px;color:var(--primary);font-weight:700;margin-bottom:3px;}
+.lot-num{font-size:16px;font-weight:700;color:var(--primary-dark);}
+.ing-block{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+.ing-hd{background:var(--bg);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;}
+.ing-name{font-size:17px;font-weight:700;}
+.ing-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 14px;border-top:1px solid var(--border);}
+.ing-input{background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:12px 10px;font-size:16px;font-family:"Noto Sans KR",sans-serif;color:var(--text);outline:none;width:100%;}
+.ing-input:focus{border-color:var(--primary);}
+.ing-label{font-size:12px;color:var(--text3);margin-bottom:4px;}
+.del-btn{width:34px;height:34px;border-radius:50%;background:#fff0f0;border:1px solid #fcc;color:var(--danger);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.add-ing-btn{display:flex;align-items:center;gap:6px;padding:12px 14px;font-size:15px;color:var(--primary);border-top:1px dashed #b3cef0;background:var(--primary-light);cursor:pointer;font-weight:500;}
+.form-row{margin-bottom:12px;}
+.form-label{font-size:13px;font-weight:700;color:var(--text2);margin-bottom:6px;display:block;}
+.form-input{font-family:"Noto Sans KR",sans-serif;font-size:15px;color:var(--text);background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;width:100%;outline:none;}
+.form-input:focus{border-color:var(--primary);background:#fff;}
+.accordion-item{background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;}
+.accordion-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;}
+.accordion-lot{font-size:14px;font-weight:700;color:var(--primary);}
+.accordion-sub{font-size:12px;color:var(--text3);margin-top:2px;}
+.accordion-arrow{font-size:18px;color:var(--text3);}
+.accordion-body{display:none;border-top:1px solid var(--border);padding:14px 16px;}
+.accordion-body.open{display:block;}
+.acc-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;}
+.acc-table th{background:var(--bg);padding:7px 10px;font-size:12px;font-weight:700;color:var(--text2);text-align:left;border-bottom:1px solid var(--border);}
+.acc-table td{padding:7px 10px;border-bottom:1px solid var(--border);}
+.acc-table tr:last-child td{border-bottom:none;}
+.autocomplete-wrap{position:relative;}
+.autocomplete-list{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--primary);border-top:none;border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;z-index:50;display:none;}
+.autocomplete-list.open{display:block;}
+.ac-item{padding:10px 14px;font-size:15px;cursor:pointer;border-bottom:1px solid var(--border);}
+.ac-item:hover{background:var(--primary-light);}
+.admin-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:flex-end;}
+.admin-overlay.open{display:flex;}
+.admin-sheet{background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px 16px 40px;}
+.admin-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;}
+.admin-title{font-size:18px;font-weight:700;margin-bottom:16px;}
+.a-label{font-size:13px;font-weight:700;color:var(--text2);margin-bottom:6px;display:block;}
+.a-input{font-family:"Noto Sans KR",sans-serif;font-size:15px;color:var(--text);background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;width:100%;outline:none;margin-bottom:10px;}
+.a-input:focus{border-color:var(--primary);background:#fff;}
+.a-btn-row{display:flex;gap:8px;margin-top:10px;}
+.a-btn{flex:1;padding:12px;border-radius:10px;border:none;font-family:"Noto Sans KR",sans-serif;font-weight:700;font-size:15px;cursor:pointer;}
+.a-save{background:var(--primary);color:#fff;}
+.a-cancel{background:var(--bg);color:var(--text2);border:1px solid var(--border);}
+.log-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);}
+.log-item:last-child{border-bottom:none;}
+.log-lot{font-size:13px;font-weight:700;color:var(--primary);}
+.log-time{font-size:12px;color:var(--text3);}
+.log-del{background:#fff0f0;color:var(--danger);border:1px solid #fcc;padding:6px 12px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:500;}
+.tc{text-align:center;} .txs{font-size:13px;color:var(--text2);}
+</style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
+    authDomain:"bbang-ssaem-prod.firebaseapp.com",
+    projectId:"bbang-ssaem-prod",
+    storageBucket:"bbang-ssaem-prod.firebasestorage.app",
+    messagingSenderId:"685237617449",
+    appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
+  });
+  window._db = firebase.firestore();
+</script>
+</head>
+<body>
+
+<!-- 상단바 -->
+<div class="topbar">
+  <button class="back-btn" id="backBtn" style="display:none" onclick="goBack()">←</button>
+  <div class="tb-main" id="tbMain">투입일보</div>
+  <div style="margin-left:auto;display:flex;gap:8px;">
+    <button onclick="openAdmin()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⚙️ 설정</button>
+    <button onclick="downloadInputDB()" style="background:rgba(255,255,255,0.15);color:#fff;border:1.5px solid rgba(255,255,255,0.4);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;margin-right:6px;">⬇️ 투입비</button><button id="syncBtn" onclick="syncToServer()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>
+  </div>
+</div>
+
+<div class="content">
+  <!-- 메인 페이지 -->
+  <div class="page active" id="page-main">
+    <div class="main-hd">
+      <div class="main-date" id="mainDate"></div>
+      <div class="main-worker" id="mainWorker">👤 작업자 설정 (탭하세요)</div>
+      <div class="main-stats">
+        <div class="stat-box"><div class="stat-lbl">오늘 투입</div><div class="stat-val" id="statDone">0건</div></div>
+        <div class="stat-box"><div class="stat-lbl">총 투입량</div><div class="stat-val" id="statTotal">0kg</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd">➕ 새 투입 등록</div>
+      <div class="card-bd">
+        <div id="inputProductList">
+          <div class="tc txs" style="padding:8px 0;margin-bottom:8px;">투입비에서 제품을 선택하거나 직접 시작하세요</div>
+        </div>
+        <button class="btn btn-outline" onclick="showPage('form')" style="margin-top:8px;">직접 입력으로 시작</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd">📋 오늘 투입 내역</div>
+      <div class="card-bd" id="todayList"><div class="tc txs" style="padding:16px 0">오늘 투입된 내역이 없습니다</div></div>
+    </div>
+  </div>
+
+  <!-- 투입 입력 페이지 -->
+  <div class="page" id="page-form">
+    <div class="lot-box">
+      <div class="lot-lbl">투입 LOT</div>
+      <div class="lot-num" id="inputLot">-</div>
+    </div>
+    <div class="card">
+      <div class="card-hd">기본 정보</div>
+      <div class="card-bd">
+        <div class="form-row">
+          <label class="form-label">제품명 (선택)</label>
+          <input class="form-input" id="inputProduct" placeholder="예: 크랜베리호두베이글">
+        </div>
+        <div class="form-row">
+          <label class="form-label">시작 시간</label>
+          <input class="form-input" id="inputStartTime" type="time">
+        </div>
+        <div class="form-row">
+          <label class="form-label">종료 시간</label>
+          <input class="form-input" id="inputEndTime" type="time">
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>원료 투입</span>
+        <span id="totalWeight" style="color:var(--primary);font-weight:700;font-size:13px;">총 0kg</span>
+      </div>
+      <div id="ingList"></div>
+      <div class="add-ing-btn" onclick="addIngRow()">+ 원료 추가</div>
+    </div>
+    <button class="btn btn-success" onclick="saveInputRecord()" style="margin-top:4px;">✅ 투입 완료</button>
+    <button class="btn btn-outline" onclick="showPage('main')" style="margin-top:8px;">취소</button>
+  </div>
+</div>
+
+<!-- 관리자 설정 -->
+<div class="admin-overlay" id="adminOverlay" onclick="if(event.target===this)closeAdmin()">
+  <div class="admin-sheet">
+    <div class="admin-handle"></div>
+    <div class="admin-title">⚙️ 설정</div>
+    <label class="a-label">작업자 이름</label>
+    <input class="a-input" id="adminWorker" placeholder="이름 입력">
+    <div id="workerList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div>
+    <div class="a-btn-row">
+      <button class="a-btn a-save" onclick="saveAdmin()">저장</button>
+      <button class="a-btn a-cancel" onclick="closeAdmin()">닫기</button>
+    </div>
+    <div style="margin-top:20px;">
+      <div class="a-label">작업자 추가</div>
+      <div style="display:flex;gap:8px;">
+        <input class="a-input" id="newWorkerInput" placeholder="이름" style="margin:0;">
+        <button class="a-btn a-save" onclick="addWorker()" style="flex:0;padding:10px 16px;white-space:nowrap;">추가</button>
+      </div>
+    </div>
+    <div style="margin-top:20px;">
+      <div class="a-label">오늘 투입 기록</div>
+      <div id="adminLogList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let INGREDIENT_DB = [];
+let INPUT_DB = {};
+let S = { todayRecords:[], workerName:'', ingRows:[] };
+
+// ===== 유틸 =====
+function getTodayKey(){ const d=new Date(); return String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
+function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
+function getNowTime(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+
+// ===== 페이지 전환 =====
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.getElementById('backBtn').style.display = id==='main'?'none':'flex';
+  if(id==='form') initForm();
+  if(id==='main'){ renderTodayList(); updateStats(); }
+}
+function goBack(){ showPage('main'); }
+
+// ===== 폼 초기화 =====
+function initForm(){
+  const today = getTodayKey();
+  const seq = S.todayRecords.length+1;
+  document.getElementById('inputLot').textContent = `투입-${today}-${String(seq).padStart(3,'0')}`;
+  document.getElementById('inputProduct').value = '';
+  document.getElementById('inputStartTime').value = getNowTime();
+  document.getElementById('inputEndTime').value = '';
+  S.ingRows = [];
+  renderIngList();
+  addIngRow();
+}
+
+// ===== 원료 행 =====
+function addIngRow(){
+  const id = Date.now();
+  S.ingRows.push({id, name:'', qty:'', lot:'', exp:''});
+  renderIngList();
+}
+function removeIngRow(id){
+  S.ingRows = S.ingRows.filter(r=>r.id!==id);
+  renderIngList();
+}
+function renderIngList(){
+  const el = document.getElementById('ingList');
+  if(!S.ingRows.length){ el.innerHTML=''; return; }
+  el.innerHTML = S.ingRows.map((row,i)=>`
+    <div class="ing-block">
+      <div class="ing-hd">
+        <span class="ing-name">원료 ${i+1}</span>
+        <button class="del-btn" onclick="removeIngRow(${row.id})">×</button>
+      </div>
+      <div style="padding:10px 14px;border-top:1px solid var(--border);">
+        <div class="form-row">
+          <label class="ing-label">원료명</label>
+          <div class="autocomplete-wrap">
+            <input class="ing-input" id="ing_name_${row.id}" value="${row.name}" placeholder="원료명 검색..." autocomplete="off"
+              oninput="showIngAC(${row.id})" onfocus="showIngAC(${row.id})" onblur="setTimeout(()=>hideIngAC(${row.id}),150)"
+              onchange="updateIngRow(${row.id})">
+            <div class="autocomplete-list" id="ac_${row.id}"></div>
+          </div>
+        </div>
+        <div class="ing-row">
+          <div>
+            <label class="ing-label">수량 (kg)</label>
+            <input class="ing-input" id="ing_qty_${row.id}" value="${row.qty}" type="number" step="0.001" placeholder="0.000"
+              oninput="updateIngRow(${row.id});calcTotal()">
+          </div>
+          <div>
+            <label class="ing-label">LOT번호</label>
+            <input class="ing-input" id="ing_lot_${row.id}" value="${row.lot}" placeholder="M001-260101-01"
+              onchange="updateIngRow(${row.id})">
+          </div>
+        </div>
+        <div class="form-row" style="padding:0 0 4px;">
+          <label class="ing-label">소비기한 YYMMDD</label>
+          <input class="ing-input" id="ing_exp_${row.id}" value="${row.exp}" placeholder="예: 270518" maxlength="6" inputmode="numeric"
+            onchange="updateIngRow(${row.id})">
+        </div>
+      </div>
+    </div>`).join('');
+  calcTotal();
+}
+function updateIngRow(id){
+  const row = S.ingRows.find(r=>r.id===id);
+  if(!row) return;
+  row.name = document.getElementById('ing_name_'+id)?.value||'';
+  row.qty  = document.getElementById('ing_qty_'+id)?.value||'';
+  row.lot  = document.getElementById('ing_lot_'+id)?.value||'';
+  row.exp  = document.getElementById('ing_exp_'+id)?.value||'';
+}
+function calcTotal(){
+  const total = S.ingRows.reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
+  document.getElementById('totalWeight').textContent = `총 ${total.toFixed(3)}kg`;
+}
+
+// ===== 자동완성 =====
+function showIngAC(id){
+  const input = document.getElementById('ing_name_'+id);
+  if(!input) return;
+  const q = input.value.trim().toLowerCase();
+  const list = document.getElementById('ac_'+id);
+  if(!list) return;
+  const matches = INGREDIENT_DB.filter(i=>i.name.toLowerCase().includes(q)||i.code.toLowerCase().includes(q)).slice(0,10);
+  if(!matches.length){ list.classList.remove('open'); return; }
+  list.innerHTML = matches.map(i=>`<div class="ac-item" onmousedown="selectIng(${id},'${i.name}','${i.code}')">${i.code} - ${i.name}</div>`).join('');
+  list.classList.add('open');
+}
+function hideIngAC(id){ const el=document.getElementById('ac_'+id); if(el) el.classList.remove('open'); }
+function selectIng(id, name, code){
+  const input = document.getElementById('ing_name_'+id);
+  if(input) input.value = name;
+  hideIngAC(id);
+  updateIngRow(id);
+}
+
+// ===== 저장 =====
+function saveInputRecord(){
+  S.ingRows.forEach(r=>updateIngRow(r.id));
+  const validRows = S.ingRows.filter(r=>r.name&&r.qty);
+  if(!validRows.length){ alert('원료를 최소 1개 이상 입력해주세요'); return; }
+  const lot = document.getElementById('inputLot').textContent;
+  const record = {
+    lot,
+    product: document.getElementById('inputProduct').value.trim()||'',
+    worker: S.workerName,
+    date: getTodayKey(),
+    startTime: document.getElementById('inputStartTime').value,
+    endTime: document.getElementById('inputEndTime').value,
+    ingredients: validRows.map(r=>({name:r.name, qty:parseFloat(r.qty)||0, lot:r.lot, exp:r.exp})),
+    savedAt: new Date().toISOString()
+  };
+  S.todayRecords.push(record);
+  saveLocal();
+  alert('투입 완료!');
+  showPage('main');
+}
+
+// ===== 로컬 저장 =====
+function saveLocal(){
+  localStorage.setItem('inputRecords_'+getTodayKey(), JSON.stringify(S.todayRecords));
+  updateStats();
+}
+function loadLocal(){
+  const d = localStorage.getItem('inputRecords_'+getTodayKey());
+  if(d) S.todayRecords = JSON.parse(d);
+  updateStats(); renderTodayList();
+}
+
+// ===== 동기화 =====
+async function syncToServer(){
+  const btn = document.getElementById('syncBtn');
+  btn.textContent = '⏳ 동기화 중...';
+  btn.disabled = true;
+  try{
+    if(!window._db) throw new Error('Firebase 연결 없음');
+    const db = window._db;
+    const keys = Object.keys(localStorage).filter(k=>k.startsWith('inputRecords_'));
+    let recs = []; keys.forEach(k=>{ recs = recs.concat(JSON.parse(localStorage.getItem(k)||'[]')); });
+    if(!recs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
+
+    // 1. inputRecords Firebase 업로드
+    for(const key of keys){
+      const dayRecs = JSON.parse(localStorage.getItem(key)||'[]');
+      if(dayRecs.length) await db.collection('appData').doc(key).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
+    }
+
+    // 2. ledgerRecords 출고 반영
+    let ledgerSnap = await db.collection('appData').doc('ledgerRecords').get();
+    let ledgerRecords = (ledgerSnap.exists && ledgerSnap.data().data) ? JSON.parse(ledgerSnap.data().data) : [];
+    recs.forEach(rec=>{
+      rec.ingredients.forEach(ing=>{
+        const exists = ledgerRecords.find(r=>r.type==='out'&&r.lot===ing.lot&&r.inputLot===rec.lot);
+        if(!exists && ing.qty>0){
+          const ingInfo = INGREDIENT_DB.find(i=>i.name===ing.name)||{};
+          ledgerRecords.push({
+            date:'20'+rec.date.slice(0,2)+'-'+rec.date.slice(2,4)+'-'+rec.date.slice(4,6),
+            name:ing.name, code:ingInfo.code||'', qty:ing.qty, lot:ing.lot, exp:ing.exp||'',
+            inputLot:rec.lot, type:'out'
+          });
+        }
+      });
+    });
+    await db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledgerRecords),updatedAt:new Date().toISOString()});
+
+    btn.textContent = '✅ '+recs.length+'건 완료';
+    setTimeout(()=>{ btn.textContent='🔄 동기화'; btn.disabled=false; }, 2500);
+  }catch(e){
+    console.error(e);
+    btn.textContent = '❌ 실패';
+    setTimeout(()=>{ btn.textContent='🔄 동기화'; btn.disabled=false; }, 2000);
+  }
+}
+
+// ===== 통계/목록 =====
+function updateStats(){
+  const total = S.todayRecords.reduce((s,r)=>s+r.ingredients.reduce((ss,i)=>ss+(i.qty||0),0),0);
+  document.getElementById('statDone').textContent = S.todayRecords.length+'건';
+  document.getElementById('statTotal').textContent = total.toFixed(3)+'kg';
+}
+function renderTodayList(){
+  const el = document.getElementById('todayList');
+  if(!S.todayRecords.length){ el.innerHTML='<div class="tc txs" style="padding:16px 0">오늘 투입된 내역이 없습니다</div>'; return; }
+  el.innerHTML = S.todayRecords.slice().reverse().map((r,ri)=>{
+    const idx = S.todayRecords.length-1-ri;
+    return `<div class="accordion-item">
+      <div class="accordion-hd" onclick="toggleAcc(${idx})">
+        <div>
+          <div class="accordion-lot">${r.lot}</div>
+          <div class="accordion-sub">${r.product||'제품명 미입력'} · ${r.worker||'-'} · ${r.startTime||'-'}~${r.endTime||'-'}</div>
+        </div>
+        <span class="accordion-arrow" id="arrow_${idx}">▼</span>
+      </div>
+      <div class="accordion-body" id="body_${idx}">
+        <table class="acc-table">
+          <thead><tr><th>원료명</th><th>수량(kg)</th><th>LOT</th><th>소비기한</th></tr></thead>
+          <tbody>${(r.ingredients||[]).map(i=>`<tr><td>${i.name}</td><td>${i.qty}</td><td>${i.lot||'-'}</td><td>${i.exp||'-'}</td></tr>`).join('')}</tbody>
+        </table>
+        <button onclick="delRecord(${idx})" style="background:#fff0f0;color:var(--danger);border:1px solid #fcc;padding:8px 16px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:500;width:100%;">삭제</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleAcc(idx){
+  const body = document.getElementById('body_'+idx);
+  const arrow = document.getElementById('arrow_'+idx);
+  if(!body) return;
+  const open = body.classList.contains('open');
+  body.classList.toggle('open', !open);
+  if(arrow) arrow.textContent = open ? '▼' : '▲';
+}
+function delRecord(idx){
+  if(!confirm('이 투입 기록을 삭제하시겠습니까?')) return;
+  S.todayRecords.splice(idx,1);
+  saveLocal();
+  renderTodayList(); updateStats();
+}
+
+// ===== 관리자 =====
+function loadSettings(){ return JSON.parse(localStorage.getItem('inputSettings')||'{"workerName":""}'); }
+function saveSettings(s){ localStorage.setItem('inputSettings',JSON.stringify(s)); }
+function loadWorkers(){ return JSON.parse(localStorage.getItem('workerList')||'[]'); }
+function openAdmin(){
+  const s = loadSettings();
+  document.getElementById('adminWorker').value = s.workerName||'';
+  renderWorkerBtns();
+  renderAdminLogs();
+  document.getElementById('adminOverlay').classList.add('open');
+}
+function closeAdmin(){ document.getElementById('adminOverlay').classList.remove('open'); }
+function renderWorkerBtns(){
+  const workers = loadWorkers();
+  const cur = loadSettings().workerName;
+  document.getElementById('workerList').innerHTML = workers.map(w=>`
+    <button onclick="selectWorker('${w}')" style="padding:8px 14px;border-radius:20px;border:1.5px solid ${w===cur?'var(--primary)':'var(--border)'};background:${w===cur?'var(--primary-light)':'#fff'};color:${w===cur?'var(--primary)':'var(--text2)'};font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">${w}</button>`).join('');
+}
+function selectWorker(name){
+  document.getElementById('adminWorker').value = name;
+  saveAdmin();
+  renderWorkerBtns();
+}
+function addWorker(){
+  const name = document.getElementById('newWorkerInput').value.trim();
+  if(!name) return;
+  const workers = loadWorkers();
+  if(!workers.includes(name)) workers.push(name);
+  localStorage.setItem('workerList', JSON.stringify(workers));
+  document.getElementById('newWorkerInput').value = '';
+  renderWorkerBtns();
+}
+function saveAdmin(){
+  const name = document.getElementById('adminWorker').value.trim();
+  saveSettings({workerName:name});
+  S.workerName = name;
+  document.getElementById('mainWorker').textContent = name ? name+' 작업자' : '👤 작업자 설정 (탭하세요)';
+  closeAdmin();
+}
+function renderAdminLogs(){
+  const el = document.getElementById('adminLogList');
+  if(!S.todayRecords.length){ el.innerHTML='<div class="txs" style="padding:8px 0">오늘 기록 없음</div>'; return; }
+  el.innerHTML = S.todayRecords.map((r,i)=>`
+    <div class="log-item">
+      <div><div class="log-lot">${r.lot}</div><div class="log-time">${r.product||'-'} · ${r.ingredients.length}종</div></div>
+      <button class="log-del" onclick="delRecord(${i});renderAdminLogs()">삭제</button>
+    </div>`).join('');
+}
+
+// ===== Firebase 로드 =====
+async function loadFromFirebase(){
+  if(!window._db) return;
+  try{
+    const [ingSnap, inputDBSnap] = await Promise.all([
+      window._db.collection('appData').doc('ingredientDB').get(),
+      window._db.collection('appData').doc('inputDB').get()
+    ]);
+    if(ingSnap.exists && ingSnap.data().data) INGREDIENT_DB = JSON.parse(ingSnap.data().data);
+    if(inputDBSnap.exists && inputDBSnap.data().data) INPUT_DB = JSON.parse(inputDBSnap.data().data);
+  }catch(e){ console.warn('Firebase 로드 실패',e); }
+}
+
+// ===== 투입비 연동 =====
+async function downloadInputDB(){
+  if(!window._db){ alert('인터넷 연결을 확인해주세요'); return; }
+  try{
+    const snap = await window._db.collection('appData').doc('inputDB').get();
+    if(snap.exists && snap.data().data){
+      INPUT_DB = JSON.parse(snap.data().data);
+      renderInputProductList();
+      alert('투입비 다운로드 완료! '+Object.keys(INPUT_DB).length+'개 제품');
+    } else {
+      alert('Firebase에 저장된 투입비가 없습니다\n통합관리에서 먼저 등록해주세요');
+    }
+  }catch(e){ alert('다운로드 실패: 네트워크를 확인해주세요'); }
+}
+function renderInputProductList(){
+  const el = document.getElementById('inputProductList');
+  if(!el) return;
+  const codes = Object.keys(INPUT_DB);
+  if(!codes.length){
+    el.innerHTML = '<div class="tc txs" style="padding:8px 0;margin-bottom:8px;">투입비에서 제품을 선택하거나 직접 시작하세요</div>';
+    return;
+  }
+  el.innerHTML = codes.map(code=>`
+    <div class="product-item" onclick="selectInputProduct('${code}')" style="margin-bottom:8px;">
+      <div>
+        <div class="product-name">${INPUT_DB[code].name}</div>
+        <div class="product-code">${code} · 원료 ${(INPUT_DB[code].ingredients||[]).length}종</div>
+      </div>
+      <div style="color:var(--text3);font-size:20px">›</div>
+    </div>`).join('');
+}
+function selectInputProduct(code){
+  const p = INPUT_DB[code];
+  if(!p) return;
+  // 폼으로 이동하면서 투입비 원료 자동 채우기
+  showPage('form');
+  document.getElementById('inputProduct').value = p.name;
+  S.ingRows = [];
+  (p.ingredients||[]).forEach(ing=>{
+    const id = Date.now()+Math.random();
+    S.ingRows.push({id, name:ing.name, qty:'', lot:'', exp:''});
+  });
+  renderIngList();
+}
+
+// ===== 초기화 =====
+(async()=>{
+  await loadFromFirebase();
+  const s = loadSettings();
+  S.workerName = s.workerName||'';
+  document.getElementById('mainDate').textContent = getToday();
+  document.getElementById('mainWorker').textContent = S.workerName ? S.workerName+' 작업자' : '👤 작업자 설정 (탭하세요)';
+  document.getElementById('mainWorker').onclick = openAdmin;
+  renderInputProductList();
+  loadLocal();
+})();
+</script>
+</body>
+</html>
