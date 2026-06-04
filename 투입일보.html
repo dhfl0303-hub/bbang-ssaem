@@ -539,7 +539,7 @@ function selectInputProduct(code){
   S.ingRows = [];
   (p.ingredients||[]).forEach(ing=>{
     const id = Date.now()+Math.random();
-    S.ingRows.push({id, name:ing.name, qty:'', lot:'', exp:''});
+    S.ingRows.push({id:Date.now()+Math.random(), name:ing.name, qty:'', lot:'', exp:''});
   });
   renderIngList();
 }

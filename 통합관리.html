@@ -2267,12 +2267,13 @@ function openEditInputRecipe(code){
   document.getElementById('irCode').readOnly = true;
   document.getElementById('irName').value = p.name;
   document.getElementById('irIngRows').innerHTML = '';
-  (p.ingredients||[]).forEach(ing=>addIRIngRow(ing.name, ing.amount));
+  (p.ingredients||[]).forEach(ing=>addIRIngRow(ing.name));
   document.getElementById('inputRecipeDelBtn').style.display = '';
   document.getElementById('inputRecipeModal').classList.add('open');
 }
-function addIRIngRow(name='', amount=''){
-  const row = document.createElement('div'); row.className='ing-row';
+function addIRIngRow(name=''){
+  const row = document.createElement('div');
+  row.style.cssText='display:grid;grid-template-columns:1fr 36px;gap:6px;margin-bottom:6px;align-items:center;';
   const uid = 'ir_'+Date.now()+Math.random().toString(36).slice(2);
   row.innerHTML = `
     <div class="autocomplete-wrap">
@@ -2280,7 +2281,6 @@ function addIRIngRow(name='', amount=''){
         oninput="showAC('${uid}')" onfocus="showAC('${uid}')" onblur="setTimeout(()=>hideAC('${uid}'),150)">
       <div class="autocomplete-list" id="ac-${uid}"></div>
     </div>
-    <input class="ing-input" type="number" placeholder="기준량(g)" value="${amount}" style="text-align:center">
     <div class="ing-del" onclick="this.closest('.ing-row').remove()">×</div>`;
   document.getElementById('irIngRows').appendChild(row);
 }
@@ -2290,10 +2290,9 @@ function saveInputRecipe(){
   if(!code||!name){ alert('코드와 이름을 입력해주세요'); return; }
   if(!code.startsWith('P')){ alert('코드는 P로 시작해야 합니다'); return; }
   const ingredients = [];
-  document.querySelectorAll('#irIngRows .ing-row').forEach(row=>{
+  document.querySelectorAll('#irIngRows div[style]').forEach(row=>{
     const nm = row.querySelector('.autocomplete-wrap input')?.value.trim();
-    const amt = parseFloat(row.querySelectorAll('input')[1]?.value)||0;
-    if(nm) ingredients.push({name:nm, amount:amt});
+    if(nm) ingredients.push({name:nm});
   });
   if(!ingredients.length){ alert('원료를 최소 1개 이상 입력해주세요'); return; }
   const now = new Date();
