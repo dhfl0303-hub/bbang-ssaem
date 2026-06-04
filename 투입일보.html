@@ -150,14 +150,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
           <label class="form-label">제품명 (선택)</label>
           <input class="form-input" id="inputProduct" placeholder="예: 크랜베리호두베이글">
         </div>
-        <div class="form-row">
-          <label class="form-label">시작 시간</label>
-          <input class="form-input" id="inputStartTime" type="time">
-        </div>
-        <div class="form-row">
-          <label class="form-label">종료 시간</label>
-          <input class="form-input" id="inputEndTime" type="time">
-        </div>
+
       </div>
     </div>
     <div class="card">
@@ -202,7 +195,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 <script>
 let INGREDIENT_DB = [];
 let INPUT_DB = {};
-let S = { todayRecords:[], workerName:'', ingRows:[] };
+let S = { todayRecords:[], workerName:'', ingRows:[], selectedProductCode:'' };
 
 // ===== 유틸 =====
 function getTodayKey(){ const d=new Date(); return String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
@@ -223,10 +216,12 @@ function goBack(){ showPage('main'); }
 function initForm(){
   const today = getTodayKey();
   const seq = S.todayRecords.length+1;
-  document.getElementById('inputLot').textContent = `투입-${today}-${String(seq).padStart(3,'0')}`;
+  const pCode = S.selectedProductCode||'';
+  document.getElementById('inputLot').textContent = `투입-${pCode?pCode+'-':''}${today}-${String(seq).padStart(3,'0')}`;
   document.getElementById('inputProduct').value = '';
   document.getElementById('inputStartTime').value = getNowTime();
   document.getElementById('inputEndTime').value = '';
+  if(!S.selectedProductCode) S.selectedProductCode='';
   S.ingRows = [];
   renderIngList();
   addIngRow();
@@ -242,11 +237,45 @@ function removeIngRow(id){
   S.ingRows = S.ingRows.filter(r=>r.id!==id);
   renderIngList();
 }
+function getIngLots(ingName){
+  try{
+    const recs = window._incomingRecords||[];
+    const lots = [];
+    recs.forEach(rec=>{
+      (rec.rows||[]).forEach(row=>{
+        if(!row.product) return;
+        const recName=row.product.trim(); const ingN=ingName.trim();
+        if(recName===ingN||recName.includes(ingN)||ingN.includes(recName)){
+          if(row.lot) lots.push({lot:row.lot, exp:row.exp||row.expVal||'', date:rec.date||''});
+        }
+      });
+    });
+    const seen=new Set();
+    return lots.filter(l=>{ if(seen.has(l.lot)) return false; seen.add(l.lot); return true; });
+  }catch(e){ return []; }
+}
+function onIngLotSelect(id){
+  const sel = document.getElementById('ing_lot_sel_'+id);
+  if(!sel) return;
+  const exp = sel.options[sel.selectedIndex]?.dataset.exp||'';
+  const lotInput = document.getElementById('ing_lot_'+id);
+  if(lotInput) lotInput.value = sel.value;
+  const expInput = document.getElementById('ing_exp_'+id);
+  if(expInput) expInput.value = exp;
+  updateIngRow(id);
+}
+
 function renderIngList(){
   const el = document.getElementById('ingList');
   if(!S.ingRows.length){ el.innerHTML=''; return; }
-  el.innerHTML = S.ingRows.map((row,i)=>`
-    <div class="ing-block">
+  el.innerHTML = S.ingRows.map((row,i)=>{
+    const lots = getIngLots(row.name||'');
+    const lotOptions = lots.length
+      ? `<select class="ing-input" id="ing_lot_sel_${row.id}" onchange="onIngLotSelect(${row.id})" style="margin-bottom:6px;">
+          <option value="">-- LOT 선택 --</option>
+          ${lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===row.lot?'selected':''}>${l.lot} (소비:${l.exp||'-'})</option>`).join('')}
+         </select>` : '';
+    return `<div class="ing-block">
       <div class="ing-hd">
         <span class="ing-name">원료 ${i+1}</span>
         <button class="del-btn" onclick="removeIngRow(${row.id})">×</button>
@@ -256,11 +285,12 @@ function renderIngList(){
           <label class="ing-label">원료명</label>
           <div class="autocomplete-wrap">
             <input class="ing-input" id="ing_name_${row.id}" value="${row.name}" placeholder="원료명 검색..." autocomplete="off"
-              oninput="showIngAC(${row.id})" onfocus="showIngAC(${row.id})" onblur="setTimeout(()=>hideIngAC(${row.id}),150)"
-              onchange="updateIngRow(${row.id})">
+              oninput="showIngAC(${row.id});renderIngList()" onfocus="showIngAC(${row.id})" onblur="setTimeout(()=>hideIngAC(${row.id}),150)"
+              onchange="updateIngRow(${row.id});renderIngList()">
             <div class="autocomplete-list" id="ac_${row.id}"></div>
           </div>
         </div>
+        ${lotOptions}
         <div class="ing-row">
           <div>
             <label class="ing-label">수량 (kg)</label>
@@ -268,7 +298,7 @@ function renderIngList(){
               oninput="updateIngRow(${row.id});calcTotal()">
           </div>
           <div>
-            <label class="ing-label">LOT번호</label>
+            <label class="ing-label">LOT번호 (직접입력)</label>
             <input class="ing-input" id="ing_lot_${row.id}" value="${row.lot}" placeholder="M001-260101-01"
               onchange="updateIngRow(${row.id})">
           </div>
@@ -279,7 +309,8 @@ function renderIngList(){
             onchange="updateIngRow(${row.id})">
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   calcTotal();
 }
 function updateIngRow(id){
@@ -326,8 +357,7 @@ function saveInputRecord(){
     product: document.getElementById('inputProduct').value.trim()||'',
     worker: S.workerName,
     date: getTodayKey(),
-    startTime: document.getElementById('inputStartTime').value,
-    endTime: document.getElementById('inputEndTime').value,
+
     ingredients: validRows.map(r=>({name:r.name, qty:parseFloat(r.qty)||0, lot:r.lot, exp:r.exp})),
     savedAt: new Date().toISOString()
   };
@@ -490,12 +520,15 @@ function renderAdminLogs(){
 async function loadFromFirebase(){
   if(!window._db) return;
   try{
-    const [ingSnap, inputDBSnap] = await Promise.all([
+    const [ingSnap, inputDBSnap, incomingSnap] = await Promise.all([
       window._db.collection('appData').doc('ingredientDB').get(),
-      window._db.collection('appData').doc('inputDB').get()
+      window._db.collection('appData').doc('inputDB').get(),
+      window._db.collection('appData').doc('incomingRecords').get()
     ]);
     if(ingSnap.exists && ingSnap.data().data) INGREDIENT_DB = JSON.parse(ingSnap.data().data);
     if(inputDBSnap.exists && inputDBSnap.data().data) INPUT_DB = JSON.parse(inputDBSnap.data().data);
+    if(incomingSnap.exists && incomingSnap.data().data) window._incomingRecords = JSON.parse(incomingSnap.data().data);
+    else window._incomingRecords = [];
   }catch(e){ console.warn('Firebase 로드 실패',e); }
 }
 
@@ -531,6 +564,7 @@ function renderInputProductList(){
     </div>`).join('');
 }
 function selectInputProduct(code){
+  S.selectedProductCode = code;
   const p = INPUT_DB[code];
   if(!p) return;
   // 폼으로 이동하면서 투입비 원료 자동 채우기
