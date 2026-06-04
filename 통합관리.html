@@ -201,6 +201,9 @@ tr:hover td{background:var(--bg);}
     <div class="nav-item" onclick="showPanel('recipe')">
       <span class="nav-icon">📋</span>배합비 관리
     </div>
+    <div class="nav-item" onclick="showPanel('input-recipe')">
+      <span class="nav-icon">📝</span>투입비 관리
+    </div>
     <div class="nav-item" onclick="showPanel('device')">
       <span class="nav-icon">⚙️</span>설비 세팅값
     </div>
@@ -477,6 +480,36 @@ tr:hover td{background:var(--bg);}
       </div>
     </div>
 
+    <!-- 투입비 관리 -->
+    <div class="panel" id="panel-input-recipe">
+      <div class="filter-row">
+        <input class="search-input" placeholder="제품명 검색..." id="inputRecipeSearch" oninput="filterInputRecipe()">
+        <button class="btn btn-primary" onclick="openAddInputRecipe()">+ 신규 등록</button>
+      </div>
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-hd-title">투입비 목록</div>
+          <span class="badge badge-blue" id="inputRecipeCnt"></span>
+        </div>
+        <div class="card-bd" style="padding:0">
+          <div class="table-wrap">
+            <table id="inputRecipeTable">
+              <thead>
+                <tr>
+                  <th>제품코드</th>
+                  <th>제품명</th>
+                  <th>원료수</th>
+                  <th>최종수정</th>
+                  <th>관리</th>
+                </tr>
+              </thead>
+              <tbody id="inputRecipeTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ② 원료 재고 현황 -->
     <div class="panel" id="panel-ingredient-stock">
       <div class="stat-grid">
@@ -660,6 +693,32 @@ tr:hover td{background:var(--bg);}
 </div>
 
 <!-- 배합비 편집 모달 -->
+<!-- 투입비 편집 모달 -->
+<div class="modal-overlay" id="inputRecipeModal" onclick="closeModalOutside(event,'inputRecipeModal')">
+  <div class="modal" style="width:600px;max-height:80vh;overflow-y:auto;">
+    <div class="modal-hd">
+      <div class="modal-title" id="inputRecipeModalTitle">투입비 등록</div>
+      <button class="modal-close" onclick="closeModal('inputRecipeModal')">×</button>
+    </div>
+    <div class="modal-bd">
+      <div class="form-grid">
+        <div class="form-row"><label class="form-label">제품코드 (P500~)</label><input class="form-input" id="irCode" placeholder="예: P500" style="font-weight:700;color:var(--primary)"></div>
+        <div class="form-row"><label class="form-label">제품명</label><input class="form-input" id="irName" placeholder="제품명 입력"></div>
+      </div>
+      <div style="margin-top:16px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px;">원료 목록</div>
+        <div id="irIngRows"></div>
+        <button class="btn btn-outline btn-sm" onclick="addIRIngRow()" style="margin-top:8px;">+ 원료 추가</button>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-danger" id="inputRecipeDelBtn" onclick="deleteInputRecipe()" style="display:none;margin-right:auto">삭제</button>
+      <button class="btn btn-outline" onclick="closeModal('inputRecipeModal')">취소</button>
+      <button class="btn btn-primary" onclick="saveInputRecipe()">저장</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="recipeModal" onclick="closeModalOutside(event,'recipeModal')">
   <div class="modal" style="width:780px;max-width:98vw">
     <div class="modal-hd">
@@ -729,6 +788,7 @@ const LOT_MAPPING_INIT = [{"pLot": "P001", "pName": "거북이단과자생지", 
 // ===== 데이터 =====
 let DB = {};
 let lotMapping = [];
+let inputDB = {};
 let ingStock = [];
 let deviceSettings = [];
 let finishedStock = [];
@@ -1128,6 +1188,7 @@ function initData(){
   // DB, lotMapping, ingStock, deviceSettings는 loadFromFirebase에서 전역변수에 이미 반영됨
   // Firebase에서 못 받은 경우 기본값 사용
   if(!DB || !Object.keys(DB).length) DB = JSON.parse(JSON.stringify(RECIPE_DB_INIT));
+  if(!inputDB) inputDB = {};
   if(!lotMapping || !lotMapping.length) lotMapping = JSON.parse(JSON.stringify(LOT_MAPPING_INIT));
   if(!ingStock) ingStock = [];
   if(!deviceSettings) deviceSettings = [];
@@ -1148,7 +1209,7 @@ async function loadFromFirebase(){
       'deviceSettings','customIngredients','editedIngredients',
       '완제품_lots','완제품_products','완제품_clients',
       'subIncomingRecords','subLedgerRecords','subItemDB','subsidiaryStock',
-      'workerList','packSettings','batchSettings','ingredientDB'
+      'workerList','packSettings','batchSettings','ingredientDB','inputDB'
     ];
     const snaps = await Promise.all(keys.map(k=>window._db.collection('appData').doc(k).get()));
     snaps.forEach((snap,i)=>{
@@ -1165,6 +1226,7 @@ async function loadFromFirebase(){
         if(key==='deviceSettings') deviceSettings = parsed;
         if(key==='customIngredients') window._customIngredients = parsed;
         if(key==='editedIngredients') window._editedIngredients = parsed;
+        if(key==='inputDB') inputDB = parsed;
         if(key==='subsidiaryStock') subsidiaryStock = parsed;
         if(key==='ingredientDB') { if(parsed.length) INGREDIENT_DB.splice(0, INGREDIENT_DB.length, ...parsed); }
       }
@@ -2149,6 +2211,7 @@ function showPanel(id){
   document.getElementById('topbarTitle').textContent=titles[id]||'';
   if(id==='material-ledger') renderLedger();
   if(id==='recipe') renderRecipe();
+  if(id==='input-recipe') renderInputRecipe();
   if(id==='ingredient-stock') renderIngStock();
   if(id==='device') renderDevice();
   if(id==='lot-mapping') renderMapping();
@@ -2163,6 +2226,91 @@ function closeAllModals(){ document.querySelectorAll('.modal-overlay').forEach(m
 function closeModalOutside(e,id){ if(e.target===document.getElementById(id)) closeModal(id); }
 
 // ===== ① 배합비 관리 =====
+// ===== 투입비 관리 =====
+let editingInputCode = null;
+function renderInputRecipe(q=''){
+  const codes = Object.keys(inputDB).filter(c=>!q||inputDB[c].name.includes(q)||c.includes(q));
+  document.getElementById('inputRecipeCnt').textContent = codes.length+'개';
+  document.getElementById('inputRecipeTbody').innerHTML = codes.map(code=>{
+    const p = inputDB[code];
+    const ingCount = (p.ingredients||[]).length;
+    return `<tr>
+      <td><span class="badge badge-blue">${code}</span></td>
+      <td style="font-weight:700">${p.name}</td>
+      <td>${ingCount}종</td>
+      <td style="font-size:12px;color:var(--text3)">${p.updatedAt||'-'}</td>
+      <td><button class="btn btn-sm btn-outline" onclick="openEditInputRecipe('${code}')">편집</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text3)">등록된 투입비가 없습니다</td></tr>';
+}
+function filterInputRecipe(){ renderInputRecipe(document.getElementById('inputRecipeSearch').value.trim()); }
+function openAddInputRecipe(){
+  closeAllModals();
+  editingInputCode = null;
+  const nums = Object.keys(inputDB).map(c=>parseInt(c.replace('P',''))||0).filter(n=>n>=500);
+  const next = nums.length ? Math.max(...nums)+1 : 500;
+  document.getElementById('inputRecipeModalTitle').textContent = '투입비 신규 등록';
+  document.getElementById('irCode').value = 'P'+next;
+  document.getElementById('irCode').readOnly = false;
+  document.getElementById('irName').value = '';
+  document.getElementById('irIngRows').innerHTML = '';
+  document.getElementById('inputRecipeDelBtn').style.display = 'none';
+  addIRIngRow();
+  document.getElementById('inputRecipeModal').classList.add('open');
+}
+function openEditInputRecipe(code){
+  closeAllModals();
+  editingInputCode = code;
+  const p = inputDB[code];
+  document.getElementById('inputRecipeModalTitle').textContent = '투입비 편집 - '+p.name;
+  document.getElementById('irCode').value = code;
+  document.getElementById('irCode').readOnly = true;
+  document.getElementById('irName').value = p.name;
+  document.getElementById('irIngRows').innerHTML = '';
+  (p.ingredients||[]).forEach(ing=>addIRIngRow(ing.name, ing.amount));
+  document.getElementById('inputRecipeDelBtn').style.display = '';
+  document.getElementById('inputRecipeModal').classList.add('open');
+}
+function addIRIngRow(name='', amount=''){
+  const row = document.createElement('div'); row.className='ing-row';
+  const uid = 'ir_'+Date.now()+Math.random().toString(36).slice(2);
+  row.innerHTML = `
+    <div class="autocomplete-wrap">
+      <input class="ing-input" id="${uid}" placeholder="원료명 입력/검색" value="${name}" autocomplete="off"
+        oninput="showAC('${uid}')" onfocus="showAC('${uid}')" onblur="setTimeout(()=>hideAC('${uid}'),150)">
+      <div class="autocomplete-list" id="ac-${uid}"></div>
+    </div>
+    <input class="ing-input" type="number" placeholder="기준량(g)" value="${amount}" style="text-align:center">
+    <div class="ing-del" onclick="this.closest('.ing-row').remove()">×</div>`;
+  document.getElementById('irIngRows').appendChild(row);
+}
+function saveInputRecipe(){
+  const code = document.getElementById('irCode').value.trim().toUpperCase();
+  const name = document.getElementById('irName').value.trim();
+  if(!code||!name){ alert('코드와 이름을 입력해주세요'); return; }
+  if(!code.startsWith('P')){ alert('코드는 P로 시작해야 합니다'); return; }
+  const ingredients = [];
+  document.querySelectorAll('#irIngRows .ing-row').forEach(row=>{
+    const nm = row.querySelector('.autocomplete-wrap input')?.value.trim();
+    const amt = parseFloat(row.querySelectorAll('input')[1]?.value)||0;
+    if(nm) ingredients.push({name:nm, amount:amt});
+  });
+  if(!ingredients.length){ alert('원료를 최소 1개 이상 입력해주세요'); return; }
+  const now = new Date();
+  const updatedAt = `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  if(editingInputCode && editingInputCode!==code) delete inputDB[editingInputCode];
+  inputDB[code] = {name, code, ingredients, updatedAt};
+  saveData('inputDB', inputDB);
+  closeModal('inputRecipeModal'); renderInputRecipe(); alert('저장됐습니다');
+}
+function deleteInputRecipe(){
+  if(!editingInputCode) return;
+  if(!confirm(`'${inputDB[editingInputCode]?.name}' 투입비를 삭제하시겠습니까?`)) return;
+  delete inputDB[editingInputCode];
+  saveData('inputDB', inputDB);
+  closeModal('inputRecipeModal'); renderInputRecipe();
+}
+
 function renderRecipe(q=''){
   const codes=Object.keys(DB).filter(c=>!q||DB[c].name.includes(q)||c.includes(q));
   document.getElementById('recipeCnt').textContent=codes.length+'개';
