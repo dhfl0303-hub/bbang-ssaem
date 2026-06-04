@@ -2415,11 +2415,12 @@ function showAC(uid){
   const input=document.getElementById(uid);
   const list=document.getElementById('ac-'+uid);
   const q=input.value.trim().toLowerCase();
-  const names=getIngNames().filter(n=>!q||n.toLowerCase().includes(q));
-  if(!names.length){ list.classList.remove('open'); return; }
-  list.innerHTML=names.slice(0,20).map(n=>`
-    <div class="autocomplete-item" onmousedown="selectAC('${uid}','${n.replace(/'/g,"\'")}')">
-      ${n.replace(new RegExp(q,'gi'),m=>`<b style="color:var(--primary)">${m}</b>`)}
+  // INGREDIENT_DB 전체 기반 (코드+이름 검색)
+  const matches = INGREDIENT_DB.filter(i=>!q||i.name.toLowerCase().includes(q)||i.code.toLowerCase().includes(q));
+  if(!matches.length){ list.classList.remove('open'); return; }
+  list.innerHTML=matches.map(i=>`
+    <div class="autocomplete-item" onmousedown="selectAC('${uid}','${i.name.replace(/'/g,"\'").replace(/\n/g,' ')}')">
+      <span style="color:var(--text3);font-size:11px;margin-right:6px;">${i.code}</span>${i.name.replace(/\n/g,' ').replace(new RegExp(q,'gi'),m=>`<b style="color:var(--primary)">${m}</b>`)}
     </div>`).join('');
   list.classList.add('open');
 }
