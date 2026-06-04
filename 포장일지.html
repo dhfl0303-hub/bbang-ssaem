@@ -163,7 +163,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
     <div class="sec">오늘 완료된 포장</div>
     <div id="todayList"><div class="tc txs" style="padding:16px 0">오늘 완료된 포장이 없습니다</div></div>
 
-    <div class="sec mt-12">배합 LOT 선택</div>
+    <div class="sec mt-12">배합 / 투입 LOT 선택</div>
     <div id="batchLotList"></div>
   </div>
 
@@ -232,10 +232,10 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 
     <div class="card">
       <div class="card-bd">
-        <!-- 포장LOT (배합일지에서) -->
-        <div class="field-label">포장LOT (배합일지 LOT 선택)</div>
+        <!-- 포장LOT (배합일지/투입일보에서) -->
+        <div class="field-label">배합 / 투입 LOT 선택</div>
         <select class="field-input" id="batchLotSel" onchange="onBatchLotSelect()" style="margin-bottom:14px;">
-          <option value="">-- 배합 LOT 선택 --</option>
+          <option value="">-- 배합 / 투입 LOT 선택 --</option>
         </select>
 
         <!-- 작업인원 -->
@@ -518,21 +518,42 @@ function deleteWorker(){
   }
 }
 
-// 배합LOT 셀렉트 채우기
+// 배합/투입 LOT 셀렉트 채우기
 function loadBatchLots(){
-  const keys=Object.keys(window._fbBatchCache||{});
   const lots=[];
-  keys.forEach(k=>{
+  // 배합LOT
+  const batchKeys=Object.keys(window._fbBatchCache||{});
+  batchKeys.forEach(k=>{
     const recs=window._fbBatchCache[k]||[];
     recs.forEach(r=>{
-      if(r.batchRecords) r.batchRecords.forEach(br=>{ if(br.lot) lots.push({lot:br.lot,product:r.product,code:r.productCode}); });
-      else if(r.lot) lots.push({lot:r.lot,product:r.product||'',code:r.productCode||''});
+      if(r.batchRecords) r.batchRecords.forEach(br=>{ if(br.lot) lots.push({lot:br.lot,product:r.product,code:r.productCode,type:'배합'}); });
+      else if(r.lot) lots.push({lot:r.lot,product:r.product||'',code:r.productCode||'',type:'배합'});
+    });
+  });
+  // 투입LOT
+  const inputKeys=Object.keys(window._fbInputCache||{});
+  inputKeys.forEach(k=>{
+    const recs=window._fbInputCache[k]||[];
+    recs.forEach(r=>{
+      if(r.lot) lots.push({lot:r.lot,product:r.product||'',code:r.lot.split('-')[1]||'',type:'투입'});
     });
   });
   const sel=document.getElementById('batchLotSel');
   if(!sel) return;
-  sel.innerHTML='<option value="">-- 배합 LOT 선택 --</option>'+
-    lots.reverse().map(l=>`<option value="${l.lot}">[${l.code}] ${l.product} - ${l.lot}</option>`).join('');
+  // 배합 먼저, 투입 다음 / 최신순
+  const batchLots = lots.filter(l=>l.type==='배합').reverse();
+  const inputLots = lots.filter(l=>l.type==='투입').reverse();
+  sel.innerHTML='<option value="">-- 배합 / 투입 LOT 선택 --</option>';
+  if(batchLots.length){
+    sel.innerHTML += `<optgroup label="── 배합 LOT ──">` +
+      batchLots.map(l=>`<option value="${l.lot}">[배합] [${l.code}] ${l.product} - ${l.lot}</option>`).join('') +
+      `</optgroup>`;
+  }
+  if(inputLots.length){
+    sel.innerHTML += `<optgroup label="── 투입 LOT ──">` +
+      inputLots.map(l=>`<option value="${l.lot}">[투입] ${l.product} - ${l.lot}</option>`).join('') +
+      `</optgroup>`;
+  }
   // 이전 값 복원
   if(S.batchLot) sel.value=S.batchLot;
 }
@@ -776,33 +797,62 @@ function initMain(){
 function renderBatchLotList(){
   const el=document.getElementById('batchLotList');
   if(!el) return;
-  // 오늘 날짜 키로 배합 기록 가져오기
   const todayKey=getTodayKey();
-  const recs=(window._fbBatchCache&&window._fbBatchCache['batchRecords_'+todayKey])||[];
-  if(!recs.length){
-    el.innerHTML='<div class="tc txs" style="padding:24px 0;color:var(--text3)">오늘 완료된 배합 LOT가 없습니다<br><span style="font-size:11px">배합일지에서 배합을 완료해주세요</span></div>';
+  // 배합LOT
+  const batchRecs=(window._fbBatchCache&&window._fbBatchCache['batchRecords_'+todayKey])||[];
+  // 투입LOT
+  const inputRecs=(window._fbInputCache&&window._fbInputCache['inputRecords_'+todayKey])||[];
+
+  if(!batchRecs.length && !inputRecs.length){
+    el.innerHTML='<div class="tc txs" style="padding:24px 0;color:var(--text3)">오늘 완료된 배합/투입 LOT가 없습니다<br><span style="font-size:11px">배합일지 또는 투입일보에서 완료 후 동기화해주세요</span></div>';
     return;
   }
-  el.innerHTML=recs.map(r=>`
-    <div class="product-item" onclick="selectBatchLot('${r.productCode}','${r.batchRecords?r.batchRecords[0]?.lot||r.lot:r.lot}')">
-      <div>
-        <div class="product-name">${r.product}</div>
-        <div class="product-code">${r.productCode} · ${r.batchRecords?r.batchRecords.map(b=>b.lot).join(', '):r.lot}</div>
-      </div>
-      <div style="color:var(--text3);font-size:20px">›</div>
-    </div>`).join('');
+
+  let html = '';
+  if(batchRecs.length){
+    html += `<div style="font-size:12px;font-weight:700;color:var(--text2);padding:6px 4px 4px;">배합 LOT</div>`;
+    html += batchRecs.map(r=>`
+      <div class="product-item" onclick="selectBatchLot('${r.productCode}','${r.batchRecords?r.batchRecords[0]?.lot||r.lot:r.lot}','배합')">
+        <div>
+          <div class="product-name">${r.product} <span style="font-size:12px;color:var(--primary);font-weight:500;">[배합]</span></div>
+          <div class="product-code">${r.productCode} · ${r.batchRecords?r.batchRecords.map(b=>b.lot).join(', '):r.lot}</div>
+        </div>
+        <div style="color:var(--text3);font-size:20px">›</div>
+      </div>`).join('');
+  }
+  if(inputRecs.length){
+    html += `<div style="font-size:12px;font-weight:700;color:var(--text2);padding:10px 4px 4px;">투입 LOT</div>`;
+    html += inputRecs.map(r=>`
+      <div class="product-item" onclick="selectBatchLot('${r.lot.split('-')[1]||''}','${r.lot}','투입')">
+        <div>
+          <div class="product-name">${r.product||'제품명 미입력'} <span style="font-size:12px;color:var(--warning);font-weight:500;">[투입]</span></div>
+          <div class="product-code">${r.lot}</div>
+        </div>
+        <div style="color:var(--text3);font-size:20px">›</div>
+      </div>`).join('');
+  }
+  el.innerHTML = html;
 }
 
-function selectBatchLot(code, lot){
+function selectBatchLot(code, lot, lotType){
   S.product=code;
   S.batchLot=lot;
-  // topbar 업데이트
-  document.getElementById('tbTitle').textContent=RECIPE_DB[code]?.name||code;
-  document.getElementById('tbSub').textContent=code;
+  S.batchLotType=lotType||'배합'; // '배합' or '투입'
+  // topbar 업데이트 - 투입LOT면 제품명을 투입기록에서 가져오기
+  let productName = RECIPE_DB[code]?.name||code;
+  if(lotType==='투입'){
+    const todayKey=getTodayKey();
+    const inputRecs=(window._fbInputCache&&window._fbInputCache['inputRecords_'+todayKey])||[];
+    const found = inputRecs.find(r=>r.lot===lot);
+    if(found && found.product) productName = found.product;
+  }
+  document.getElementById('tbTitle').textContent=productName;
+  document.getElementById('tbSub').textContent=code||lot;
   // 포장LOT 생성
   const today=getTodayKey();
-  const existCount=S.todayRecords.filter(r=>r.productCode===code).length;
-  document.getElementById('packLot')&&(document.getElementById('packLot').textContent=`포장-${code}-${today}-${String(existCount+1).padStart(3,'0')}`);
+  const pCode = code||lot.split('-')[1]||'P';
+  const existCount=S.todayRecords.filter(r=>r.productCode===pCode).length;
+  document.getElementById('packLot')&&(document.getElementById('packLot').textContent=`포장-${pCode}-${today}-${String(existCount+1).padStart(3,'0')}`);
   showPage('form');
 }
 function updateStats(){
@@ -826,6 +876,7 @@ function renderTodayList(){
       <div class="accordion-body" id="acc-${idx}">
         <table class="acc-table">
           <tr><th>항목</th><th>내용</th></tr>
+          <tr><td>${r.batchLotType==='투입'?'투입LOT':'배합LOT'}</td><td>${r.batchLot||'-'}</td></tr>
           <tr><td>소비기한</td><td>${r.expiryDate}</td></tr>
           <tr><td>생산수량</td><td>${r.qtyPcs}개 / ${r.qtyBoxes}박스</td></tr>
           <tr><td>잔량</td><td>${r.remaining}개</td></tr>
@@ -940,7 +991,7 @@ function genPrint(r){
       <tr>
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">포장로트</td>
         <td style="border:1px solid #999;padding:4px 8px;font-weight:700">${r.lot}</td>
-        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">배합LOT</td>
+        <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">${r.batchLotType==='투입'?'투입LOT':'배합LOT'}</td>
         <td style="border:1px solid #999;padding:4px 8px">${r.batchLot||'-'}</td>
       </tr>
       <tr>
@@ -1132,6 +1183,7 @@ function completePackaging(signImg=''){
     lot, productCode:code, product:p.name,
     date:today, time:getNow(),
     batchLot:document.getElementById('batchLotSel')?.value||'-',
+    batchLotType:S.batchLotType||'배합',
     workers:document.getElementById('workers').value||'-',
     startTime:getTimeVal('startTime'),
     endTime:getTimeVal('endTime'),
@@ -1211,6 +1263,15 @@ async function loadFromFirebase(){
       batchPromises.push(window._db.collection('appData').doc(key).get().then(snap=>{ if(snap.exists&&snap.data().data) window._fbBatchCache[key]=JSON.parse(snap.data().data); }));
     }
     await Promise.all(batchPromises);
+    // inputRecords 로드 (최근 7일)
+    window._fbInputCache = {};
+    const inputPromises = [];
+    for(let i=0;i<7;i++){
+      const d = new Date(today); d.setDate(d.getDate()-i);
+      const key = 'inputRecords_'+String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+      inputPromises.push(window._db.collection('appData').doc(key).get().then(snap=>{ if(snap.exists&&snap.data().data) window._fbInputCache[key]=JSON.parse(snap.data().data); }));
+    }
+    await Promise.all(inputPromises);
   }catch(e){ console.warn('Firebase 로드 실패',e); }
 }
 
