@@ -143,16 +143,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
       <div class="lot-lbl">투입 LOT</div>
       <div class="lot-num" id="inputLot">-</div>
     </div>
-    <div class="card">
-      <div class="card-hd">기본 정보</div>
-      <div class="card-bd">
-        <div class="form-row">
-          <label class="form-label">제품명 (선택)</label>
-          <input class="form-input" id="inputProduct" placeholder="예: 크랜베리호두베이글">
-        </div>
-
-      </div>
-    </div>
+    <input type="hidden" id="inputProduct">
     <div class="card">
       <div class="card-hd" style="display:flex;justify-content:space-between;align-items:center;">
         <span>원료 투입</span>
@@ -195,7 +186,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 <script>
 let INGREDIENT_DB = [];
 let INPUT_DB = {};
-let S = { todayRecords:[], workerName:'', ingRows:[], selectedProductCode:'' };
+let S = { todayRecords:[], workerName:'', ingRows:[], selectedProductCode:'', _skipInit:false };
 
 // ===== 유틸 =====
 function getTodayKey(){ const d=new Date(); return String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
@@ -207,7 +198,8 @@ function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   document.getElementById('backBtn').style.display = id==='main'?'none':'flex';
-  if(id==='form') initForm();
+  if(id==='form' && !S._skipInit) initForm();
+  S._skipInit = false;
   if(id==='main'){ renderTodayList(); updateStats(); }
 }
 function goBack(){ showPage('main'); }
@@ -219,8 +211,6 @@ function initForm(){
   const pCode = S.selectedProductCode||'';
   document.getElementById('inputLot').textContent = `투입-${pCode?pCode+'-':''}${today}-${String(seq).padStart(3,'0')}`;
   document.getElementById('inputProduct').value = '';
-  document.getElementById('inputStartTime').value = getNowTime();
-  document.getElementById('inputEndTime').value = '';
   if(!S.selectedProductCode) S.selectedProductCode='';
   S.ingRows = [];
   renderIngList();
@@ -285,8 +275,8 @@ function renderIngList(){
           <label class="ing-label">원료명</label>
           <div class="autocomplete-wrap">
             <input class="ing-input" id="ing_name_${row.id}" value="${row.name}" placeholder="원료명 검색..." autocomplete="off"
-              oninput="showIngAC(${row.id});renderIngList()" onfocus="showIngAC(${row.id})" onblur="setTimeout(()=>hideIngAC(${row.id}),150)"
-              onchange="updateIngRow(${row.id});renderIngList()">
+              oninput="showIngAC(${row.id})" onfocus="showIngAC(${row.id})" onblur="setTimeout(()=>{ hideIngAC(${row.id}); updateIngRow(${row.id}); },150)"
+              onchange="updateIngRow(${row.id})">
             <div class="autocomplete-list" id="ac_${row.id}"></div>
           </div>
         </div>
@@ -567,14 +557,18 @@ function selectInputProduct(code){
   S.selectedProductCode = code;
   const p = INPUT_DB[code];
   if(!p) return;
-  // 폼으로 이동하면서 투입비 원료 자동 채우기
-  showPage('form');
-  document.getElementById('inputProduct').value = p.name;
+  // ingRows 먼저 세팅
   S.ingRows = [];
   (p.ingredients||[]).forEach(ing=>{
-    const id = Date.now()+Math.random();
     S.ingRows.push({id:Date.now()+Math.random(), name:ing.name, qty:'', lot:'', exp:''});
   });
+  // initForm 건너뛰고 폼으로 이동
+  S._skipInit = true;
+  const today = getTodayKey();
+  const seq = S.todayRecords.length+1;
+  showPage('form');
+  document.getElementById('inputLot').textContent = `투입-${code}-${today}-${String(seq).padStart(3,'0')}`;
+  document.getElementById('inputProduct').value = p.name;
   renderIngList();
 }
 
