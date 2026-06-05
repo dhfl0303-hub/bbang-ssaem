@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>부자재수불부</title>
+<style>@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+:root{--primary:#1a5fa8;--primary-light:#e8f0fb;--primary-dark:#0d3f75;--success:#1e9e6e;--success-light:#e6f5ef;--warning:#e07b1a;--warning-light:#fdf0e0;--danger:#d63031;--danger-light:#fff0f0;--border:#e0e4ea;--bg:#f4f6fa;--text:#1a1d23;--text2:#5a6070;--text3:#9aa0ad;--radius:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text);}
+.topbar{background:var(--primary-dark);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+.topbar-title{color:#fff;font-size:16px;font-weight:700;}
+.topbar-back{color:rgba(255,255,255,0.8);background:none;border:none;font-size:13px;cursor:pointer;}
+.content{padding:20px;max-width:1400px;margin:0 auto;}
+.card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden;}
+.card-hd{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.card-hd-title{font-size:15px;font-weight:700;}
+.card-bd{padding:20px;}
+.filter-row{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap;}
+.search-input{border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:"Noto Sans KR",sans-serif;outline:none;min-width:160px;}
+.search-input:focus{border-color:var(--primary);}
+.btn{display:inline-flex;align-items:center;gap:6px;border:none;border-radius:8px;cursor:pointer;font-family:"Noto Sans KR",sans-serif;font-weight:600;padding:8px 16px;font-size:13px;transition:all 0.15s;}
+.btn-primary{background:var(--primary);color:#fff;}
+.btn-outline{background:transparent;color:var(--primary);border:1.5px solid var(--primary);}
+.btn-success{background:var(--success);color:#fff;}
+.btn-danger{background:var(--danger-light);color:var(--danger);border:1px solid #fcc;}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+.stat-box{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 20px;}
+.stat-label{font-size:12px;color:var(--text3);margin-bottom:6px;font-weight:500;}
+.stat-value{font-size:26px;font-weight:700;}
+.stat-blue{color:var(--primary);}
+.stat-green{color:var(--success);}
+.stat-red{color:var(--danger);}
+.table-wrap{overflow-x:auto;}
+table{width:100%;min-width:600px;border-collapse:collapse;font-size:13px;}
+thead tr{background:var(--bg);}
+th{padding:10px 12px;text-align:left;font-weight:700;color:var(--text2);border-bottom:2px solid var(--border);white-space:nowrap;}
+td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--bg);}
+.badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+.badge-blue{background:var(--primary-light);color:var(--primary);}
+.badge-green{background:var(--success-light);color:var(--success);}
+.badge-gray{background:#f0f0f0;color:#666;}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff;border-radius:16px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal-hd{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:16px;font-weight:700;}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);}
+.modal-bd{padding:24px;}
+.modal-ft{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+.form-row{margin-bottom:16px;}
+.form-label{font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;display:block;}
+.form-input{border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;font-family:"Noto Sans KR",sans-serif;outline:none;width:100%;}
+.form-input:focus{border-color:var(--primary);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.fl-tab{padding:8px;border:none;border-radius:7px;font-family:"Noto Sans KR",sans-serif;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all 0.15s;}
+.fl-tab.active{background:var(--primary);color:#fff;}
+.fl-panel{display:none;}
+.fl-panel.active{display:block;}
+.tc{text-align:center;}</style>
+</head>
+<body>
+<div class="topbar">
+  <button class="topbar-back" onclick="location.href='통합관리.html'">← 통합관리</button>
+  <div class="topbar-title">🏷 부자재수불부</div>
+  <div id="topbarDate" style="color:rgba(255,255,255,0.7);font-size:12px;"></div>
+</div>
+<div class="content">
+  <div class="filter-row">
+    <div>
+      <label style="font-size:12px;font-weight:700;color:var(--text2);margin-right:6px">조회 날짜</label>
+      <input type="text" class="search-input" id="subLedgerDate" style="min-width:140px" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubLedgerDate(this)">
+    </div>
+    <input class="search-input" placeholder="품목명 검색..." id="subLedgerSearch" oninput="renderSubLedger()">
+    <select class="search-input" id="subLedgerCategory" onchange="renderSubLedger()" style="min-width:140px">
+      <option value="">전체 품목</option>
+      <option value="필름포장지">필름포장지</option>
+      <option value="벌크비닐">벌크비닐</option>
+      <option value="박스">박스</option>
+      <option value="패키지박스">패키지박스</option>
+      <option value="기타">기타</option>
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="renderSubLedger()">조회</button>
+    <button class="btn btn-outline btn-sm" onclick="printSubLedger()">🖨️ 출력</button>
+    <button class="btn btn-primary btn-sm" onclick="openNewSubItemModal()">+ 신규등록</button>
+    <button class="btn btn-sm" style="background:var(--warning-light);color:var(--warning);border:1px solid #f0c080" onclick="openSubInitStock()">📋 초기재고 등록</button>
+    <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="openDeleteSubCode()">🗑️ 코드 삭제</button>
+  </div>
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-hd-title">수불 현황</div>
+      <span class="badge badge-blue" id="subLedgerDate-display"></span>
+    </div>
+    <div class="card-bd" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>코드</th><th>품목명</th><th>거래처</th><th>규격</th><th>단위</th><th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th><th>관리</th></tr></thead>
+          <tbody id="subLedgerTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 수정 모달 -->
+<div class="modal-overlay" id="editSubItemModal" onclick="closeModalOutside(event,'editSubItemModal')">
+  <div class="modal" style="width:480px">
+    <div class="modal-hd"><div class="modal-title">✏️ 부자재 수정</div><button class="modal-close" onclick="closeModal('editSubItemModal')">×</button></div>
+    <div class="modal-bd">
+      <input type="hidden" id="editSubCode">
+      <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="editSubNameDisplay" disabled style="background:#f4f6fa;color:var(--text2)"></div>
+      <div class="form-grid">
+        <div class="form-row"><label class="form-label">규격</label><input class="form-input" id="editSubSpec" placeholder="규격 입력"></div>
+        <div class="form-row"><label class="form-label">단위</label><select class="form-input" id="editSubUnit"><option value="EA">EA</option><option value="Rl">Rl</option><option value="개">개</option><option value="매">매</option></select></div>
+        <div class="form-row"><label class="form-label">거래처</label><input class="form-input" id="editSubSupplier" placeholder="거래처명"></div>
+      </div>
+      <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:12px;">초기재고 수정</div>
+        <div class="form-grid">
+          <div class="form-row"><label class="form-label">재고량</label><input class="form-input" id="editSubQty" type="number" placeholder="0"></div>
+          <div class="form-row"><label class="form-label">기준날짜 YYMMDD</label><input class="form-input" id="editSubDate" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubInitDate(this)"></div>
+          <div class="form-row"><label class="form-label">제조일자 YYMMDD <span style="color:var(--text3);font-weight:400">(선택)</span></label><input class="form-input" id="editSubMfg" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubInitDate(this)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('editSubItemModal')">취소</button><button class="btn btn-primary" onclick="saveEditSubItem()">저장</button></div>
+  </div>
+</div>
+
+<!-- 코드 삭제 모달 -->
+<div class="modal-overlay" id="deleteSubCodeModal" onclick="closeModalOutside(event,'deleteSubCodeModal')">
+  <div class="modal" style="width:400px">
+    <div class="modal-hd"><div class="modal-title">🗑️ 코드 삭제</div><button class="modal-close" onclick="closeModal('deleteSubCodeModal')">×</button></div>
+    <div class="modal-bd">
+      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">⚠️ 해당 품목 코드와 수불 내역이 모두 삭제됩니다.</div>
+      <div class="form-row"><label class="form-label">품목 선택</label>
+        <select class="form-input" id="deleteSubCodeSelect">
+          <option value="">-- 품목 선택 --</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('deleteSubCodeModal')">취소</button><button class="btn btn-danger" onclick="confirmDeleteSubCode()">삭제</button></div>
+  </div>
+</div>
+
+<!-- 신규등록 모달 -->
+<div class="modal-overlay" id="newSubItemModal" onclick="closeModalOutside(event,'newSubItemModal')">
+  <div class="modal" style="width:480px">
+    <div class="modal-hd"><div class="modal-title">➕ 부자재 신규 등록</div><button class="modal-close" onclick="closeModal('newSubItemModal')">×</button></div>
+    <div class="modal-bd">
+      <div class="form-grid">
+        <div class="form-row"><label class="form-label">품목 분류</label><select class="form-input" id="nsiCategory" onchange="updateNsiCode()"><option value="필름포장지">필름포장지</option><option value="벌크비닐">벌크비닐</option><option value="박스">박스</option><option value="패키지박스">패키지박스</option><option value="기타">기타</option></select></div>
+        <div class="form-row"><label class="form-label">품목코드 (자동)</label><input class="form-input" id="nsiCode" readonly style="background:#f8f9fb;color:var(--primary);font-weight:700"></div>
+        <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="nsiName" placeholder="품목명 입력"></div>
+        <div class="form-row"><label class="form-label">규격</label><input class="form-input" id="nsiSpec" placeholder="규격 입력"></div>
+        <div class="form-row"><label class="form-label">단위</label><select class="form-input" id="nsiUnit"><option value="EA">EA</option><option value="Rl">Rl</option><option value="개">개</option><option value="매">매</option></select></div>
+        <div class="form-row"><label class="form-label">거래처</label><input class="form-input" id="nsiSupplier" placeholder="거래처명"></div>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('newSubItemModal')">취소</button><button class="btn btn-primary" onclick="saveNewSubItem()">저장</button></div>
+  </div>
+</div>
+
+<!-- 수불 등록 모달 -->
+<div class="modal-overlay" id="subLedgerRecordModal" onclick="closeModalOutside(event,'subLedgerRecordModal')">
+  <div class="modal" style="width:420px">
+    <div class="modal-hd"><div class="modal-title" id="subLedgerRecordTitle">수불 등록</div><button class="modal-close" onclick="closeModal('subLedgerRecordModal')">×</button></div>
+    <div class="modal-bd">
+      <input type="hidden" id="slrCode">
+      <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="slrName" readonly style="background:#f8f9fb;font-weight:700"></div>
+      <div class="form-grid">
+        <div class="form-row"><label class="form-label">구분</label><select class="form-input" id="slrType"><option value="in">입고</option><option value="out">출고</option></select></div>
+        <div class="form-row"><label class="form-label">수량</label><input class="form-input" id="slrQty" type="number" placeholder="0"></div>
+        <div class="form-row"><label class="form-label">날짜 YYMMDD</label><input class="form-input" id="slrDate" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubInitDate(this)"></div>
+        <div class="form-row"><label class="form-label">제조일자 YYMMDD <span style="color:var(--text3);font-weight:400">(선택)</span></label><input class="form-input" id="slrMfg" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubInitDate(this)"></div>
+      </div>
+      <div class="form-row"><label class="form-label">비고</label><input class="form-input" id="slrNote" placeholder="LOT번호, 비고 등"></div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('subLedgerRecordModal')">취소</button><button class="btn btn-primary" onclick="saveSubLedgerRecord()">저장</button></div>
+  </div>
+</div>
+
+<!-- 초기재고 모달 -->
+<div class="modal-overlay" id="subInitStockModal" onclick="closeModalOutside(event,'subInitStockModal')">
+  <div class="modal" style="width:680px">
+    <div class="modal-hd"><div class="modal-title">📋 부자재 초기재고 등록</div><button class="modal-close" onclick="closeModal('subInitStockModal')">×</button></div>
+    <div class="modal-bd">
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-row"><label class="form-label">기준 날짜 YYMMDD</label><input class="form-input" id="siDate" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubInitDate(this)"></div>
+        <div class="form-row"><label class="form-label">품목 선택</label><select class="form-input" id="siItem"><option value="">-- 품목 선택 --</option></select></div>
+        <div class="form-row"><label class="form-label">재고량</label><input class="form-input" id="siQty" type="number" placeholder="0"></div>
+        <div class="form-row"><label class="form-label">제조일자 YYMMDD <span style="color:var(--text3);font-weight:400">(선택)</span></label><input class="form-input" id="siMfg" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubInitDate(this)"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="addSubInitRow()">+ 추가</button>
+      <div class="table-wrap"><table><thead><tr><th>코드</th><th>품목명</th><th>재고량</th><th>제조일자</th><th>기준일</th><th></th></tr></thead><tbody id="subInitStockTbody"></tbody></table></div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('subInitStockModal')">취소</button><button class="btn btn-primary" onclick="saveSubInitStock()">전체 저장</button></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+    apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
+    authDomain:"bbang-ssaem-prod.firebaseapp.com",
+    projectId:"bbang-ssaem-prod",
+    storageBucket:"bbang-ssaem-prod.firebasestorage.app",
+    messagingSenderId:"685237617449",
+    appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
+  });
+window._db = firebase.firestore();
+</script>
+<script>
+
+function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
+function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function closeModalOutside(e,id){ if(e.target.id===id) closeModal(id); }
+function closeAllModals(){ document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open')); }
+
+// ===== 부자재수불부 =====
+const SUB_CATEGORIES=['필름포장지','벌크비닐','박스','패키지박스','기타'];
+const SUB_CAT_ICONS={'필름포장지':'🎞️','벌크비닐':'🗂️','박스':'📦','패키지박스':'🎁','기타':'📋'};
+let SUB_ITEM_DB=[];
+let subLedgerRecords=[];
+
+async function initSubLedger(){
+  // Firebase에서 로드
+  try{
+    const subRecSnap=window._db?await window._db.collection('appData').doc('subIncomingRecords').get():null;
+    const subRecs=(subRecSnap&&subRecSnap.exists&&subRecSnap.data().data)?JSON.parse(subRecSnap.data().data):[];
+    subRecs.forEach(rec=>{
+      (rec.rows||[]).forEach(row=>{
+        if(!row.item||!row.qty) return;
+        const lot=row.lot||'';
+        const exists=subLedgerRecords.find(r=>r.lot===lot&&r.name===row.item&&r.type==='in');
+        if(!exists){
+          const isoDate=rec.date||getTodayISO2();
+          const subCat=row.category||Object.keys({'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>row.item.includes(k))||'기타';
+          const subCode=autoSubCode(subCat);
+          subLedgerRecords.push({date:isoDate,name:row.item,code:subCode,qty:parseFloat(row.qty)||0,mfg:row.mfg||'',lot,supplier:row.supplier||'',type:'in'});
+        }
+      });
+    });
+    if(window._db) window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  }catch(e){}
+  subLedgerRecords.forEach(r=>{
+    if(r.name&&!SUB_ITEM_DB.find(i=>i.name===r.name)){
+      const cat=Object.keys({'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>r.name.includes(k)||r.category===k)||'기타';
+      const newCode=autoSubCode(cat); SUB_ITEM_DB.push({code:newCode,name:r.name,category:cat,spec:'',unit:'EA',supplier:r.supplier||''});
+    }
+  });
+  if(window._db) window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+}
+
+function autoSubCode(category){
+  const prefixMap={'필름포장지':'F','벌크비닐':'G','박스':'H','패키지박스':'P','기타':'Z'};
+  const prefix=prefixMap[category]||'Z';
+  const nums=SUB_ITEM_DB.filter(i=>i.category===category).map(i=>parseInt((i.code||'').replace(prefix,''))||0);
+  const next=(nums.length?Math.max(...nums):0)+1;
+  return prefix+String(next).padStart(3,'0');
+}
+
+function calcSubLedgerRow(item,monthStart,selDate){
+  // init = 전일재고, in = 입고, out = 출고
+  const initQty=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='init'&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
+  const prevIn=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='in'&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
+  const prevOut=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='out'&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
+  const prevStock=Math.max(0,initQty+prevIn-prevOut);
+  const monthIn=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='in'&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
+  const monthOut=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='out'&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
+  const closing=Math.max(0,prevStock+monthIn-monthOut);
+  return {prevStock,monthIn,monthOut,closing};
+}
+
+function fmtSubLedgerDate(input){
+  const v=input.value.replace(/\D/g,'').slice(0,6);
+  input.value=v;
+  if(v.length===6){ input.style.color='var(--primary)'; input.style.fontWeight='700'; }
+  else{ input.style.color=''; input.style.fontWeight=''; }
+  renderSubLedger();
+}
+function getSubLedgerDateISO(){
+  const v=document.getElementById('subLedgerDate').value.replace(/\D/g,'');
+  if(v.length!==6) return getTodayISO2();
+  return '20'+v.slice(0,2)+'-'+v.slice(2,4)+'-'+v.slice(4,6);
+}
+function renderSubLedger(){
+  const selDate=getSubLedgerDateISO();
+  const q=(document.getElementById('subLedgerSearch')?.value||'').trim().toLowerCase();
+  const catFilter=document.getElementById('subLedgerCategory')?.value||'';
+  const el=document.getElementById('subLedgerDate-display');
+  if(el) el.textContent=selDate;
+  const[sy,sm]=selDate.split('-').map(Number);
+  const monthStart=`${sy}-${String(sm).padStart(2,'0')}-01`;
+  const tbody=document.getElementById('subLedgerTbody');
+  const cats=catFilter?[catFilter]:SUB_CATEGORIES;
+  let html='';let totalItems=0;
+  cats.forEach(cat=>{
+    let items=SUB_ITEM_DB.filter(i=>i.category===cat&&(!q||i.name.toLowerCase().includes(q)||i.code.toLowerCase().includes(q)));
+    if(!items.length) return;
+    totalItems+=items.length;
+    html+=`<tr><td colspan="10" style="background:#eef2f8;padding:8px 12px;font-size:12px;font-weight:700;color:var(--primary-dark);border-bottom:2px solid var(--border);">${SUB_CAT_ICONS[cat]||'📦'} ${cat}</td></tr>`;
+    html+=items.map(item=>{
+      const{prevStock,monthIn,monthOut,closing}=calcSubLedgerRow(item,monthStart,selDate);
+      return `<tr><td><span class="badge badge-blue" style="font-size:10px">${item.code}</span></td><td style="font-weight:600">${item.name}</td><td style="font-size:12px;color:var(--text2)">${item.supplier||'-'}</td><td style="font-size:12px;color:var(--text2)">${item.spec||'-'}</td><td class="tc" style="font-size:12px">${item.unit||'EA'}</td><td class="tc" style="color:var(--text2)">${prevStock>0?prevStock:'-'}</td><td class="tc" style="color:var(--success);font-weight:${monthIn>0?700:400}">${monthIn>0?'+'+monthIn:'-'}</td><td class="tc" style="color:var(--danger);font-weight:${monthOut>0?700:400}">${monthOut>0?'-'+monthOut:'-'}</td><td class="tc" style="font-weight:700;color:${closing>0?'var(--primary)':'var(--text3)'}">${closing}</td><td style="white-space:nowrap;"><button class="btn btn-sm btn-primary" onclick="openSubLedgerRecord('${item.name}','${item.code}')">+ 등록</button><button class="btn btn-sm btn-outline" onclick="openEditSubItem('${item.code}')">수정</button><button class="btn btn-sm btn-danger" onclick="deleteSubItem('${item.code}')">삭제</button></td></tr>`;
+    }).join('');
+  });
+  if(!totalItems) html='<tr><td colspan="10" class="tc" style="padding:24px;color:var(--text3)">등록된 부자재가 없습니다</td></tr>';
+  if(tbody) tbody.innerHTML=html;
+}
+
+function fmtSubInitDate(input){
+  const v=input.value.replace(/\D/g,'').slice(0,6);
+  input.value=v;
+  if(v.length===6){ input.style.color='var(--primary)'; input.style.fontWeight='700'; }
+  else{ input.style.color=''; input.style.fontWeight=''; }
+}
+function subYYMMDDtoISO(v){
+  if(!v||v.length!==6) return getTodayISO2();
+  return '20'+v.slice(0,2)+'-'+v.slice(2,4)+'-'+v.slice(4,6);
+}
+function isoToYYMMDD(iso){
+  if(!iso||iso.length<10) return '';
+  return iso.slice(2,4)+iso.slice(5,7)+iso.slice(8,10);
+}
+function openDeleteSubCode(){
+  const sel = document.getElementById('deleteSubCodeSelect');
+  sel.innerHTML = '<option value="">-- 품목 선택 --</option>' +
+    SUB_ITEM_DB.map(i=>`<option value="${i.code}">[${i.code}] ${i.name}</option>`).join('');
+  document.getElementById('deleteSubCodeModal').classList.add('open');
+}
+function confirmDeleteSubCode(){
+  const code = document.getElementById('deleteSubCodeSelect').value;
+  if(!code){ alert('품목을 선택해주세요'); return; }
+  const item = SUB_ITEM_DB.find(i=>i.code===code);
+  if(!confirm(`'${item.name}' 코드와 수불 내역을 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  SUB_ITEM_DB = SUB_ITEM_DB.filter(i=>i.code!==code);
+  subLedgerRecords = subLedgerRecords.filter(r=>r.name!==item.name);
+  if(window._db){
+    window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+    window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  }
+  closeModal('deleteSubCodeModal');
+  renderSubLedger();
+  alert('삭제 완료');
+}
+
+function openEditSubItem(code){
+  const item = SUB_ITEM_DB.find(i=>i.code===code);
+  if(!item){ alert('품목 정보를 찾을 수 없습니다'); return; }
+  const initRec = subLedgerRecords.find(r=>r.name===item.name&&r.type==='init');
+  document.getElementById('editSubCode').value = code;
+  document.getElementById('editSubNameDisplay').value = item.name;
+  document.getElementById('editSubSpec').value = item.spec||'';
+  document.getElementById('editSubUnit').value = item.unit||'EA';
+  document.getElementById('editSubSupplier').value = item.supplier||'';
+  document.getElementById('editSubQty').value = initRec ? initRec.qty : '';
+  document.getElementById('editSubDate').value = initRec ? isoToYYMMDD(initRec.date) : '';
+  document.getElementById('editSubMfg').value = initRec ? isoToYYMMDD(initRec.mfg||'') : '';
+  document.getElementById('editSubItemModal').classList.add('open');
+}
+function saveEditSubItem(){
+  const code = document.getElementById('editSubCode').value;
+  const item = SUB_ITEM_DB.find(i=>i.code===code);
+  if(!item) return;
+  item.spec = document.getElementById('editSubSpec').value.trim();
+  item.unit = document.getElementById('editSubUnit').value;
+  item.supplier = document.getElementById('editSubSupplier').value.trim();
+  const qty = parseFloat(document.getElementById('editSubQty').value)||0;
+  const dateV = document.getElementById('editSubDate').value;
+  const mfgV = document.getElementById('editSubMfg').value;
+  if(qty>0){
+    subLedgerRecords = subLedgerRecords.filter(r=>!(r.name===item.name&&r.type==='init'));
+    subLedgerRecords.push({date:subYYMMDDtoISO(dateV), name:item.name, code:item.code, qty, mfg:subYYMMDDtoISO(mfgV)||'', type:'init'});
+    if(window._db) window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  }
+  if(window._db) window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  closeModal('editSubItemModal');
+  renderSubLedger();
+  alert('수정 완료');
+}
+
+function openSubLedgerRecord(name,code){
+  closeAllModals();
+  document.getElementById('slrName').value=name;
+  document.getElementById('slrCode').value=code;
+  document.getElementById('slrType').value='in';
+  document.getElementById('slrQty').value='';
+  const _td2=new Date(); document.getElementById('slrDate').value=String(_td2.getFullYear()).slice(2)+String(_td2.getMonth()+1).padStart(2,'0')+String(_td2.getDate()).padStart(2,'0');
+  document.getElementById('slrMfg').value='';
+  document.getElementById('slrNote').value='';
+  document.getElementById('subLedgerRecordTitle').textContent=`수불 등록 - ${name}`;
+  document.getElementById('subLedgerRecordModal').classList.add('open');
+}
+function saveSubLedgerRecord(){
+  const name=document.getElementById('slrName').value;
+  const code=document.getElementById('slrCode').value;
+  const type=document.getElementById('slrType').value;
+  const qty=parseInt(document.getElementById('slrQty').value)||0;
+  const date=subYYMMDDtoISO(document.getElementById('slrDate').value);
+  const mfg=subYYMMDDtoISO(document.getElementById('slrMfg').value)||'';
+  const note=document.getElementById('slrNote').value.trim();
+  if(!qty){alert('수량을 입력해주세요');return;}
+  subLedgerRecords.push({date,name,code,qty,mfg,note,type});
+  if(window._db) window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  closeModal('subLedgerRecordModal');renderSubLedger();
+}
+function deleteSubItem(code){
+  if(!confirm('해당 품목의 수불 내역을 삭제하시겠습니까?'))return;
+  const item=SUB_ITEM_DB.find(i=>i.code===code);
+  if(item){
+    subLedgerRecords=subLedgerRecords.filter(r=>r.name!==item.name);
+    if(window._db) window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  }
+  renderSubLedger();
+}
+function openNewSubItemModal(){
+  closeAllModals();
+  document.getElementById('nsiCategory').value='필름포장지';
+  document.getElementById('nsiName').value='';
+  document.getElementById('nsiSpec').value='';
+  document.getElementById('nsiUnit').value='EA';
+  document.getElementById('nsiSupplier').value='';
+  updateNsiCode();
+  document.getElementById('newSubItemModal').classList.add('open');
+}
+function updateNsiCode(){
+  const cat=document.getElementById('nsiCategory').value;
+  document.getElementById('nsiCode').value=autoSubCode(cat);
+}
+function saveNewSubItem(){
+  const category=document.getElementById('nsiCategory').value;
+  const code=document.getElementById('nsiCode').value;
+  const name=document.getElementById('nsiName').value.trim();
+  const spec=document.getElementById('nsiSpec').value.trim();
+  const unit=document.getElementById('nsiUnit').value;
+  const supplier=document.getElementById('nsiSupplier').value.trim();
+  if(!name){alert('품목명을 입력해주세요');return;}
+  if(SUB_ITEM_DB.find(i=>i.name===name)){alert('이미 등록된 품목명입니다');return;}
+  SUB_ITEM_DB.push({code,name,category,spec,unit,supplier});
+  if(window._db) window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  closeModal('newSubItemModal');renderSubLedger();
+}
+function openSubInitStock(){
+  closeAllModals();
+  const sel=document.getElementById('siItem');
+  sel.innerHTML='<option value="">-- 품목 선택 --</option>'+SUB_ITEM_DB.map(i=>`<option value="${i.name}">[${i.code}] ${i.name}</option>`).join('');
+  document.getElementById('subInitStockTbody').innerHTML='';
+  const _td4=new Date(); const _yy4=String(_td4.getFullYear()).slice(2); const _mm4=String(_td4.getMonth()+1).padStart(2,'0'); const _dd4=String(_td4.getDate()).padStart(2,'0');
+  document.getElementById('siDate').value=_yy4+_mm4+_dd4;
+  document.getElementById('siMfg').value='';
+  document.getElementById('siQty').value='';
+  document.getElementById('subInitStockModal').classList.add('open');
+}
+function addSubInitRow(){
+  const name=document.getElementById('siItem').value;
+  const qty=parseInt(document.getElementById('siQty').value)||0;
+  const mfg=subYYMMDDtoISO(document.getElementById('siMfg').value)||'';
+  const date=subYYMMDDtoISO(document.getElementById('siDate').value);
+  if(!name||!qty){alert('품목과 재고량을 입력해주세요');return;}
+  const item=SUB_ITEM_DB.find(i=>i.name===name);
+  subInitRows.push({date,name,code:item?item.code:'',qty,mfg,type:'init'});
+  renderSubInitRows();
+}
+let subInitRows=[];
+function renderSubInitRows(){
+  document.getElementById('subInitStockTbody').innerHTML=subInitRows.map((r,i)=>`<tr><td><span class="badge badge-blue" style="font-size:10px">${r.code}</span></td><td style="font-weight:600">${r.name}</td><td class="tc">${r.qty}</td><td class="tc">${r.mfg||'-'}</td><td class="tc">${r.date}</td><td><button class="btn btn-sm btn-danger" onclick="removeSubInitRow(${i})">삭제</button></td></tr>`).join('');
+}
+function removeSubInitRow(i){subInitRows.splice(i,1);renderSubInitRows();}
+function saveSubInitStock(){
+  if(!subInitRows.length){alert('등록할 재고가 없습니다');return;}
+  subLedgerRecords=subLedgerRecords.filter(r=>r.type!=='init');
+  subInitRows.forEach(r=>subLedgerRecords.push(r));
+  if(window._db) window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  closeModal('subInitStockModal');renderSubLedger();
+}
+function printSubLedger(){
+  const selDate=getSubLedgerDateISO();
+  const[sy,sm]=selDate.split('-').map(Number);
+  const monthStart=`${sy}-${String(sm).padStart(2,'0')}-01`;
+  let bodyHtml='';
+  SUB_CATEGORIES.forEach(cat=>{
+    const items=SUB_ITEM_DB.filter(i=>i.category===cat);
+    if(!items.length) return;
+    bodyHtml+=`<tr><td colspan="9" class="cat-header">${cat}</td></tr>`;
+    bodyHtml+=items.map(item=>{
+      const{prevStock,monthIn,monthOut,closing}=calcSubLedgerRow(item,monthStart,selDate);
+      return `<tr><td><span class="badge">${item.code}</span></td><td class="left bold">${item.name}</td><td class="left">${item.supplier||'-'}</td><td class="left">${item.spec||'-'}</td><td>${item.unit||'EA'}</td><td>${prevStock>0?prevStock:'-'}</td><td>${monthIn>0?'+'+monthIn:'-'}</td><td>${monthOut>0?'-'+monthOut:'-'}</td><td class="bold">${closing}</td></tr>`;
+    }).join('');
+  });
+  const printWin=window.open('','_blank');
+  printWin.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>부자재수불부 ${selDate}</title><style>body{font-family:"Noto Sans KR",sans-serif;font-size:10px;padding:20px;}h2{font-size:16px;margin-bottom:4px;}.sub{font-size:12px;color:#666;margin-bottom:14px;}table{width:100%;border-collapse:collapse;}th{background:#f0f0f0;border:1px solid #999;padding:5px;text-align:center;font-weight:700;}td{border:1px solid #999;padding:5px;text-align:center;}td.left{text-align:left;}td.bold{font-weight:700;}td.cat-header{background:#dde4f0;font-size:11px;font-weight:700;text-align:left;padding:6px 10px;color:#0d3f75;}.badge{display:inline-block;padding:2px 6px;border-radius:10px;font-size:9px;font-weight:700;background:#e8f0fb;color:#1a5fa8;}@page{margin:10mm;size:A4 landscape;}</style></head><body><h2>부자재수불부</h2><div class="sub">조회일자: ${selDate} / 출력일시: ${new Date().toLocaleString('ko-KR')}</div><table><thead><tr><th>코드</th><th>품목명</th><th>거래처</th><th>규격</th><th>단위</th><th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th></tr></thead><tbody>${bodyHtml}</tbody></table></body></html>`);
+  printWin.document.close();
+  setTimeout(()=>printWin.print(),500);
+}
+function renderSubsidiary(){renderSubLedger();}
+function openAddSubsidiary(){openNewSubItemModal();}
+function saveSubsidiary(){}
+
+// ===== Firebase 자동 동기화 =====
+// ===== Firebase 직접 읽기 =====
+async function loadFromFirebase(){
+  if(!window._db) return;
+  try{
+    const [itemSnap, ledgerSnap] = await Promise.all([
+      window._db.collection('appData').doc('subItemDB').get(),
+      window._db.collection('appData').doc('subLedgerRecords').get()
+    ]);
+    if(itemSnap.exists && itemSnap.data().data) SUB_ITEM_DB = JSON.parse(itemSnap.data().data);
+    if(ledgerSnap.exists && ledgerSnap.data().data) subLedgerRecords = JSON.parse(ledgerSnap.data().data);
+  }catch(e){ console.warn('Firebase 로드 실패',e); }
+}
+
+// ===== 초기화 =====
+(async ()=>{
+  await loadFromFirebase();
+  await initSubLedger();
+  document.getElementById('topbarDate').textContent=getToday();
+  const _td=new Date(); const _yy=String(_td.getFullYear()).slice(2); const _mm=String(_td.getMonth()+1).padStart(2,'0'); const _dd=String(_td.getDate()).padStart(2,'0');
+  const _sldEl=document.getElementById('subLedgerDate'); if(_sldEl){_sldEl.value=_yy+_mm+_dd; _sldEl.style.color='var(--primary)'; _sldEl.style.fontWeight='700';}
+  renderSubLedger();
+})();
+</script>
+</body>
+</html>
