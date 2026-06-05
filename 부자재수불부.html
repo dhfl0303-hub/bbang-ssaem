@@ -460,11 +460,15 @@ function openSubInitStock(){
 function addSubInitRow(){
   const name=document.getElementById('siItem').value;
   const qty=parseInt(document.getElementById('siQty').value)||0;
-  const mfg=subYYMMDDtoISO(document.getElementById('siMfg').value)||'';
+  const mfg=document.getElementById('siMfg').value||'';
   const date=subYYMMDDtoISO(document.getElementById('siDate').value);
   if(!name||!qty){alert('품목과 재고량을 입력해주세요');return;}
   const item=SUB_ITEM_DB.find(i=>i.name===name);
-  subInitRows.push({date,name,code:item?item.code:'',qty,mfg,type:'init'});
+  const code=item?item.code:'';
+  // LOT 자동 생성: 코드-OI-제조일자 (초기재고)
+  const mfgKey=mfg.replace(/-/g,'').slice(2)||'000000';
+  const lot=code?`${code}-OF-${mfgKey}`:'';
+  subInitRows.push({date,name,code,qty,mfg:subYYMMDDtoISO(mfg)||'',lot,type:'init'});
   renderSubInitRows();
 }
 let subInitRows=[];

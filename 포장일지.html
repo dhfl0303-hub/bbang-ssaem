@@ -585,15 +585,32 @@ function loadSubLots(){
     'pkgBoxLot':'패키지박스'
   };
   const itemDB=window._subItemDB||[];
+  // subItemDB에서 name→category 매핑 (초기재고는 category 필드 없음)
+  const nameTocat={};
+  itemDB.forEach(i=>{ if(i.name&&i.category) nameTocat[i.name]=i.category; });
   Object.entries(catMap).forEach(([selId,cat])=>{
     const sel=document.getElementById(selId);
     if(!sel) return;
     const catItems=itemDB.filter(i=>i.category===cat).map(i=>i.name);
-    const catRecs=recs.filter(r=>catItems.includes(r.name)&&r.qty>0);
+    // category 필드 없는 경우 subItemDB에서 역으로 찾아서 매칭
+    const catRecs=recs.filter(r=>{
+      if(!r.name) return false;
+      const rCat=r.category||nameTocat[r.name]||'';
+      return (catItems.includes(r.name)||rCat===cat);
+    });
     const seen=new Set();
-    const lots=catRecs.filter(r=>{ if(!r.lot||seen.has(r.lot))return false; seen.add(r.lot); return true; });
+    const lots=catRecs.filter(r=>{
+      const key=r.lot||r.name;
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     sel.innerHTML='<option value="">-- 선택 --</option>'+
-      lots.map(r=>`<option value="${r.lot}">${r.name} - ${r.lot}</option>`).join('');
+      lots.map(r=>{
+        const isOI=r.lot&&r.lot.includes('-OF-');
+        const label=isOI?`${r.name} - ${r.lot} (초기재고)`:`${r.name} - ${r.lot}`;
+        return `<option value="${r.lot||r.name}">${label}</option>`;
+      }).join('');
   });
 }
 
