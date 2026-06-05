@@ -322,8 +322,8 @@ tr:hover td{background:var(--bg);}
             <table>
               <thead>
                 <tr>
-                  <th>배합LOT</th><th>제품명</th><th>원료코드</th><th>원료명</th>
-                  <th>소비기한</th><th>실사용량(g)</th><th>총배합수</th>
+                  <th>배합LOT</th><th>제품명</th><th>작업자</th><th>원료코드</th><th>원료명</th>
+                  <th>소비기한</th><th>실사용량(g)</th><th>총배합수</th><th>출력</th>
                 </tr>
               </thead>
               <tbody id="batchStatusTbody">
@@ -368,7 +368,7 @@ tr:hover td{background:var(--bg);}
                 <tr>
                   <th>투입LOT</th><th>제품명</th><th>작업자</th>
                   <th>원료코드</th><th>원료명</th><th>LOT</th>
-                  <th>소비기한</th><th style="text-align:right;">투입량(kg)</th>
+                  <th>소비기한</th><th style="text-align:right;">투입량(kg)</th><th>출력</th>
                 </tr>
               </thead>
               <tbody id="inputStatusTbody">
@@ -410,7 +410,7 @@ tr:hover td{background:var(--bg);}
                 <tr>
                   <th>포장LOT</th><th>제품명</th><th>작업자</th>
                   <th>시작</th><th>종료</th><th>포장수량(ea)</th>
-                  <th>박스수</th><th>필름</th><th>벌크비닐</th><th>박스</th>
+                  <th>박스수</th><th>필름</th><th>벌크비닐</th><th>박스</th><th>출력</th>
                 </tr>
               </thead>
               <tbody id="packStatusTbody">
@@ -1624,16 +1624,20 @@ function loadBatchStatus(){
   let rows = [];
   records.forEach(r=>{
     const batches = r.batchRecords||[];
+    const worker = r.worker||r.workerName||'-';
     totalBatches += r.totalBatches||batches.length;
     totalLots += batches.length;
     batches.forEach(b=>{
       const ings = b.ingredients||[];
+      const batchWorker = b.workerName||worker;
       if(!ings.length){
         rows.push(`<tr>
           <td><span class="badge badge-blue">${b.lot||'-'}</span></td>
           <td style="font-weight:700;">${r.product||'-'}</td>
+          <td>${batchWorker}</td>
           <td>-</td><td>-</td><td>-</td><td>-</td>
           <td style="text-align:center;">${r.totalBatches||batches.length}</td>
+          <td style="text-align:center;"><button class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:11px;" onclick="printBatchRecord('${b.lot}')">🖨️</button></td>
         </tr>`);
       } else {
         ings.forEach((ing,ii)=>{
@@ -1642,22 +1646,22 @@ function loadBatchStatus(){
           const exps = ing.exps||[];
           if(!exps.length){
             rows.push(`<tr>
-              ${ii===0?`<td rowspan="${ings.length}"><span class="badge badge-blue">${b.lot||'-'}</span></td><td rowspan="${ings.length}" style="font-weight:700;">${r.product||'-'}</td>`:''}
+              ${ii===0?`<td rowspan="${ings.length}"><span class="badge badge-blue">${b.lot||'-'}</span></td><td rowspan="${ings.length}" style="font-weight:700;">${r.product||'-'}</td><td rowspan="${ings.length}">${batchWorker}</td>`:''}
               <td><span class="badge badge-gray" style="font-size:10px;">${code}</span></td>
               <td>${ing.name}</td><td>-</td>
               <td style="text-align:right;">${(ing.total||0).toLocaleString()}</td>
-              ${ii===0?`<td rowspan="${ings.length}" style="text-align:center;">${r.totalBatches||batches.length}</td>`:''}
+              ${ii===0?`<td rowspan="${ings.length}" style="text-align:center;">${r.totalBatches||batches.length}</td><td rowspan="${ings.length}" style="text-align:center;"><button class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:11px;" onclick="printBatchRecord('${b.lot}')">🖨️</button></td>`:''}
             </tr>`);
           } else {
             exps.forEach((e,ei)=>{
               const isFirst = ii===0 && ei===0;
               const totalRows = ings.reduce((s,x)=>s+Math.max(1,(x.exps||[]).length),0);
               rows.push(`<tr>
-                ${isFirst?`<td rowspan="${totalRows}"><span class="badge badge-blue">${b.lot||'-'}</span></td><td rowspan="${totalRows}" style="font-weight:700;">${r.product||'-'}</td>`:''}
+                ${isFirst?`<td rowspan="${totalRows}"><span class="badge badge-blue">${b.lot||'-'}</span></td><td rowspan="${totalRows}" style="font-weight:700;">${r.product||'-'}</td><td rowspan="${totalRows}">${batchWorker}</td>`:''}
                 ${ei===0?`<td rowspan="${exps.length}"><span class="badge badge-gray" style="font-size:10px;">${code}</span></td><td rowspan="${exps.length}">${ing.name}</td>`:''}
                 <td style="font-size:12px;">${e.exp||'-'}</td>
                 <td style="text-align:right;">${(e.amount||0).toLocaleString()}</td>
-                ${isFirst?`<td rowspan="${totalRows}" style="text-align:center;">${r.totalBatches||batches.length}</td>`:''}
+                ${isFirst?`<td rowspan="${totalRows}" style="text-align:center;">${r.totalBatches||batches.length}</td><td rowspan="${totalRows}" style="text-align:center;"><button class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:11px;" onclick="printBatchRecord('${b.lot}')">🖨️</button></td>`:''}
               </tr>`);
             });
           }
@@ -1665,7 +1669,7 @@ function loadBatchStatus(){
       }
     });
   });
-  tbody.innerHTML = rows.join('') || '<tr><td colspan="7" class="tc" style="padding:24px;color:var(--text3);">해당 날짜의 배합 기록이 없습니다</td></tr>';
+  tbody.innerHTML = rows.join('') || '<tr><td colspan="9" class="tc" style="padding:24px;color:var(--text3);">해당 날짜의 배합 기록이 없습니다</td></tr>';
 
   document.getElementById('bsBatch').textContent = totalBatches;
   document.getElementById('bsLot').textContent = totalLots;
@@ -1717,6 +1721,7 @@ function loadInputStatus(){
         <td style="font-size:12px;">${ing.lot||'-'}</td>
         <td style="font-size:12px;">${ing.exp||'-'}</td>
         <td style="text-align:right;font-weight:700;">${(parseFloat(ing.qty)||0).toFixed(3)}</td>
+        ${isFirst?`<td rowspan="${ings.length}" style="text-align:center;"><button class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:11px;" onclick="printInputRecord('${r.lot}')">🖨️</button></td>`:''}
       </tr>`);
     });
   });
@@ -1768,7 +1773,7 @@ function loadPackStatus(){
     return `<tr>
       <td><span class="badge badge-blue">${r.lot||'-'}</span></td>
       <td style="font-weight:700;">${r.product||'-'}</td>
-      <td style="text-align:center;">${r.workers||'-'}</td>
+      <td style="text-align:center;">${r.workers||r.worker||'-'}</td>
       <td style="text-align:center;">${r.startTime||'-'}</td>
       <td style="text-align:center;">${r.endTime||'-'}</td>
       <td style="text-align:center;font-weight:700;">${(parseInt(r.qtyPcs)||0).toLocaleString()}</td>
@@ -1776,6 +1781,7 @@ function loadPackStatus(){
       <td style="text-align:center;">${r.filmQty||0}</td>
       <td style="text-align:center;">${r.bulkQty||0}</td>
       <td style="text-align:center;">${r.boxQty||0}</td>
+      <td style="text-align:center;"><button class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:11px;" onclick="printPackRecord('${r.lot}')">🖨️</button></td>
     </tr>`;
   }).join('');
 
@@ -3007,6 +3013,167 @@ function saveDevice(){
   saveData('deviceSettings',deviceSettings);
   closeModal('deviceModal'); renderDevice(); alert('저장됐습니다');
 }
+
+// ===== PDF 출력 함수들 =====
+function yymmddToFull(v){ if(!v||v.length!==6) return v||'-'; return '20'+v.slice(0,2)+'.'+v.slice(2,4)+'.'+v.slice(4,6); }
+
+function printBatchRecord(batchLot){
+  // 모든 날짜의 batchRecords에서 해당 LOT 찾기
+  let found = null, foundSession = null;
+  Object.keys(window._fbCache||{}).filter(k=>k.startsWith('batchRecords_')).forEach(k=>{
+    (window._fbCache[k]||[]).forEach(r=>{
+      (r.batchRecords||[]).forEach(b=>{
+        if(b.lot===batchLot){ found=b; foundSession=r; }
+      });
+    });
+  });
+  if(!found){ alert('해당 배합 기록을 찾을 수 없습니다'); return; }
+  const worker = foundSession.worker||foundSession.workerName||'-';
+  const date = yymmddToFull(foundSession.date||'');
+  const ings = found.ingredients||[];
+  const rows = ings.flatMap(ing=>(ing.exps||[{exp:'-',amount:ing.total||0}]).map(e=>{
+    const ingDB = (typeof INGREDIENT_DB!=='undefined') ? INGREDIENT_DB.find(x=>x.name===ing.name) : null;
+    const code = ingDB?ingDB.code:'-';
+    return `<tr>
+      <td>${code}</td><td>${ing.name}</td>
+      <td style="text-align:center;">${e.lot||'-'}</td>
+      <td style="text-align:center;">${e.exp||'-'}</td>
+      <td style="text-align:right;">${(e.amount||0).toLocaleString()}g</td>
+    </tr>`;
+  })).join('');
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>배합일지 - ${batchLot}</title>
+  <style>
+    body{font-family:'Noto Sans KR',sans-serif;font-size:11px;padding:16px;color:#111;}
+    h2{font-size:16px;font-weight:900;margin-bottom:4px;}
+    .info-table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:11px;}
+    .info-table td{border:1px solid #999;padding:4px 8px;}
+    .info-table td:first-child{background:#f5f5f5;font-weight:700;width:15%;}
+    table{width:100%;border-collapse:collapse;font-size:11px;}
+    th{background:#e8f0fb;border:1px solid #999;padding:5px 8px;font-weight:700;text-align:left;}
+    td{border:1px solid #ccc;padding:5px 8px;}
+    .sign-area{display:grid;grid-template-columns:40px 1fr 1fr;border:1px solid #999;margin-top:16px;width:300px;margin-left:auto;}
+    .sign-cell{border-left:1px solid #999;padding:4px 8px;min-height:50px;}
+    .sign-label{font-size:10px;font-weight:700;color:#555;border-bottom:1px solid #ccc;padding:2px 4px;}
+    @page{margin:10mm;size:A4;}
+  </style></head><body>
+  <h2>생산 배합일지</h2>
+  <table class="info-table" style="margin-bottom:10px;">
+    <tr><td>배합LOT</td><td style="font-weight:700;color:#1a5fa8;">${batchLot}</td><td>작업일자</td><td>${date}</td></tr>
+    <tr><td>제품명</td><td>${foundSession.product||'-'}</td><td>작업자</td><td>${worker}</td></tr>
+    <tr><td>총 배합수</td><td colspan="3">${foundSession.totalBatches||1}배합</td></tr>
+  </table>
+  <table>
+    <thead><tr><th>원료코드</th><th>원료명</th><th>LOT</th><th>소비기한</th><th style="text-align:right;">실사용량(g)</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="sign-area">
+    <div style="display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;writing-mode:vertical-rl;letter-spacing:3px;padding:6px 4px;">결재</div>
+    <div class="sign-cell"><div class="sign-label">작성</div></div>
+    <div class="sign-cell"><div class="sign-label">승인</div></div>
+  </div>
+  </body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(), 400);
+}
+
+function printInputRecord(inputLot){
+  let found = null;
+  Object.keys(window._fbCache||{}).filter(k=>k.startsWith('inputRecords_')).forEach(k=>{
+    (window._fbCache[k]||[]).forEach(r=>{ if(r.lot===inputLot) found=r; });
+  });
+  if(!found){ alert('해당 투입 기록을 찾을 수 없습니다'); return; }
+  const date = yymmddToFull(found.date||'');
+  const ings = found.ingredients||[];
+  const rows = ings.map(ing=>{
+    const ingDB = (typeof INGREDIENT_DB!=='undefined') ? INGREDIENT_DB.find(x=>x.name===ing.name) : null;
+    const code = ingDB?ingDB.code:'-';
+    return `<tr>
+      <td>${code}</td><td>${ing.name||'-'}</td>
+      <td style="text-align:center;">${ing.lot||'-'}</td>
+      <td style="text-align:center;">${ing.exp||'-'}</td>
+      <td style="text-align:right;">${(parseFloat(ing.qty)||0).toFixed(3)}kg</td>
+    </tr>`;
+  }).join('');
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>투입일보 - ${inputLot}</title>
+  <style>
+    body{font-family:'Noto Sans KR',sans-serif;font-size:11px;padding:16px;color:#111;}
+    h2{font-size:16px;font-weight:900;margin-bottom:4px;}
+    .info-table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:11px;}
+    .info-table td{border:1px solid #999;padding:4px 8px;}
+    .info-table td:first-child{background:#f5f5f5;font-weight:700;width:15%;}
+    table{width:100%;border-collapse:collapse;font-size:11px;}
+    th{background:#fff3e0;border:1px solid #999;padding:5px 8px;font-weight:700;text-align:left;}
+    td{border:1px solid #ccc;padding:5px 8px;}
+    .sign-area{display:grid;grid-template-columns:40px 1fr 1fr;border:1px solid #999;margin-top:16px;width:300px;margin-left:auto;}
+    .sign-cell{border-left:1px solid #999;padding:4px 8px;min-height:50px;}
+    .sign-label{font-size:10px;font-weight:700;color:#555;border-bottom:1px solid #ccc;padding:2px 4px;}
+    @page{margin:10mm;size:A4;}
+  </style></head><body>
+  <h2>투입일보</h2>
+  <table class="info-table">
+    <tr><td>투입LOT</td><td style="font-weight:700;color:#e07b1a;">${inputLot}</td><td>작업일자</td><td>${date}</td></tr>
+    <tr><td>제품명</td><td>${found.product||'-'}</td><td>작업자</td><td>${found.worker||'-'}</td></tr>
+  </table>
+  <table>
+    <thead><tr><th>원료코드</th><th>원료명</th><th>LOT</th><th>소비기한</th><th style="text-align:right;">투입량(kg)</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="sign-area">
+    <div style="display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;writing-mode:vertical-rl;letter-spacing:3px;padding:6px 4px;">결재</div>
+    <div class="sign-cell"><div class="sign-label">작성</div></div>
+    <div class="sign-cell"><div class="sign-label">승인</div></div>
+  </div>
+  </body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(), 400);
+}
+
+function printPackRecord(packLot){
+  let found = null;
+  Object.keys(window._fbCache||{}).filter(k=>k.startsWith('packRecords_')).forEach(k=>{
+    (window._fbCache[k]||[]).forEach(r=>{ if(r.lot===packLot) found=r; });
+  });
+  if(!found){ alert('해당 포장 기록을 찾을 수 없습니다'); return; }
+  const dateKey = packLot.split('-')[2]||found.date||'';
+  const date = yymmddToFull(dateKey);
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>포장일지 - ${packLot}</title>
+  <style>
+    body{font-family:'Noto Sans KR',sans-serif;font-size:11px;padding:16px;color:#111;}
+    h2{font-size:16px;font-weight:900;margin-bottom:4px;}
+    .info-table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:11px;}
+    .info-table td{border:1px solid #999;padding:4px 8px;}
+    .info-table td:first-child{background:#f5f5f5;font-weight:700;width:20%;}
+    .sign-area{display:grid;grid-template-columns:40px 1fr 1fr;border:1px solid #999;margin-top:16px;width:300px;margin-left:auto;}
+    .sign-cell{border-left:1px solid #999;padding:4px 8px;min-height:50px;}
+    .sign-label{font-size:10px;font-weight:700;color:#555;border-bottom:1px solid #ccc;padding:2px 4px;}
+    @page{margin:10mm;size:A4;}
+  </style></head><body>
+  <h2>포장일지</h2>
+  <table class="info-table">
+    <tr><td>포장LOT</td><td style="font-weight:700;color:#1e9e6e;">${packLot}</td><td>작업일자</td><td>${date}</td></tr>
+    <tr><td>제품명</td><td>${found.product||'-'}</td><td>작업자</td><td>${found.workers||found.worker||'-'}</td></tr>
+    <tr><td>시작시간</td><td>${found.startTime||'-'}</td><td>종료시간</td><td>${found.endTime||'-'}</td></tr>
+    <tr><td>포장수량</td><td>${(parseInt(found.qtyPcs)||0).toLocaleString()}ea</td><td>박스수</td><td>${found.qtyBoxes||0}box</td></tr>
+    <tr><td>필름</td><td>${found.filmQty||0}개</td><td>벌크비닐</td><td>${found.bulkQty||0}개</td></tr>
+    <tr><td>박스</td><td>${found.boxQty||0}개</td><td>소비기한</td><td>${found.expiryDate||'-'}</td></tr>
+    <tr><td>배합LOT</td><td colspan="3">${found.batchLot||'-'}</td></tr>
+  </table>
+  <div class="sign-area">
+    <div style="display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;writing-mode:vertical-rl;letter-spacing:3px;padding:6px 4px;">결재</div>
+    <div class="sign-cell"><div class="sign-label">작성</div></div>
+    <div class="sign-cell"><div class="sign-label">승인</div></div>
+  </div>
+  </body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(), 400);
+}
+
 function deleteDevice(i){ if(!confirm('삭제하시겠습니까?'))return; deviceSettings.splice(i,1); saveData('deviceSettings',deviceSettings); renderDevice(); }
 
 // ===== ④ LOT 매핑 관리 =====
