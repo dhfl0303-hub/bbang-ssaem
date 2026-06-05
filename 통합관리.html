@@ -300,7 +300,9 @@ tr:hover td{background:var(--bg);}
       <div class="filter-row">
         <div>
           <label style="font-size:12px;font-weight:700;color:var(--text2);margin-right:6px;">조회 날짜</label>
-          <input type="text" class="search-input" id="batchStatusDate" style="min-width:120px;" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtMgmtDate(this)">
+          <select class="search-input" id="batchStatusDate" style="min-width:160px;">
+            <option value="">날짜 선택...</option>
+          </select>
         </div>
         <button class="btn btn-primary btn-sm" onclick="loadBatchStatus()">🔄 조회</button>
         <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="deleteBatchStatus()">🗑️ 삭제</button>
@@ -342,7 +344,9 @@ tr:hover td{background:var(--bg);}
       <div class="filter-row">
         <div>
           <label style="font-size:12px;font-weight:700;color:var(--text2);margin-right:6px;">조회 날짜</label>
-          <input type="text" class="search-input" id="inputStatusDate" style="min-width:120px;" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtMgmtDate(this)">
+          <select class="search-input" id="inputStatusDate" style="min-width:160px;">
+            <option value="">날짜 선택...</option>
+          </select>
         </div>
         <button class="btn btn-primary btn-sm" onclick="loadInputStatus()">🔄 조회</button>
         <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="deleteInputStatus()">🗑️ 삭제</button>
@@ -381,7 +385,9 @@ tr:hover td{background:var(--bg);}
       <div class="filter-row">
         <div>
           <label style="font-size:12px;font-weight:700;color:var(--text2);margin-right:6px;">조회 날짜</label>
-          <input type="text" class="search-input" id="packStatusDate" style="min-width:120px;" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtMgmtDate(this)">
+          <select class="search-input" id="packStatusDate" style="min-width:160px;">
+            <option value="">날짜 선택...</option>
+          </select>
         </div>
         <button class="btn btn-primary btn-sm" onclick="loadPackStatus()">🔄 조회</button>
         <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="deletePackStatus()">🗑️ 삭제</button>
@@ -455,7 +461,9 @@ tr:hover td{background:var(--bg);}
       <div class="filter-row">
         <div>
           <label style="font-size:12px;font-weight:700;color:var(--text2);margin-right:6px;">조회 날짜</label>
-          <input type="text" class="search-input" id="yieldDate" style="min-width:120px;" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtMgmtDate(this)">
+          <select class="search-input" id="yieldDate" style="min-width:160px;">
+            <option value="">날짜 선택...</option>
+          </select>
         </div>
         <button class="btn btn-primary btn-sm" onclick="loadYield()">🔄 조회</button>
         <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="deleteYield()">🗑️ 삭제</button>
@@ -1727,7 +1735,8 @@ async function deleteInputStatus(){
   if(!recs.length){ alert('해당 날짜의 투입 데이터가 없습니다'); return; }
   if(!confirm(`${yymmddToDisplay(key)} 투입 데이터 ${recs.length}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
   if(window._fbCache) delete window._fbCache['inputRecords_'+key];
-  if(window._db){ try{ await window._db.collection('autoSync').doc('inputRecords_'+key).delete(); }catch(e){} }
+  if(window._db){ try{ await window._db.collection('appData').doc('inputRecords_'+key).delete(); }catch(e){} }
+  fillDateDropdown('inputStatusDate','inputRecords_');
   loadInputStatus();
   alert('삭제 완료');
 }
@@ -2297,7 +2306,8 @@ async function deleteBatchStatus(){
   if(!recs.length){ alert('해당 날짜의 배합 데이터가 없습니다'); return; }
   if(!confirm(`${yymmddToDisplay(key)} 배합 데이터 ${recs.length}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
   if(window._fbCache) delete window._fbCache['batchRecords_'+key];
-  if(window._db){ try{ await window._db.collection('autoSync').doc('batchRecords_'+key).delete(); }catch(e){} }
+  if(window._db){ try{ await window._db.collection('appData').doc('batchRecords_'+key).delete(); }catch(e){} }
+  fillDateDropdown('batchStatusDate','batchRecords_');
   loadBatchStatus();
   alert('삭제 완료');
 }
@@ -2309,7 +2319,8 @@ async function deletePackStatus(){
   if(!recs.length){ alert('해당 날짜의 포장 데이터가 없습니다'); return; }
   if(!confirm(`${yymmddToDisplay(key)} 포장 데이터 ${recs.length}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
   if(window._fbCache) delete window._fbCache['packRecords_'+key];
-  if(window._db){ try{ await window._db.collection('autoSync').doc('packRecords_'+key).delete(); }catch(e){} }
+  if(window._db){ try{ await window._db.collection('appData').doc('packRecords_'+key).delete(); }catch(e){} }
+  fillDateDropdown('packStatusDate','packRecords_');
   loadPackStatus();
   alert('삭제 완료');
 }
@@ -2323,7 +2334,8 @@ async function deleteYield(){
   if(!confirm(`${yymmddToDisplay(key)} 배합(${batchRecs.length}건) + 포장(${packRecs.length}건) 데이터를 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
   if(window._fbCache) delete window._fbCache['batchRecords_'+key];
   if(window._fbCache) delete window._fbCache['packRecords_'+key];
-  if(window._db){ try{ await Promise.all([ window._db.collection('autoSync').doc('batchRecords_'+key).delete(), window._db.collection('autoSync').doc('packRecords_'+key).delete() ]); }catch(e){} }
+  if(window._db){ try{ await Promise.all([ window._db.collection('appData').doc('batchRecords_'+key).delete(), window._db.collection('appData').doc('packRecords_'+key).delete() ]); }catch(e){} }
+  fillYieldDateDropdown();
   loadYield();
   alert('삭제 완료');
 }
@@ -2418,25 +2430,56 @@ function loadYield(){
   document.getElementById('yieldCnt').textContent = rows.length;
 }
 
+// ===== 날짜 드롭다운 채우기 =====
+function fillDateDropdown(selectId, prefix){
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  const cur = sel.value;
+  // _fbCache에서 해당 prefix 키 추출 → 날짜 목록
+  const dates = Object.keys(window._fbCache||{})
+    .filter(k=>k.startsWith(prefix))
+    .map(k=>k.replace(prefix,''))
+    .sort((a,b)=>b.localeCompare(a)); // 최신순
+  sel.innerHTML = '<option value="">날짜 선택...</option>' +
+    dates.map(d=>`<option value="${d}" ${d===cur?'selected':''}>${yymmddToDisplay(d)}</option>`).join('');
+  // 이전 선택값 유지 or 첫번째 날짜 자동선택
+  if(cur && dates.includes(cur)) sel.value = cur;
+  else if(dates.length) sel.value = dates[0];
+}
+
+// 수율은 batch+pack 합집합으로 날짜 추출
+function fillYieldDateDropdown(){
+  const sel = document.getElementById('yieldDate');
+  if(!sel) return;
+  const cur = sel.value;
+  const batchDates = Object.keys(window._fbCache||{}).filter(k=>k.startsWith('batchRecords_')).map(k=>k.replace('batchRecords_',''));
+  const packDates  = Object.keys(window._fbCache||{}).filter(k=>k.startsWith('packRecords_')).map(k=>k.replace('packRecords_',''));
+  const inputDates = Object.keys(window._fbCache||{}).filter(k=>k.startsWith('inputRecords_')).map(k=>k.replace('inputRecords_',''));
+  const dates = [...new Set([...batchDates,...packDates,...inputDates])].sort((a,b)=>b.localeCompare(a));
+  sel.innerHTML = '<option value="">날짜 선택...</option>' +
+    dates.map(d=>`<option value="${d}" ${d===cur?'selected':''}>${yymmddToDisplay(d)}</option>`).join('');
+  if(cur && dates.includes(cur)) sel.value = cur;
+  else if(dates.length) sel.value = dates[0];
+}
+
 // ===== showPanel 확장 (날짜 기본값 설정) =====
 function showPanel(id){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+id).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  // 날짜 기본값 자동설정
-  const todayFull = new Date().toISOString().slice(0,10);
-  if(id==='batch-status' && !document.getElementById('batchStatusDate').value){
-    document.getElementById('batchStatusDate').value=todayYYMMDD();
+  // 날짜 드롭다운 채우기
+  if(id==='batch-status'){
+    fillDateDropdown('batchStatusDate','batchRecords_');
   }
-  if(id==='input-status' && !document.getElementById('inputStatusDate').value){
-    document.getElementById('inputStatusDate').value=todayYYMMDD();
+  if(id==='input-status'){
+    fillDateDropdown('inputStatusDate','inputRecords_');
     loadInputStatus();
   }
-  if(id==='pack-status' && !document.getElementById('packStatusDate').value){
-    document.getElementById('packStatusDate').value=todayYYMMDD();
+  if(id==='pack-status'){
+    fillDateDropdown('packStatusDate','packRecords_');
   }
-  if(id==='yield-mgmt' && !document.getElementById('yieldDate').value){
-    document.getElementById('yieldDate').value=todayYYMMDD();
+  if(id==='yield-mgmt'){
+    fillYieldDateDropdown();
   }
   event.currentTarget.classList.add('active');
   const titles={
