@@ -148,7 +148,7 @@ async function syncToServer(){
   <div class="card">
     <div class="card-hd">
       <div class="card-hd-title">📦 부자재 입고 검사 일지</div>
-      <div style="display:flex;gap:6px;"><button class="btn btn-sm btn-outline" onclick="openSupplierModal()">🏢 거래처 관리</button><button class="btn btn-sm btn-outline" onclick="openPackagingModal()">📦 포장재 관리</button></div>
+      <div style="display:flex;gap:6px;"><button class="btn btn-sm btn-outline" onclick="openSupplierModal()">🏢 거래처 관리</button></div>
     </div>
     <div class="card-bd">
       <div class="form-row">
@@ -381,7 +381,8 @@ async function syncToServer(){
 </div>
 
 <script>
-// ===== 부자재 품목 =====
+// ===== 부자재 품목 (수불부 SUB_ITEM_DB에서 로드) =====
+let SUB_ITEM_DB = []; // Firebase appData/subItemDB 에서 로드
 const SUB_ITEMS = [
   {name:'필름포장지'},
   {name:'벌크비닐'},
@@ -645,11 +646,13 @@ function onItemChange(id){
   document.getElementById('lot-code-'+id).value='';
   const disp=document.getElementById('lot-code-disp-'+id);
   if(disp) disp.textContent='-';
-  // 포장재명 목록 업데이트
+  // 포장재명 목록 — 수불부 SUB_ITEM_DB에서 카테고리 매칭
+  const catMap={'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'};
+  const cat=catMap[itemName]||itemName;
   const specSel=document.getElementById('spec-'+id);
-  const items=(packagingDB[itemName]||[]).map(i=>typeof i==='string'?{code:'',name:i}:i);
+  const items=SUB_ITEM_DB.filter(i=>i.category===cat);
   specSel.innerHTML='<option value="">포장재명 선택</option>'+
-    items.map(i=>`<option value="${i.code}">${i.code} ${i.name}</option>`).join('');
+    items.map(i=>`<option value="${i.code}" data-name="${i.name}">[${i.code}] ${i.name}</option>`).join('');
   document.getElementById('lot-date-'+id).value=getInDateYYMMDD();
   buildLot(id);
 }
@@ -739,16 +742,45 @@ function saveRecord(){
   switchTab('history');
 }
 
-function syncToSubsidiary(rows, isoDate){
+async function syncToSubsidiary(rows, isoDate){
+  // 부자재수불부(Firebase appData/subIncomingRecords)에 저장
+  if(!window._db) return;
   try{
-    let stock=JSON.parse(localStorage.getItem('subsidiaryStock')||'[]');
-    const itemMap={'필름포장지':'film','벌크비닐':'bulk','박스':'box','패키지박스':'pkgbox'};
-    rows.forEach(r=>{
-      if(!r.item||!r.qty) return;
-      stock.push({item:itemMap[r.item]||r.item,itemName:r.item,qty:parseFloat(r.qty)||0,unit:r.unit,date:isoDate,lot:r.lot,note:r.spec,type:'in'});
+    const snap = await window._db.collection('appData').doc('subIncomingRecords').get();
+    let subRecs = (snap.exists && snap.data().data) ? JSON.parse(snap.data().data) : [];
+    // 현재 record를 subIncomingRecords 형식으로 추가
+    const newRec = {
+      id: Date.now(),
+      date: isoDate,
+      inspector: '이광훈',
+      rows: rows.map(r=>({
+        item: r.item,
+        spec: r.spec,
+        lot: r.lot,
+        qty: r.qty,
+        unit: r.unit,
+        mfg: r.mfg||'',
+        supplier: r.supplier||''
+      }))
+    };
+    // 중복 방지: 같은 date+lot 조합 제외
+    newRec.rows.forEach(row=>{
+      if(!row.item||!row.qty) return;
+      const dup = subRecs.find(rec=>
+        rec.rows && rec.rows.some(r=>r.lot===row.lot && r.item===row.item && r.qty===row.qty)
+      );
+      if(!dup) return;
+      // 중복이면 newRec.rows에서 제거
+      newRec.rows = newRec.rows.filter(r=>!(r.lot===row.lot&&r.item===row.item&&r.qty===row.qty));
     });
-    localStorage.setItem('subsidiaryStock', JSON.stringify(stock));
-  }catch(e){}
+    if(newRec.rows.length){
+      subRecs.push(newRec);
+      await window._db.collection('appData').doc('subIncomingRecords').set({
+        data: JSON.stringify(subRecs),
+        updatedAt: new Date().toISOString()
+      });
+    }
+  }catch(e){ console.warn('수불부 연동 실패',e); }
 }
 
 // ===== 저장내역 =====
@@ -1166,7 +1198,21 @@ async function loadFromFirebaseAuto(){
   }catch(e){ console.warn('Firebase 로드 실패',e); }
 }
 
-(async ()=>{ await loadFromFirebaseAuto(); init(); })();
+async function loadSubItemDB(){
+  if(!window._db) return;
+  try{
+    const snap = await window._db.collection('appData').doc('subItemDB').get();
+    if(snap.exists && snap.data().data){
+      SUB_ITEM_DB = JSON.parse(snap.data().data);
+    }
+  }catch(e){ console.warn('SUB_ITEM_DB 로드 실패',e); }
+}
+
+(async ()=>{
+  await loadFromFirebaseAuto();
+  await loadSubItemDB();
+  init();
+})();
 </script>
 </body>
 </html>
