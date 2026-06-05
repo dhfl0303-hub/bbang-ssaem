@@ -2974,7 +2974,7 @@ function renderDevice(){
   document.getElementById('deviceTbody').innerHTML=settings.length?
     settings.map(d=>`<tr>
       <td><span class="badge badge-blue">${d.code}</span></td>
-      <td style="font-weight:600">${DB[d.code]?DB[d.code].name:d.code}</td>
+      <td style="font-weight:600">${DB[d.code]?DB[d.code].name:(inputDB&&inputDB[d.code]?inputDB[d.code].name:d.code)}</td>
       <td class="tc">${d.sealingC1||'-'}℃ / ${d.sealingC2||'-'}℃</td>
       <td class="tc">${d.sealingK1||'-'}℃ / ${d.sealingK2||'-'}℃</td>
       <td class="tc">${d.sealerTemp||'-'}℃</td>
