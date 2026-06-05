@@ -602,7 +602,7 @@ tr:hover td{background:var(--bg);}
         <div class="card-bd" style="padding:0">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>제품코드</th><th>제품명</th><th>센터온도 전/후(℃)</th><th>캇타온도 상/하(℃)</th><th>실링기(℃)</th></tr></thead>
+              <thead><tr><th>제품코드</th><th>제품명</th><th>센터온도 전/후(℃)</th><th>캇타온도 상/하(℃)</th><th>실링기(℃)</th><th>관리</th></tr></thead>
               <tbody id="deviceTbody"></tbody>
             </table>
           </div>
@@ -2972,12 +2972,13 @@ function renderDevice(){
   if(!document.getElementById('deviceTbody')) return;
   const settings=deviceSettings||[];
   document.getElementById('deviceTbody').innerHTML=settings.length?
-    settings.map(d=>`<tr>
+    settings.map((d,i)=>`<tr>
       <td><span class="badge badge-blue">${d.code}</span></td>
       <td style="font-weight:600">${DB[d.code]?DB[d.code].name:(inputDB&&inputDB[d.code]?inputDB[d.code].name:d.code)}</td>
       <td class="tc">${d.sealingC1||'-'}℃ / ${d.sealingC2||'-'}℃</td>
       <td class="tc">${d.sealingK1||'-'}℃ / ${d.sealingK2||'-'}℃</td>
       <td class="tc">${d.sealerTemp||'-'}℃</td>
+      <td><button class="btn btn-sm btn-danger" onclick="deleteDevice(${i})">삭제</button></td>
     </tr>`).join(''):
     '<tr><td colspan="5" class="tc" style="padding:24px;color:var(--text3)">포장일지 → 설정 → 설비세팅값에서 등록하세요</td></tr>';
 }
