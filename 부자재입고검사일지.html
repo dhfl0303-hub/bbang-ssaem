@@ -1164,9 +1164,6 @@ async function loadFromFirebaseAuto(){
       }
     });
   }catch(e){ console.warn('Firebase 로드 실패',e); }
-}catch(e){}
-    });
-  }catch(e){ console.warn('Firebase 로드 실패',e); }
 }
 
 (async ()=>{ await loadFromFirebaseAuto(); init(); })();
