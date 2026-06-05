@@ -457,6 +457,25 @@ function loadLocal(){
   if(d) S.todayRecords=JSON.parse(d);
   updateStats(); renderTodayList();
 }
+// Firebase에서 삭제된 날짜의 localStorage 자동 정리
+async function cleanDeletedFromFirebase(){
+  if(!window._db) return;
+  try{
+    const keys = Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
+    for(const key of keys){
+      const snap = await window._db.collection('appData').doc(key).get();
+      if(!snap.exists){
+        // Firebase에 없으면 localStorage에서도 삭제
+        localStorage.removeItem(key);
+        const dateKey = key.replace('batchRecords_','');
+        if(dateKey === getTodayKey()){
+          S.todayRecords = [];
+          updateStats(); renderTodayList();
+        }
+      }
+    }
+  }catch(e){ console.warn('정리 오류',e); }
+}
 
 // 페이지 전환
 function showPage(id){
@@ -498,6 +517,8 @@ function initMain(){
   document.getElementById('mainWorker').textContent=s.workerName ? s.workerName+' 작업자' : '작업자 미설정';
   renderProductList(Object.keys(DB));
   loadLocal();
+  // Firebase에서 삭제된 데이터 자동 정리 (통합관리에서 삭제 시 반영)
+  cleanDeletedFromFirebase();
 }
 function filterProducts(){
   const q=document.getElementById('searchInput').value.trim().toLowerCase();
@@ -1165,7 +1186,16 @@ function switchTab(tab,btn){
 
 
 // ===== 기타사용원재료 =====
-function goInputIng(){
+async function goInputIng(){
+  // INPUT_DB가 비어있으면 Firebase에서 다시 로드 시도
+  if(!INPUT_DB || !Object.keys(INPUT_DB).length){
+    if(window._db){
+      try{
+        const snap = await window._db.collection('appData').doc('inputDB').get();
+        if(snap.exists && snap.data().data) INPUT_DB = JSON.parse(snap.data().data);
+      }catch(e){ INPUT_DB={}; }
+    }
+  }
   const p = INPUT_DB[S.product];
   // 해당 제품의 투입비가 없으면 바로 서명 페이지로
   if(!p || !p.ingredients || !p.ingredients.length){
