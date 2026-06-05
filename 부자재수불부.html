@@ -237,7 +237,7 @@ async function initSubLedger(){
       (rec.rows||[]).forEach(row=>{
         if(!row.item||!row.qty) return;
         const lot=row.lot||'';
-        const exists=subLedgerRecords.find(r=>r.lot===lot&&r.name===row.item&&r.type==='in');
+        const exists=subLedgerRecords.find(r=>r.lot===lot&&r.type==='in');
         if(!exists){
           const isoDate=rec.date||getTodayISO2();
           const subCat=row.category||Object.keys({'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>row.item.includes(k))||'기타';
@@ -513,6 +513,13 @@ async function loadFromFirebase(){
     ]);
     if(itemSnap.exists && itemSnap.data().data) SUB_ITEM_DB = JSON.parse(itemSnap.data().data);
     if(ledgerSnap.exists && ledgerSnap.data().data) subLedgerRecords = JSON.parse(ledgerSnap.data().data);
+    // 잘못 들어간 카테고리명(필름포장지 등) 항목 정리
+    const badNames=['필름포장지','벌크비닐','박스','패키지박스'];
+    const before=subLedgerRecords.length;
+    subLedgerRecords=subLedgerRecords.filter(r=>!badNames.includes(r.name));
+    if(subLedgerRecords.length!==before){
+      window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+    }
   }catch(e){ console.warn('Firebase 로드 실패',e); }
 }
 
