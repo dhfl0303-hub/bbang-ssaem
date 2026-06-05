@@ -754,7 +754,8 @@ async function syncToSubsidiary(rows, isoDate){
       date: isoDate,
       inspector: '이광훈',
       rows: rows.map(r=>({
-        item: r.item,
+        item: r.spec,       // 포장재명 (수불부 품목명으로 사용)
+        category: r.item,   // 포장재구분 (필름포장지/박스 등)
         spec: r.spec,
         lot: r.lot,
         qty: r.qty,
