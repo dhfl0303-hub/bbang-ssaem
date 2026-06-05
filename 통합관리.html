@@ -1278,7 +1278,14 @@ async function loadFromFirebase(){
         if(key==='editedIngredients') window._editedIngredients = parsed;
         if(key==='inputDB') inputDB = parsed;
         if(key==='subsidiaryStock') subsidiaryStock = parsed;
-        if(key==='ingredientDB') { if(parsed.length) INGREDIENT_DB.splice(0, INGREDIENT_DB.length, ...parsed); }
+        if(key==='ingredientDB') {
+          if(parsed.length){
+            // M000 정제수는 항상 유지 (수불부 제외 원료)
+            const preserved = INGREDIENT_DB.filter(i=>i.code==='M000');
+            INGREDIENT_DB.splice(0, INGREDIENT_DB.length, ...preserved);
+            parsed.forEach(i=>{ if(i.code!=='M000') INGREDIENT_DB.push(i); });
+          }
+        }
       }
     });
     // batchRecords, packRecords 전체 로드
