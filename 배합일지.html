@@ -141,6 +141,12 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 .log-del{background:#fff0f0;color:var(--danger);border:1px solid #fcc;padding:6px 12px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:500;}
 
 .print-area{display:none;}
+/* 기타사용원재료 */
+.input-ing-block{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+.input-ing-hd{background:#fff8e8;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0d080;}
+.input-ing-name{font-size:17px;font-weight:700;color:#7a5800;}
+.input-lot-row{display:grid;grid-template-columns:1fr 1fr 36px;gap:6px;padding:8px 14px;border-top:1px solid var(--border);align-items:center;}
+.input-add-btn{display:flex;align-items:center;gap:6px;padding:10px 14px;font-size:14px;color:#7a5800;border-top:1px dashed #f0d080;background:#fff8e8;cursor:pointer;font-weight:500;}
 .accordion-item{background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;}
 .accordion-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;transition:background 0.15s;}
 .accordion-hd:active{background:var(--primary-light);}
@@ -267,6 +273,21 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
     <button class="btn btn-primary mt-12" id="completeBatchBtn" onclick="completeBatch()">✓ 배합 완료 → 로트 생성</button>
   </div>
 
+  <!-- 기타사용원재료 입력 -->
+  <div class="page" id="page-input-ing">
+    <div class="card">
+      <div class="card-hd" style="background:#fff8e8;border-bottom:1px solid #f0d080;">
+        <span style="color:#7a5800;font-weight:700;">📋 기타사용원재료 입력</span>
+        <span style="font-size:12px;color:#a07020;margin-left:8px;">배합 완료 후 투입된 원료</span>
+      </div>
+      <div class="card-bd" style="padding-bottom:10px;">
+        <div id="inputIngList"></div>
+      </div>
+    </div>
+    <button class="btn btn-success mt-12" onclick="completeInputIng()">✅ 확인 후 서명 →</button>
+    <button class="btn btn-outline mt-12" onclick="skipInputIng()" style="margin-top:8px;font-size:14px;">건너뛰기 (투입없음)</button>
+  </div>
+
   <!-- 서명 -->
   <div class="page" id="page-sign">
     <div class="card">
@@ -343,12 +364,14 @@ const INGREDIENT_DB_STATIC = {};
 INGREDIENT_DB_STATIC_LIST.forEach(i=>{ INGREDIENT_DB_STATIC[i.name]=i.code; });
 
 let DB = {};
+let INPUT_DB = {}; // 투입비 DB (P500~)
 let S = {
   page:'main', history:[],
   product:null, machine:null,
   totalBatches:1, currentBatch:1,
   batchRecords:[], prevData:{},
-  todayRecords:[], editCode:null
+  todayRecords:[], editCode:null,
+  inputIngredients:[] // 기타사용원재료 입력값
 };
 
 // 날짜
@@ -413,8 +436,13 @@ function initDB(){
   const s=localStorage.getItem('recipeDB');
   DB = s ? JSON.parse(s) : JSON.parse(JSON.stringify(RECIPE_DB_INIT));
   if(!s) localStorage.setItem('recipeDB',JSON.stringify(DB));
-  // ledgerRecords Firebase에서 로드 (OI LOT 드롭다운용)
+  // inputDB Firebase에서 로드 (투입비 관리)
   if(window._db){
+    window._db.collection('appData').doc('inputDB').get().then(snap=>{
+      if(snap.exists && snap.data().data) INPUT_DB = JSON.parse(snap.data().data);
+      else INPUT_DB = {};
+    }).catch(()=>{ INPUT_DB={}; });
+    // ledgerRecords Firebase에서 로드 (OI LOT 드롭다운용)
     window._db.collection('appData').doc('ledgerRecords').get().then(snap=>{
       if(snap.exists && snap.data().data) window._ledgerRecords = JSON.parse(snap.data().data);
       else window._ledgerRecords = [];
@@ -981,7 +1009,7 @@ function completeBatch(){
   S.batchRecords.push({batchNum:S.currentBatch,machine:S.machine,lot,time,ingredients});
   saveLocal();
   if(S.currentBatch<S.totalBatches){ S.currentBatch++; renderBatchPage(); window.scrollTo(0,0); }
-  else goSign();
+  else goInputIng();
 }
 
 // 원료수불부 출고 자동반영
@@ -1014,6 +1042,7 @@ function syncBatchToLedger(){
 function showComplete(){
   const p=DB[S.product];
   syncBatchToLedger(); // 원료수불부 출고 자동반영
+  saveInputIngToLocal(); // 기타사용원재료 투입기록 저장
   const sessionKey=S.product+'-'+getTodayKey();
   const existIdx=S.todayRecords.findIndex(r=>r.sessionKey===sessionKey);
   const sessionData={
@@ -1135,6 +1164,95 @@ function switchTab(tab,btn){
 }
 
 
+// ===== 기타사용원재료 =====
+function goInputIng(){
+  const p = INPUT_DB[S.product];
+  // 해당 제품의 투입비가 없으면 바로 서명 페이지로
+  if(!p || !p.ingredients || !p.ingredients.length){
+    S.inputIngredients = [];
+    goSign(); return;
+  }
+  S.inputIngredients = p.ingredients.map(ing=>({
+    name: ing.name,
+    lots: [{qty:'', lot:'', exp:''}]
+  }));
+  renderInputIngPage();
+  showPage('input-ing');
+}
+
+function renderInputIngPage(){
+  const list = document.getElementById('inputIngList');
+  if(!list) return;
+  list.innerHTML = S.inputIngredients.map((ing, ii)=>`
+    <div class="input-ing-block">
+      <div class="input-ing-hd">
+        <span class="input-ing-name">${ing.name}</span>
+      </div>
+      <div style="padding:4px 14px 2px;display:grid;grid-template-columns:1fr 1fr 36px;gap:6px;">
+        <span style="font-size:12px;color:var(--text3);font-weight:500;">실사용량(kg)</span>
+        <span style="font-size:12px;color:var(--text3);font-weight:500;">소비기한</span>
+        <span></span>
+      </div>
+      ${ing.lots.map((lr,li)=>`
+        <div class="input-lot-row">
+          <input class="exp-input" type="number" step="0.001" placeholder="kg" value="${lr.qty}"
+            oninput="S.inputIngredients[${ii}].lots[${li}].qty=this.value">
+          <input class="exp-input" type="text" placeholder="예) 27.05.10" value="${lr.exp}"
+            oninput="S.inputIngredients[${ii}].lots[${li}].exp=this.value">
+          ${ing.lots.length>1?`<div class="del-btn" onclick="delInputLotRow(${ii},${li})">×</div>`:'<div></div>'}
+        </div>`).join('')}
+      <div class="input-add-btn" onclick="addInputLotRow(${ii})">＋ 소비기한 추가</div>
+    </div>`).join('');
+}
+
+function addInputLotRow(ii){
+  S.inputIngredients[ii].lots.push({qty:'', lot:'', exp:''});
+  renderInputIngPage();
+}
+function delInputLotRow(ii, li){
+  S.inputIngredients[ii].lots.splice(li,1);
+  renderInputIngPage();
+}
+function completeInputIng(){
+  goSign();
+}
+function skipInputIng(){
+  S.inputIngredients = [];
+  goSign();
+}
+
+// ===== 기타사용원재료 → inputRecords에 저장 =====
+function saveInputIngToLocal(){
+  const ings = S.inputIngredients||[];
+  const hasData = ings.some(ing=>ing.lots.some(lr=>parseFloat(lr.qty)>0));
+  if(!hasData) return;
+  const today = getTodayKey();
+  const existing = JSON.parse(localStorage.getItem('inputRecords_'+today)||'[]');
+  const seq = existing.length + 1;
+  const p = DB[S.product];
+  const ingredients = [];
+  ings.forEach(ing=>{
+    ing.lots.forEach(lr=>{
+      if(parseFloat(lr.qty)>0){
+        ingredients.push({name:ing.name, qty:parseFloat(lr.qty)||0, lot:'', exp:lr.exp||''});
+      }
+    });
+  });
+  if(!ingredients.length) return;
+  const settings = loadSettings();
+  const record = {
+    lot: `투입-${S.product}-${today}-${String(seq).padStart(3,'0')}`,
+    product: p ? p.name : S.product,
+    worker: settings.workerName||'-',
+    date: today,
+    ingredients,
+    savedAt: new Date().toISOString(),
+    fromBatch: true // 배합일지에서 생성됨 표시
+  };
+  existing.push(record);
+  localStorage.setItem('inputRecords_'+today, JSON.stringify(existing));
+}
+
 // 서명 캔버스
 let signCtx=null, signing=false, hasSign=false, signImg='';
 
@@ -1206,7 +1324,16 @@ async function syncToServer(){
     });
     await db.collection('appData').doc('ledgerRecords').set({ data: JSON.stringify(ledgerRecords), updatedAt: new Date().toISOString() });
 
-    // 4. 배합비(recipeDB) Firebase 업로드
+    // 4. inputRecords Firebase 업로드 (배합일지에서 생성된 투입기록)
+    const inputKeys = Object.keys(localStorage).filter(k=>k.startsWith('inputRecords_'));
+    for(const key of inputKeys){
+      const dayRecs = JSON.parse(localStorage.getItem(key)||'[]');
+      if(dayRecs.length){
+        await db.collection('appData').doc(key).set({ data: JSON.stringify(dayRecs), updatedAt: new Date().toISOString() });
+      }
+    }
+
+    // 5. 배합비(recipeDB) Firebase 업로드
     await db.collection('appData').doc('recipeDB').set({ data: JSON.stringify(DB), updatedAt: new Date().toISOString() });
 
     btn.textContent = '✅ '+recs.length+'건 완료';
