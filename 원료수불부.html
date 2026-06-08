@@ -90,6 +90,8 @@ tr:hover td{background:var(--bg);}
     <button class="btn btn-sm" style="background:var(--warning-light);color:var(--warning);border:1px solid #f0c080" onclick="openInitStock()">📋 전일재고 등록</button>
     <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="openDeleteCode()">🗑️ 코드 삭제</button>
     <button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;" onclick="openDeleteAllLedger()">⚠️ 수불내역 전체삭제</button>
+    <button class="btn btn-sm" style="background:var(--success-light);color:var(--success);border:1px solid #8dc;" onclick="backupLedger()">💾 백업</button>
+    <button class="btn btn-sm" style="background:var(--primary-light);color:var(--primary);border:1px solid #acd;" onclick="restoreLedger()">🔄 복원</button>
 
   </div>
   <div class="card">
@@ -659,6 +661,37 @@ async function confirmDeleteAllLedger(){
   closeModal('deleteAllLedgerModal');
   renderLedger();
   alert('수불내역 + 입고내역 전체 삭제 완료');
+}
+
+// ===== 백업/복원 =====
+async function backupLedger(){
+  if(!window._db){ alert('Firebase 연결을 확인해주세요'); return; }
+  if(!ledgerRecords.length){ alert('백업할 데이터가 없습니다'); return; }
+  if(!confirm('현재 수불내역을 백업하시겠습니까?\n(기존 백업은 덮어씌워집니다)')) return;
+  try{
+    await window._db.collection('appData').doc('ledgerRecords_backup').set({
+      data: JSON.stringify(ledgerRecords),
+      updatedAt: new Date().toISOString(),
+      count: ledgerRecords.length
+    });
+    alert('✅ 백업 완료! ('+ledgerRecords.length+'건)\n복원 버튼으로 되돌릴 수 있습니다.');
+  }catch(e){ alert('백업 실패: '+e.message); }
+}
+
+async function restoreLedger(){
+  if(!window._db){ alert('Firebase 연결을 확인해주세요'); return; }
+  try{
+    const snap = await window._db.collection('appData').doc('ledgerRecords_backup').get();
+    if(!snap.exists || !snap.data().data){ alert('저장된 백업이 없습니다.\n먼저 💾 백업을 해주세요.'); return; }
+    const backupData = JSON.parse(snap.data().data);
+    const backupDate = snap.data().updatedAt||'';
+    const backupCount = backupData.length;
+    if(!confirm('백업 시점으로 복원하시겠습니까?\n\n백업일시: '+backupDate+'\n백업건수: '+backupCount+'건\n현재건수: '+ledgerRecords.length+'건\n\n현재 데이터는 사라집니다.')) return;
+    ledgerRecords = backupData;
+    await saveLedger();
+    renderLedger();
+    alert('✅ 복원 완료! ('+backupCount+'건)');
+  }catch(e){ alert('복원 실패: '+e.message); }
 }
 
 function printLedger(){
