@@ -1376,7 +1376,7 @@ async function syncToServer(){
               const code = INGREDIENT_DB_STATIC[ing.name]||'';
               const rawDate=rec.date||getWorkDateKey();
               const isoDate=rawDate.length===6?'20'+rawDate.slice(0,2)+'-'+rawDate.slice(2,4)+'-'+rawDate.slice(4,6):rawDate;
-              ledgerRecords.push({ date:isoDate, name:ing.name, code, qty:(e.qty||ing.amount||0)/1000, lot:e.lot||'', exp:e.exp||'', batchLot:br.lot, type:'out' });
+              ledgerRecords.push({ date:isoDate, name:ing.name, code, qty:(e.amount||0)/1000, lot:e.lot||'', exp:e.exp||'', batchLot:br.lot, type:'out' });
             }
           });
         });
