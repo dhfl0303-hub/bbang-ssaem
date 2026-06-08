@@ -2843,42 +2843,71 @@ function setIngSort(mode){
   renderIngStock();
 }
 
-// incomingRecords → ingStock 자동 반영
-function syncIngStockFromIncoming(){
+// ledgerRecords → ingStock 재구성 (init+in-out)
+function syncIngStockFromLedger(){
   try{
-    const incoming = incomingRecords||[];
-    // 기존 ingStock 완전 초기화 후 incomingRecords 기반으로 재구성
-    const newStock = [];
-    const seen = new Set(); // name+expiry+mfg 기준 중복 방지
-    incoming.forEach(rec=>{
-      (rec.rows||[]).forEach(row=>{
-        if(!row.product||!row.qty) return;
-        const key = `${row.product}_${row.exp||''}_${row.mfg||''}_${row.lot||''}`;
-        if(seen.has(key)) return;
-        seen.add(key);
-        newStock.push({
-          name:row.product,
-          code:row.code||'',
-          qty:parseFloat(row.qty)||0,
-          expiry:row.exp||'',
-          mfg:row.mfg||'',
-          lot:row.lot||'',
-          _syncKey:key
-        });
-      });
+    const stockMap = {}; // lot 기준 재고 관리
+    // 1. init, in → 재고 추가
+    ledgerRecords.forEach(r=>{
+      if(r.type!=='init' && r.type!=='in') return;
+      const lot = r.lot || (r.code||'')+'_'+(r.exp||r.mfg||'');
+      if(!stockMap[lot]){
+        stockMap[lot] = {
+          name:(r.name||'').replace(/\n/g,' '),
+          code:r.code||'',
+          qty:0,
+          expiry:r.exp||'',
+          mfg:r.mfg||'',
+          lot:r.lot||'',
+          _syncKey:lot
+        };
+      }
+      stockMap[lot].qty += r.qty||0;
     });
-    // 수동 등록한 항목은 유지 (_syncKey가 'manual_'로 시작)
-    const manualItems = ingStock.filter(s=>s._syncKey&&s._syncKey.startsWith('manual_'));
-    ingStock = [...newStock, ...manualItems];
+    // 2. out → 재고 차감 (같은 원료명 기준)
+    ledgerRecords.forEach(r=>{
+      if(r.type!=='out') return;
+      const name = (r.name||'').replace(/\n/g,' ');
+      // 같은 원료의 재고에서 차감 (오래된 것부터)
+      let remain = r.qty||0;
+      Object.values(stockMap)
+        .filter(s=>s.name===name && s.qty>0)
+        .sort((a,b)=>(a.expiry||a.mfg||'').localeCompare(b.expiry||b.mfg||''))
+        .forEach(s=>{
+          if(remain<=0) return;
+          const deduct = Math.min(s.qty, remain);
+          s.qty -= deduct;
+          remain -= deduct;
+        });
+    });
+    // 3. 재고 0 이하 제거
+    ingStock = Object.values(stockMap).filter(s=>s.qty>0.001);
+    // 4. 소비기한 형식 변환 (YY.MM.DD → ISO for daysDiff)
+    ingStock.forEach(s=>{
+      if(s.expiry && /^\d{2}\.\d{2}\.\d{2}$/.test(s.expiry)){
+        s.expiry = '20'+s.expiry.replace(/\./g,'-');
+      }
+      if(s.mfg && /^\d{2}\.\d{2}\.\d{2}$/.test(s.mfg)){
+        s.mfg = '20'+s.mfg.replace(/\./g,'-');
+      }
+    });
+    // 수동 등록 항목 유지
+    const manual = (window._manualIngStock||[]);
+    manual.forEach(m=>{ if(m.qty>0) ingStock.push(m); });
     saveData('ingStock', ingStock);
-  }catch(e){}
+  }catch(e){ console.warn('syncIngStock 오류',e); }
 }
 function renderIngStock(){
   const today=new Date(); today.setHours(0,0,0,0);
   let expired=0,near=0,normal=0;
   const alerts=[];
   ingStock.forEach(s=>{
+    if(!s.expiry || s.expiry==='-'){
+      normal++; // 소비기한 없음(제조일자만) → 정상 처리
+      return;
+    }
     const diff=daysDiff(s.expiry);
+    if(isNaN(diff)){ normal++; return; }
     if(diff<0){ expired++; alerts.push({...s,diff,type:'expired'}); }
     else if(diff<=7){ near++; alerts.push({...s,diff,type:'near'}); }
     else normal++;
@@ -2932,7 +2961,7 @@ function renderIngStock(){
     const totalQty=g.items.reduce((s,i)=>s+Number(i.qty),0);
     const expanded=ingExpandedSet.has(code);
     // 그룹 내 상태 중 가장 심각한 것
-    const worstDiff=Math.min(...g.items.map(i=>daysDiff(i.expiry)||999));
+    const worstDiff=Math.min(...g.items.map(i=>{const d=daysDiff(i.expiry);return isNaN(d)?999:d;}));
     const gBadge=worstDiff<0?'badge-red':worstDiff<=7?'badge-orange':'badge-green';
     const gLabel=worstDiff<0?'초과':worstDiff<=7?'D-'+worstDiff:'정상';
     html+=`<tr style="cursor:pointer;background:var(--bg2)" onclick="toggleIngGroup('${code}')">
@@ -2947,9 +2976,10 @@ function renderIngStock(){
       g.items.forEach(s=>{
         const origIdx=ingStock.indexOf(ingStock.find(x=>x._syncKey===s._syncKey&&x.name===s.name&&x.qty===s.qty));
         const diff=daysDiff(s.expiry);
-        const badge=diff<0?'badge-red':diff<=7?'badge-orange':'badge-green';
-        const label=diff<0?'초과':diff<=7?'D-'+diff:'정상';
-        const dateLabel=s.mfg?`제조: ${s.mfg}`:(s.expiry?`소비: ${s.expiry}`:'-');
+        const hasExp=s.expiry&&s.expiry!=='-'&&!isNaN(diff);
+        const badge=!hasExp?'badge-gray':diff<0?'badge-red':diff<=7?'badge-orange':'badge-green';
+        const label=!hasExp?'-':diff<0?'초과':diff<=7?'D-'+diff:'정상';
+        const dateLabel=s.expiry&&s.expiry!=='-'?`소비: ${s.expiry}`:(s.mfg&&s.mfg!=='-'?`제조: ${s.mfg}`:'-');
         html+=`<tr style="background:var(--bg);font-size:12px">
           <td></td>
           <td style="padding-left:24px;color:var(--text2)">${s.name}</td>
@@ -3044,7 +3074,7 @@ function saveEditIncoming(){
     row.exp      = document.getElementById('eir_exp_'+ri)?.value||row.exp;
   });
   if(window._db) window._db.collection('appData').doc('incomingRecords').set({data:JSON.stringify(incomingRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-  syncIngStockFromIncoming();
+  syncIngStockFromLedger();
   closeModal('editIncomingModal'); renderIncoming(); alert('수정 완료');
 }
 function deleteIncoming(i){
@@ -3054,7 +3084,7 @@ function deleteIncoming(i){
   const origIdx = incomingRecords.indexOf(r);
   incomingRecords.splice(origIdx,1);
   if(window._db) window._db.collection('appData').doc('incomingRecords').set({data:JSON.stringify(incomingRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-  syncIngStockFromIncoming();
+  syncIngStockFromLedger();
   renderIncoming();
 }
 
@@ -3284,7 +3314,7 @@ function saveSubsidiary(){
 (async ()=>{
   await loadFromFirebase();
   initData();
-  syncIngStockFromIncoming();
+  syncIngStockFromLedger();
   document.getElementById('topbarDate').textContent=getToday();
   const _ld=document.getElementById('ledgerDate'); if(_ld) _ld.value=getTodayISO2();
   renderRecipe();
