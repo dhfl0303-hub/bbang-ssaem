@@ -472,26 +472,25 @@ function initDB(){
 function saveLocal(){ localStorage.setItem('batchRecords_'+getWorkDateKey(),JSON.stringify(S.todayRecords)); updateStats(); }
 function loadLocal(){
   const d=localStorage.getItem('batchRecords_'+getWorkDateKey());
-  if(d) S.todayRecords=JSON.parse(d);
+  S.todayRecords = d ? JSON.parse(d) : [];
   updateStats(); renderTodayList();
 }
-// Firebase에서 삭제된 날짜의 localStorage 자동 정리
+// Firebase에서 명시적으로 삭제된(deletedKeys) 날짜의 localStorage만 정리
 async function cleanDeletedFromFirebase(){
   if(!window._db) return;
   try{
-    const keys = Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
-    for(const key of keys){
-      const snap = await window._db.collection('appData').doc(key).get();
-      if(!snap.exists){
-        // Firebase에 없으면 localStorage에서도 삭제
-        localStorage.removeItem(key);
-        const dateKey = key.replace('batchRecords_','');
-        if(dateKey === getWorkDateKey()){
-          S.todayRecords = [];
-          updateStats(); renderTodayList();
-        }
+    const dkSnap = await window._db.collection('appData').doc('deletedKeys').get();
+    if(!dkSnap.exists || !dkSnap.data().data) return;
+    const deletedKeys = JSON.parse(dkSnap.data().data);
+    const batchDeleted = deletedKeys.filter(k=>k.startsWith('batchRecords_'));
+    batchDeleted.forEach(k=>{
+      localStorage.removeItem(k);
+      const dateKey = k.replace('batchRecords_','');
+      if(dateKey === getWorkDateKey()){
+        S.todayRecords = [];
+        updateStats(); renderTodayList();
       }
-    }
+    });
   }catch(e){ console.warn('정리 오류',e); }
 }
 
@@ -1417,13 +1416,20 @@ async function syncToServer(){
     recs.forEach(rec=>{
       (rec.batchRecords||[]).forEach(br=>{
         br.ingredients.forEach(ing=>{
+          const ingCode = INGREDIENT_DB_STATIC[ing.name]||'';
+          if(ingCode==='M000') return; // 정제수 제외
           (ing.exps||[ing]).forEach(e=>{
+            const qty = (e.amount||0)/1000;
+            if(!qty) return;
             const exists = ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===br.lot&&r.exp===e.exp);
-            if(!exists){
-              const code = INGREDIENT_DB_STATIC[ing.name]||'';
+            if(exists){
+              // 기존 기록의 qty가 0이면 올바른 값으로 업데이트
+              if(!exists.qty || exists.qty===0) exists.qty = qty;
+            } else {
+              const code = ingCode;
               const rawDate=rec.date||getWorkDateKey();
               const isoDate=rawDate.length===6?'20'+rawDate.slice(0,2)+'-'+rawDate.slice(2,4)+'-'+rawDate.slice(4,6):rawDate;
-              ledgerRecords.push({ date:isoDate, name:ing.name, code, qty:(e.amount||0)/1000, lot:e.lot||'', exp:e.exp||'', batchLot:br.lot, type:'out' });
+              ledgerRecords.push({ date:isoDate, name:ing.name, code, qty, lot:e.lot||'', exp:e.exp||'', batchLot:br.lot, type:'out' });
             }
           });
         });
