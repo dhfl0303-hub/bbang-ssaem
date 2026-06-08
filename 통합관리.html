@@ -572,6 +572,21 @@ tr:hover td{background:var(--bg);}
         <div class="card-hd"><div class="card-hd-title">⚠️ 소비기한 알림</div></div>
         <div class="card-bd" id="alertList"></div>
       </div>
+      <!-- 폐기대장 -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-hd">
+          <div class="card-hd-title">🗑️ 폐기대장</div>
+          <span class="badge badge-gray" id="disposeCount">0건</span>
+        </div>
+        <div class="card-bd" style="padding:0">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>폐기일</th><th>코드</th><th>원료명</th><th>폐기량</th><th>LOT</th><th>사유</th></tr></thead>
+              <tbody id="disposeTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
       <div class="card">
         <div class="card-hd">
           <div class="card-hd-title">원료 재고 목록</div>
@@ -591,21 +606,7 @@ tr:hover td{background:var(--bg);}
           </div>
         </div>
       </div>
-      <!-- 폐기대장 -->
-      <div class="card" style="margin-top:16px">
-        <div class="card-hd">
-          <div class="card-hd-title">🗑️ 폐기대장</div>
-          <span class="badge badge-gray" id="disposeCount">0건</span>
-        </div>
-        <div class="card-bd" style="padding:0">
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>폐기일</th><th>코드</th><th>원료명</th><th>폐기량</th><th>LOT</th><th>사유</th></tr></thead>
-              <tbody id="disposeTbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+
     </div>
 
     <!-- ③ 설비 세팅값 -->
