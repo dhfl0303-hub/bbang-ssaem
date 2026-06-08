@@ -618,24 +618,23 @@ function onBatchLotSelect(){
 function loadSubLots(){
   const recs=window._subLedgerRecords||[];
   const catMap={
-    'filmLot':'필름포장지',
-    'bulkLot':'비닐',
-    'boxLot':'박스',
-    'pkgBoxLot':'패키지박스'
+    'filmLot':['필름포장지'],
+    'bulkLot':['비닐','PE봉투'],
+    'boxLot':['박스'],
+    'pkgBoxLot':['패키지박스']
   };
   const itemDB=window._subItemDB||[];
-  // subItemDB에서 name→category 매핑 (초기재고는 category 필드 없음)
+  // subItemDB에서 name→category 매핑
   const nameTocat={};
   itemDB.forEach(i=>{ if(i.name&&i.category) nameTocat[i.name]=i.category; });
-  Object.entries(catMap).forEach(([selId,cat])=>{
+  Object.entries(catMap).forEach(([selId,cats])=>{
     const sel=document.getElementById(selId);
     if(!sel) return;
-    const catItems=itemDB.filter(i=>i.category===cat).map(i=>i.name);
-    // category 필드 없는 경우 subItemDB에서 역으로 찾아서 매칭
+    const catItems=itemDB.filter(i=>cats.includes(i.category)).map(i=>i.name);
     const catRecs=recs.filter(r=>{
       if(!r.name) return false;
       const rCat=r.category||nameTocat[r.name]||'';
-      return (catItems.includes(r.name)||rCat===cat);
+      return (catItems.includes(r.name)||cats.includes(rCat));
     });
     const seen=new Set();
     const lots=catRecs.filter(r=>{
