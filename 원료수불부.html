@@ -254,10 +254,11 @@ let ledgerRecords = [];
 let initRows = [];
 let ingStock = [];
 
-function initLedger(){
-  // ledgerRecords는 Firebase에서 로드
+async function initLedger(){
+  // incomingRecords → ledgerRecords 확정 저장
   try{
     const recs = window._incomingRecords||[];
+    let added = false;
     recs.forEach(rec=>{
       (rec.rows||[]).forEach(row=>{
         if(!row.product||!row.qty) return;
@@ -266,9 +267,11 @@ function initLedger(){
         if(!exists){
           const ing=getIngByName(row.product);
           ledgerRecords.push({date:rec.date||getTodayISO2(),name:row.product,code:ing?ing.code:row.lot?.split('-')[0]||'',qty:parseFloat(row.qty)||0,exp:row.exp||'',lot:row.lot||'',type:'in',_key:uniqueKey});
+          added = true;
         }
       });
     });
+    if(added) await saveLedger();
   }catch(e){}
 }
 
@@ -747,7 +750,7 @@ async function loadFromFirebase(){
 // ===== 초기화 =====
 (async ()=>{
   await loadFromFirebase();
-  initLedger();
+  await initLedger();
   document.getElementById('topbarDate').textContent=getToday();
   const _td=new Date(); const _yy=String(_td.getFullYear()).slice(2); const _mm=String(_td.getMonth()+1).padStart(2,'0'); const _dd=String(_td.getDate()).padStart(2,'0');
   const _ldEl=document.getElementById('ledgerDate'); if(_ldEl){_ldEl.value=_yy+_mm+_dd; _ldEl.style.color='var(--primary)'; _ldEl.style.fontWeight='700';}
