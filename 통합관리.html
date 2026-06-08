@@ -2505,7 +2505,7 @@ function fillDateDropdown(selectId, prefix){
   const cur = sel.value;
   // _fbCache에서 해당 prefix 키 추출 → 날짜 목록
   const dates = Object.keys(window._fbCache||{})
-    .filter(k=>k.startsWith(prefix))
+    .filter(k=>k.startsWith(prefix) && Array.isArray(window._fbCache[k]) && window._fbCache[k].length>0)
     .map(k=>k.replace(prefix,''))
     .sort((a,b)=>b.localeCompare(a)); // 최신순
   sel.innerHTML = '<option value="">날짜 선택...</option>' +
@@ -2520,9 +2520,9 @@ function fillYieldDateDropdown(){
   const sel = document.getElementById('yieldDate');
   if(!sel) return;
   const cur = sel.value;
-  const batchDates = Object.keys(window._fbCache||{}).filter(k=>k.startsWith('batchRecords_')).map(k=>k.replace('batchRecords_',''));
-  const packDates  = Object.keys(window._fbCache||{}).filter(k=>k.startsWith('packRecords_')).map(k=>k.replace('packRecords_',''));
-  const inputDates = Object.keys(window._fbCache||{}).filter(k=>k.startsWith('inputRecords_')).map(k=>k.replace('inputRecords_',''));
+  const batchDates = Object.keys(window._fbCache||{}).filter(k=>k.startsWith('batchRecords_')&&Array.isArray(window._fbCache[k])&&window._fbCache[k].length>0).map(k=>k.replace('batchRecords_',''));
+  const packDates  = Object.keys(window._fbCache||{}).filter(k=>k.startsWith('packRecords_')&&Array.isArray(window._fbCache[k])&&window._fbCache[k].length>0).map(k=>k.replace('packRecords_',''));
+  const inputDates = Object.keys(window._fbCache||{}).filter(k=>k.startsWith('inputRecords_')&&Array.isArray(window._fbCache[k])&&window._fbCache[k].length>0).map(k=>k.replace('inputRecords_',''));
   const dates = [...new Set([...batchDates,...packDates,...inputDates])].sort((a,b)=>b.localeCompare(a));
   sel.innerHTML = '<option value="">날짜 선택...</option>' +
     dates.map(d=>`<option value="${d}" ${d===cur?'selected':''}>${yymmddToDisplay(d)}</option>`).join('');
