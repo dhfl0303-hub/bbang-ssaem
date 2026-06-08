@@ -401,6 +401,21 @@ function fmtInitDate(input){
   input.value=v;
   if(v.length===6){input.dataset.formatted=`${v.slice(0,2)}.${v.slice(2,4)}.${v.slice(4,6)}`;input.style.color='var(--primary)';input.style.fontWeight='700';}
   else{input.dataset.formatted='';input.style.color='';input.style.fontWeight='';}
+  // 소비기한 ↔ 제조일자 상호 배제
+  if(input.id==='initExp' && v.length>0){
+    const other=document.getElementById('initMfg');
+    if(other){other.value='';other.dataset.formatted='';other.style.color='';other.style.fontWeight='';other.disabled=true;other.placeholder='소비기한 입력됨';}
+  } else if(input.id==='initExp' && v.length===0){
+    const other=document.getElementById('initMfg');
+    if(other){other.disabled=false;other.placeholder='예: 260101';}
+  }
+  if(input.id==='initMfg' && v.length>0){
+    const other=document.getElementById('initExp');
+    if(other){other.value='';other.dataset.formatted='';other.style.color='';other.style.fontWeight='';other.disabled=true;other.placeholder='제조일자 입력됨';}
+  } else if(input.id==='initMfg' && v.length===0){
+    const other=document.getElementById('initExp');
+    if(other){other.disabled=false;other.placeholder='예: 270518';}
+  }
 }
 
 function getInitDateVal(id){
@@ -432,9 +447,9 @@ function openInitStock(e){
   const initQty=document.getElementById('initQty');
   if(initQty) initQty.value='';
   const initExp=document.getElementById('initExp');
-  if(initExp) initExp.value='';
+  if(initExp){initExp.value='';initExp.dataset.formatted='';initExp.style.color='';initExp.style.fontWeight='';initExp.disabled=false;initExp.placeholder='예: 270518';}
   const initMfg=document.getElementById('initMfg');
-  if(initMfg) initMfg.value='';
+  if(initMfg){initMfg.value='';initMfg.dataset.formatted='';initMfg.style.color='';initMfg.style.fontWeight='';initMfg.disabled=false;initMfg.placeholder='예: 260101';}
   const modal=document.getElementById('initStockModal');
   if(modal) modal.classList.add('open');
   else alert('모달을 찾을 수 없습니다. 페이지를 새로고침해주세요.');
@@ -454,8 +469,10 @@ function addInitRow(){
   renderInitRows();
   document.getElementById('initIngName').value='';
   document.getElementById('initQty').value='';
-  document.getElementById('initExp').value='';
-  document.getElementById('initMfg').value='';
+  const _exp=document.getElementById('initExp');
+  _exp.value='';_exp.dataset.formatted='';_exp.style.color='';_exp.style.fontWeight='';_exp.disabled=false;_exp.placeholder='예: 270518';
+  const _mfg=document.getElementById('initMfg');
+  _mfg.value='';_mfg.dataset.formatted='';_mfg.style.color='';_mfg.style.fontWeight='';_mfg.disabled=false;_mfg.placeholder='예: 260101';
   // 기준날짜 잠금
   const initDateEl=document.getElementById('initDate');
   if(initDateEl) initDateEl.readOnly=true;
