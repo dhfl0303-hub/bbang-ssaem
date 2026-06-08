@@ -1310,6 +1310,15 @@ async function syncToServer(){
     if(!window._db) throw new Error('Firebase 연결 없음');
     const db = window._db;
 
+    // 0. 통합관리에서 삭제된 키 확인 → localStorage 정리
+    let deletedKeys = [];
+    try{
+      const dkSnap = await db.collection('appData').doc('deletedKeys').get();
+      if(dkSnap.exists && dkSnap.data().data) deletedKeys = JSON.parse(dkSnap.data().data);
+    }catch(e){}
+    const packDeleted = deletedKeys.filter(k=>k.startsWith('packRecords_'));
+    packDeleted.forEach(k=>{ localStorage.removeItem(k); });
+
     // 1. packRecords localStorage → Firebase
     const keys = Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
     let recs = []; keys.forEach(k=>{ recs = recs.concat(JSON.parse(localStorage.getItem(k)||'[]')); });
@@ -1318,6 +1327,12 @@ async function syncToServer(){
     for(const key of keys){
       const dayRecs = JSON.parse(localStorage.getItem(key)||'[]');
       if(dayRecs.length) await db.collection('appData').doc(key).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
+    }
+
+    // 처리 완료된 deletedKeys 제거
+    if(packDeleted.length){
+      const remaining = deletedKeys.filter(k=>!k.startsWith('packRecords_'));
+      await db.collection('appData').doc('deletedKeys').set({data:JSON.stringify(remaining),updatedAt:new Date().toISOString()});
     }
 
     // 2. 부자재수불부 출고 반영

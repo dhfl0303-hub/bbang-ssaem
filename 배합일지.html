@@ -1327,7 +1327,16 @@ async function syncToServer(){
     if(!window._db) throw new Error('Firebase 연결 없음');
     const db = window._db;
 
-    // 1. localStorage의 모든 배합 기록 수집
+    // 0. 통합관리에서 삭제된 키 확인 → localStorage 정리
+    let deletedKeys = [];
+    try{
+      const dkSnap = await db.collection('appData').doc('deletedKeys').get();
+      if(dkSnap.exists && dkSnap.data().data) deletedKeys = JSON.parse(dkSnap.data().data);
+    }catch(e){}
+    const batchDeleted = deletedKeys.filter(k=>k.startsWith('batchRecords_'));
+    batchDeleted.forEach(k=>{ localStorage.removeItem(k); });
+
+    // 1. localStorage의 모든 배합 기록 수집 (삭제된 키 제외)
     const keys = Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
     let recs = []; keys.forEach(k=>{ recs = recs.concat(JSON.parse(localStorage.getItem(k)||'[]')); });
     if(!recs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
@@ -1338,6 +1347,12 @@ async function syncToServer(){
       if(dayRecs.length){
         await db.collection('appData').doc(key).set({ data: JSON.stringify(dayRecs), updatedAt: new Date().toISOString() });
       }
+    }
+
+    // 처리 완료된 deletedKeys 제거
+    if(batchDeleted.length){
+      const remaining = deletedKeys.filter(k=>!k.startsWith('batchRecords_'));
+      await db.collection('appData').doc('deletedKeys').set({data:JSON.stringify(remaining),updatedAt:new Date().toISOString()});
     }
 
     // 3. 원료수불부 출고 반영 (ledgerRecords Firebase 업데이트)
