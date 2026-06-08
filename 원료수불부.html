@@ -467,7 +467,7 @@ function addInitRow(){
   const row = {date, name, code:ing?ing.code:'', qty, exp, mfg, type:'init'};
   initRows.push(row);
   renderInitRows();
-  document.getElementById('initIngName').value='';
+  // 원료명은 유지 (같은 원료 연속 입력 편의)
   document.getElementById('initQty').value='';
   const _exp=document.getElementById('initExp');
   _exp.value='';_exp.dataset.formatted='';_exp.style.color='';_exp.style.fontWeight='';_exp.disabled=false;_exp.placeholder='예: 270518';
