@@ -121,8 +121,10 @@ async function syncToServer(){
     const a=JSON.parse(localStorage.getItem('subIncomingRecords')||'[]');
     const b=JSON.parse(localStorage.getItem('subsidiaryStock')||'[]');
     let count=0;
-    for(const r of a){await db.collection('subIncomingRecords').doc(String(r.id||Date.now()+count)).set({...r,_syncedAt:new Date().toISOString()});count++;}
-    for(const r of b){await db.collection('subsidiaryStock').doc(String(r.lot||Date.now()+count)).set({...r,_syncedAt:new Date().toISOString()});count++;}
+    // subIncomingRecords는 syncToSubsidiary에서 appData에 저장됨 - 여기서는 전체 배열로 저장
+    await db.collection('appData').doc('subIncomingRecords').set({data:JSON.stringify(a),updatedAt:new Date().toISOString()});count+=a.length;
+    // subsidiaryStock도 appData에 저장
+    if(b.length) await db.collection('appData').doc('subsidiaryStock').set({data:JSON.stringify(b),updatedAt:new Date().toISOString()});
     btn.textContent='✅ '+count+'건 완료';
     setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2500);
   }catch(e){
