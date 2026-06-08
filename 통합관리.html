@@ -3114,11 +3114,19 @@ function openDispose(idx){
   document.getElementById('dispReasonEtc').value = '';
   document.getElementById('dispReasonEtcRow').style.display = 'none';
   document.getElementById('disposeModal').dataset.idx = idx;
+  initDisposeEvents();
   document.getElementById('disposeModal').classList.add('open');
 }
-document.getElementById('dispReason').addEventListener('change',function(){
-  document.getElementById('dispReasonEtcRow').style.display = this.value==='기타'?'':'none';
-});
+// dispReason 이벤트는 모달 열 때 바인딩
+function initDisposeEvents(){
+  const el=document.getElementById('dispReason');
+  if(el&&!el._bound){
+    el.addEventListener('change',function(){
+      document.getElementById('dispReasonEtcRow').style.display = this.value==='기타'?'':'none';
+    });
+    el._bound=true;
+  }
+}
 
 async function saveDispose(){
   const idx = parseInt(document.getElementById('disposeModal').dataset.idx);
