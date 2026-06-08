@@ -403,7 +403,7 @@ function openInitStock(e){
   const tb=document.getElementById('initStockTbody');
   if(tb) tb.innerHTML='';
   const initDate=document.getElementById('initDate');
-  if(initDate) initDate.value=getTodayISO2();
+  if(initDate){ const _d=new Date(); initDate.value=String(_d.getFullYear()).slice(2)+String(_d.getMonth()+1).padStart(2,'0')+String(_d.getDate()).padStart(2,'0'); }
   const initIngName=document.getElementById('initIngName');
   if(initIngName) initIngName.value='';
   const initQty=document.getElementById('initQty');
@@ -420,10 +420,11 @@ function openInitStock(e){
 function addInitRow(){
   const name = document.getElementById('initIngName').value.trim();
   const qty = parseFloat(document.getElementById('initQty').value)||0;
-  const exp = document.getElementById('initExp').value;
-  const mfg = document.getElementById('initMfg').value||'';
-  const date = document.getElementById('initDate').value||getTodayISO2();
-  if(!name||!qty||!exp){ alert('원료명, 재고량, 소비기한을 모두 입력해주세요'); return; }
+  const exp = getInitDateVal('initExp');
+  const mfg = getInitDateVal('initMfg')||'';
+  const dateRaw = document.getElementById('initDate').value||'';
+  const date = dateRaw.length===6 ? yymmddToISO(dateRaw) : (dateRaw||getTodayISO2());
+  if(!name||!qty||(!exp&&!mfg)){ alert('원료명, 재고량, 소비기한 또는 제조일자를 입력해주세요'); return; }
   const ing = getIngByName(name);
   const row = {date, name, code:ing?ing.code:'', qty, exp, mfg, type:'init'};
   initRows.push(row);
@@ -526,8 +527,8 @@ function saveEditIngredient(){
   ing.storage = document.getElementById('editIngStorage').value.trim();
   // 전일재고 업데이트
   const qty = parseFloat(document.getElementById('editIngQty').value)||0;
-  const exp = document.getElementById('editIngExp').value;
-  const mfg = document.getElementById('editIngMfg').value||'';
+  const exp = getInitDateVal('editIngExp');
+  const mfg = getInitDateVal('editIngMfg')||'';
   if(qty>0){
     ledgerRecords = ledgerRecords.filter(r=>!(r.name===ing.name&&r.type==='init'));
     const today = getLedgerDateISO();
