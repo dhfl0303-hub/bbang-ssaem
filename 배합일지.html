@@ -746,55 +746,44 @@ function onExpInput(input){
   updateAutoCalc(input.closest('.ing-block'));
 }
 
-// incomingRecords + ledgerRecords(init) 에서 원료별 LOT 목록 가져오기
+// ledgerRecords(init+in)에서 원료별 LOT 목록 가져오기
 function getIngLots(ingName){
   try{
     const lots=[];
     const seen=new Set();
-
-    // 1. ledgerRecords type:'init' → OI LOT (Firebase에서 로드된 것 우선)
     const ledger = window._ledgerRecords||JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
-    ledger.forEach(r=>{
-      if(r.type!=='init') return;
-      const recName=r.name.trim(); const ingN=ingName.trim();
-      if(recName===ingN||recName.includes(ingN)||ingN.includes(recName)){
-        if(r.lot && !seen.has(r.lot)){
-          seen.add(r.lot);
-          lots.push({
-            lot:r.lot,
-            label:`${r.lot} (초기재고 소비:${fmtExp(r.exp||'')})`,
-            exp:fmtExp(r.exp||''),
-            date:'',
-            isOI:true
-          });
-        }
-      }
-    });
+    const ingN=ingName.trim().replace(/\n/g,' ');
 
-    // 2. incomingRecords → 입고 LOT
-    const recs=JSON.parse(localStorage.getItem('incomingRecords')||'[]');
-    recs.forEach(rec=>{
-      (rec.rows||[]).forEach(row=>{
-        if(!row.product) return;
-        const recName=row.product.trim(); const ingN=ingName.trim();
-        if(recName===ingN||recName.includes(ingN)||ingN.includes(recName)){
-          if(row.lot && !seen.has(row.lot)){
-            seen.add(row.lot);
-            const hasExp = !!(row.expVal||row.exp);
-            const expDisp = fmtExp(row.expVal||row.exp||'');
-            const mfgDisp = row.mfg||'';
-            const datePart = `입고:${rec.date||''}`;
-            const dateLbl = hasExp ? `${datePart} 소비:${expDisp}` : `${datePart} 제조:${mfgDisp}`;
-            lots.push({
-              lot:row.lot,
-              label:`${row.lot} (${dateLbl})`,
-              exp:expDisp,
-              date:rec.date||'',
-              isOI:false
-            });
-          }
-        }
-      });
+    ledger.forEach(r=>{
+      if(r.type!=='init' && r.type!=='in') return;
+      const recName=(r.name||'').trim().replace(/\n/g,' ');
+      if(recName!==ingN && !recName.includes(ingN) && !ingN.includes(recName)) return;
+      if(!r.lot || seen.has(r.lot)) return;
+      seen.add(r.lot);
+
+      if(r.type==='init'){
+        // 초기재고: 코드-OI-소비기한or제조일자
+        const hasExp = !!(r.exp);
+        const dateLbl = hasExp ? '소비:'+fmtExp(r.exp) : '제조:'+fmtExp(r.mfg||'');
+        lots.push({
+          lot:r.lot,
+          label:r.lot+' (초기재고 '+dateLbl+')',
+          exp:fmtExp(r.exp||r.mfg||''),
+          date:'',
+          isOI:true
+        });
+      } else {
+        // 입고: 코드-입고일자-소비기한or제조일자
+        const hasExp = !!(r.exp);
+        const dateLbl = hasExp ? '소비:'+fmtExp(r.exp) : '제조:'+fmtExp(r.mfg||'');
+        lots.push({
+          lot:r.lot,
+          label:r.lot+' (입고:'+r.date+' '+dateLbl+')',
+          exp:fmtExp(r.exp||r.mfg||''),
+          date:r.date||'',
+          isOI:false
+        });
+      }
     });
 
     // OI 먼저, 그 다음 입고일 오래된 순

@@ -207,7 +207,7 @@ tr:hover td{background:var(--bg);}
         <div class="form-row"><label class="form-label">제조일자 YYMMDD <span style="color:var(--text3);font-weight:400">(선택)</span></label><input class="form-input" id="initMfg" placeholder="예: 260101" maxlength="6" inputmode="numeric" oninput="fmtInitDate(this)"></div>
       </div>
       <button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="addInitRow()">+ 추가</button>
-      <div class="table-wrap"><table><thead><tr><th>원료명</th><th>코드</th><th>재고량(kg)</th><th>소비기한</th><th>제조일자</th><th>기준일</th><th></th></tr></thead><tbody id="initStockTbody"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>원료명</th><th>코드</th><th>LOT</th><th>재고량(kg)</th><th>소비기한</th><th>제조일자</th><th>기준일</th><th></th></tr></thead><tbody id="initStockTbody"></tbody></table></div>
     </div>
     <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('initStockModal')">취소</button><button class="btn btn-primary" onclick="saveInitStock()">전체 저장</button></div>
   </div>
@@ -464,7 +464,10 @@ function addInitRow(){
   const date = dateRaw.length===6 ? yymmddToISO(dateRaw) : (dateRaw||getTodayISO2());
   if(!name||!qty||(!exp&&!mfg)){ alert('원료명, 재고량, 소비기한 또는 제조일자를 입력해주세요'); return; }
   const ing = getIngByName(name);
-  const row = {date, name, code:ing?ing.code:'', qty, exp, mfg, type:'init'};
+  const code = ing?ing.code:'';
+  const datepart = (exp||mfg).replace(/\./g,'');
+  const lot = code + '-OI-' + datepart;
+  const row = {date, name, code, qty, exp, mfg, lot, type:'init'};
   initRows.push(row);
   renderInitRows();
   // 원료명은 유지 (같은 원료 연속 입력 편의)
@@ -483,6 +486,7 @@ function renderInitRows(){
     <tr>
       <td style="font-weight:600">${r.name.replace(/\n/g,' ')}</td>
       <td><span class="badge badge-blue" style="font-size:10px">${r.code}</span></td>
+      <td style="font-size:11px;color:var(--primary);font-weight:600">${r.lot||'-'}</td>
       <td class="tc">${r.qty.toFixed(3)}</td>
       <td class="tc">${r.exp||'-'}</td>
       <td class="tc">${r.mfg||'-'}</td>
@@ -786,6 +790,19 @@ async function loadFromFirebase(){
 (async ()=>{
   await loadFromFirebase();
   await initLedger();
+  // LOT 없는 init 레코드 자동 보정
+  let lotFixed = false;
+  ledgerRecords.forEach(r=>{
+    if(r.type==='init' && !r.lot){
+      const code = r.code || '';
+      const datepart = (r.exp||r.mfg||'').replace(/\./g,'');
+      if(code && datepart){
+        r.lot = code + '-OI-' + datepart;
+        lotFixed = true;
+      }
+    }
+  });
+  if(lotFixed) await saveLedger();
   document.getElementById('topbarDate').textContent=getToday();
   const _td=new Date(); const _yy=String(_td.getFullYear()).slice(2); const _mm=String(_td.getMonth()+1).padStart(2,'0'); const _dd=String(_td.getDate()).padStart(2,'0');
   const _ldEl=document.getElementById('ledgerDate'); if(_ldEl){_ldEl.value=_yy+_mm+_dd; _ldEl.style.color='var(--primary)'; _ldEl.style.fontWeight='700';}
