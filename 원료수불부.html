@@ -603,12 +603,20 @@ async function confirmDeleteAllLedger(){
     return;
   }
   document.getElementById('deleteAllPwError').style.display='none';
-  if(!confirm('수불내역 전체를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+  if(!confirm('수불내역 + 입고내역 전체를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
   ledgerRecords = [];
-  await saveLedger();
+  window._incomingRecords = [];
+  ingStock = [];
+  if(window._db){
+    await Promise.all([
+      window._db.collection('appData').doc('ledgerRecords').set({data:'[]', updatedAt:new Date().toISOString()}),
+      window._db.collection('appData').doc('incomingRecords').set({data:'[]', updatedAt:new Date().toISOString()}),
+      window._db.collection('appData').doc('ingStock').set({data:'[]', updatedAt:new Date().toISOString()}),
+    ]).catch(e=>{ alert('Firebase 삭제 실패: '+e.message); return; });
+  }
   closeModal('deleteAllLedgerModal');
   renderLedger();
-  alert('수불내역 전체 삭제 완료');
+  alert('수불내역 + 입고내역 전체 삭제 완료');
 }
 
 function printLedger(){
