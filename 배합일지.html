@@ -371,7 +371,7 @@ let INPUT_DB = {}; // 투입비 DB (P500~)
 let S = {
   page:'main', history:[],
   product:null, machine:null,
-  totalBatches:1, currentBatch:1,
+  totalBatches:1, currentBatch:1, lotOffset:0,
   batchRecords:[], prevData:{},
   todayRecords:[], editCode:null,
   inputIngredients:[] // 기타사용원재료 입력값
@@ -518,7 +518,7 @@ function goBack(){
   document.getElementById('tbBatch').style.display=prev==='batch'?'flex':'none';
 }
 function goHome(){
-  S.history=[]; S.product=null; S.machine=null; S.batchRecords=[]; S.prevData={};
+  S.history=[]; S.product=null; S.machine=null; S.batchRecords=[]; S.prevData={}; S.lotOffset=0;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-main').classList.add('active');
   S.page='main';
@@ -717,6 +717,10 @@ function updateSummary(){
 }
 function startBatching(){
   if(!S.machine){ alert('배합을 선택해주세요'); return; }
+  // 같은 제품+날짜 기존 기록 확인 → LOT 번호 이어서 생성
+  const sessionKey = S.product+'-'+getWorkDateKey();
+  const existing = S.todayRecords.find(r=>r.sessionKey===sessionKey);
+  S.lotOffset = existing ? (existing.batchRecords||[]).length : 0;
   S.currentBatch=1; S.batchRecords=[]; S.prevData={};
   renderBatchPage(); showPage('batch');
 }
@@ -725,7 +729,8 @@ function startBatching(){
 function renderBatchPage(){
   const n=S.currentBatch, total=S.totalBatches;
   const p=DB[S.product]; const m=S.machine; const md=p.batches[m];
-  const lot=`배합-${S.product}-${getWorkDateKey()}-${String(n).padStart(3,'0')}`;
+  const lotNum=n+(S.lotOffset||0);
+  const lot=`배합-${S.product}-${getWorkDateKey()}-${String(lotNum).padStart(3,'0')}`;
   document.getElementById('currentLot').textContent=lot;
   document.getElementById('completeBatchBtn').textContent=`✓ ${n}배합 완료 → 로트 생성`;
   // 상단바 정보
@@ -1061,7 +1066,8 @@ function completeBatch(){
     ingredients.push({name,total,exps});
     S.prevData[name]=exps;
   });
-  const lot=`배합-${S.product}-${getWorkDateKey()}-${String(S.currentBatch).padStart(3,'0')}`;
+  const lotNum=S.currentBatch+(S.lotOffset||0);
+  const lot=`배합-${S.product}-${getWorkDateKey()}-${String(lotNum).padStart(3,'0')}`;
   const time=getNow();
   S.batchRecords.push({batchNum:S.currentBatch,machine:S.machine,lot,time,ingredients});
   saveLocal();
@@ -1108,18 +1114,32 @@ function showComplete(){
     .map(ing=>({name:ing.name, qty:parseFloat(ing.qty)||0, lot:ing.lot||'', exp:ing.exp||''}));
   const sessionKey=S.product+'-'+getWorkDateKey();
   const existIdx=S.todayRecords.findIndex(r=>r.sessionKey===sessionKey);
-  const sessionData={
-    sessionKey, productCode:S.product, product:p.name,
-    date:getWorkDateKey(), totalBatches:S.totalBatches,
-    startTime:S.batchRecords[0].time, endTime:S.batchRecords[S.batchRecords.length-1].time,
-    batchRecords:JSON.parse(JSON.stringify(S.batchRecords)),
-    extraIngredients: extraIngs
-  };
-  if(existIdx>=0) S.todayRecords[existIdx]=sessionData;
-  else S.todayRecords.push(sessionData);
+  const newBatchRecords=JSON.parse(JSON.stringify(S.batchRecords));
+  if(existIdx>=0){
+    // 병합: 기존 batchRecords에 새 배합 추가
+    const existing=S.todayRecords[existIdx];
+    existing.batchRecords=[...(existing.batchRecords||[]),...newBatchRecords];
+    existing.totalBatches=existing.batchRecords.length;
+    existing.endTime=newBatchRecords[newBatchRecords.length-1].time;
+    if(extraIngs.length) existing.extraIngredients=[...(existing.extraIngredients||[]),...extraIngs];
+  } else {
+    const sessionData={
+      sessionKey, productCode:S.product, product:p.name,
+      date:getWorkDateKey(), totalBatches:S.totalBatches,
+      startTime:S.batchRecords[0].time, endTime:S.batchRecords[S.batchRecords.length-1].time,
+      batchRecords:newBatchRecords,
+      extraIngredients: extraIngs
+    };
+    S.todayRecords.push(sessionData);
+  }
   saveLocal();
+  const mergedRecord = S.todayRecords.find(r=>r.sessionKey===sessionKey);
+  const totalBatchCount = mergedRecord ? mergedRecord.batchRecords.length : S.batchRecords.length;
+  const isAdded = (S.lotOffset||0) > 0;
   document.getElementById('doneTitle').textContent=p.name+' 배합 완료!';
-  document.getElementById('doneSub').textContent='총 '+S.totalBatches+'배합 · '+S.batchRecords.length+'개 로트 생성';
+  document.getElementById('doneSub').textContent=isAdded
+    ? `추가 ${S.batchRecords.length}배합 완료 (총 ${totalBatchCount}배합)`
+    : '총 '+S.totalBatches+'배합 · '+S.batchRecords.length+'개 로트 생성';
   const totals={};
   S.batchRecords.forEach(r=>r.ingredients.forEach(ing=>{
     if(!totals[ing.name])totals[ing.name]={};
