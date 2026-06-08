@@ -3008,16 +3008,21 @@ function renderIngStock(){
   const alertCard=document.getElementById('alertCard');
   if(alerts.length){
     alertCard.style.display='';
-    document.getElementById('alertList').innerHTML=alerts.map(a=>`
-      <div class="alert-item ${a.type==='expired'?'alert-red':'alert-orange'}">
-        <div>
+    document.getElementById('alertList').innerHTML=alerts.map(a=>{
+      const aIdx=ingStock.findIndex(s=>s.name===a.name&&s.expiry===a.expiry&&s.qty===a.qty);
+      return `<div class="alert-item ${a.type==='expired'?'alert-red':'alert-orange'}">
+        <div style="flex:1">
           <div class="alert-name">${a.name}</div>
           <div class="alert-sub">소비기한: ${a.expiry} · 재고: ${Number(a.qty).toLocaleString()}kg</div>
         </div>
-        <span class="badge ${a.type==='expired'?'badge-red':'badge-orange'}">
-          ${a.type==='expired'?'초과':'D-'+a.diff}
-        </span>
-      </div>`).join('');
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="badge ${a.type==='expired'?'badge-red':'badge-orange'}" style="font-size:15px;padding:6px 14px;font-weight:800">
+            ${a.type==='expired'?'초과':'D-'+a.diff}
+          </span>
+          <button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;font-size:11px;padding:4px 8px;" onclick="event.stopPropagation();openDispose(${aIdx})">폐기</button>
+        </div>
+      </div>`;
+    }).join('');
   } else alertCard.style.display='none';
 
   // 코드별 그룹핑
