@@ -807,7 +807,7 @@ function savePackSettings(s){ window._packSettings=s; if(window._db) window._db.
 function saveLocal(){ localStorage.setItem('packRecords_'+getWorkDateKey(),JSON.stringify(S.todayRecords)); updateStats(); }
 function loadLocal(){
   const d=localStorage.getItem('packRecords_'+getWorkDateKey());
-  if(d) S.todayRecords=JSON.parse(d);
+  S.todayRecords = d ? JSON.parse(d) : [];
   updateStats(); renderTodayList();
 }
 
@@ -1350,16 +1350,7 @@ async function syncToServer(){
     if(!window._db) throw new Error('Firebase 연결 없음');
     const db = window._db;
 
-    // 0. 통합관리에서 삭제된 키 확인 → localStorage 정리
-    let deletedKeys = [];
-    try{
-      const dkSnap = await db.collection('appData').doc('deletedKeys').get();
-      if(dkSnap.exists && dkSnap.data().data) deletedKeys = JSON.parse(dkSnap.data().data);
-    }catch(e){}
-    const packDeleted = deletedKeys.filter(k=>k.startsWith('packRecords_'));
-    packDeleted.forEach(k=>{ localStorage.removeItem(k); });
-
-    // 1. packRecords localStorage → Firebase
+    // 1. packRecords localStorage → Firebase (먼저 동기화)
     const keys = Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
     let recs = []; keys.forEach(k=>{ recs = recs.concat(JSON.parse(localStorage.getItem(k)||'[]')); });
     if(!recs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
@@ -1369,13 +1360,23 @@ async function syncToServer(){
       if(dayRecs.length) await db.collection('appData').doc(key).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
     }
 
-    // 처리 완료된 deletedKeys 제거
+    // 2. 통합관리에서 삭제된 키 확인 → 동기화 완료 후 localStorage 정리
+    let deletedKeys = [];
+    try{
+      const dkSnap = await db.collection('appData').doc('deletedKeys').get();
+      if(dkSnap.exists && dkSnap.data().data) deletedKeys = JSON.parse(dkSnap.data().data);
+    }catch(e){}
+    const packDeleted = deletedKeys.filter(k=>k.startsWith('packRecords_'));
+    // 방금 동기화한 키는 삭제하지 않음 (새 데이터 보호)
+    packDeleted.forEach(k=>{
+      if(!keys.includes(k)) localStorage.removeItem(k);
+    });
     if(packDeleted.length){
       const remaining = deletedKeys.filter(k=>!k.startsWith('packRecords_'));
       await db.collection('appData').doc('deletedKeys').set({data:JSON.stringify(remaining),updatedAt:new Date().toISOString()});
     }
 
-    // 2. 부자재수불부 출고 반영
+    // 3. 부자재수불부 출고 반영
     let subSnap = await db.collection('appData').doc('subLedgerRecords').get();
     let subRecs = (subSnap.exists && subSnap.data().data) ? JSON.parse(subSnap.data().data) : [];
     recs.forEach(rec=>{
