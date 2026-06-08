@@ -152,8 +152,16 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
   <!-- 메인 -->
   <div class="page active" id="page-main">
     <div class="main-hd">
-      <div class="main-date" id="mainDate"></div>
-      <div class="main-worker" id="mainWorker" onclick="showPage('settings')" style="cursor:pointer;"></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div class="main-date" id="mainDate"></div>
+          <div class="main-worker" id="mainWorker" onclick="showPage('settings')" style="cursor:pointer;"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:700;">작업일:</span>
+          <input id="workDateInput" type="text" inputmode="numeric" maxlength="6" placeholder="YYMMDD" oninput="onWorkDateInput(this)" style="width:80px;padding:6px 10px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:#fff;font-size:15px;font-weight:700;font-family:'Noto Sans KR',sans-serif;text-align:center;outline:none;">
+        </div>
+      </div>
       <div class="main-stats">
         <div class="stat-box"><div class="stat-lbl">오늘 완료 포장</div><div class="stat-val" id="statDone">0건</div></div>
         <div class="stat-box"><div class="stat-lbl">총 생산수량</div><div class="stat-val" id="statTotal">0개</div></div>
@@ -459,9 +467,40 @@ let S = {
 };
 
 // 날짜
-function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
+let _workDateKey = '';
+function getToday(){
+  const k = getWorkDateKey();
+  const y = 2000+parseInt(k.slice(0,2)); const m = parseInt(k.slice(2,4)); const d = parseInt(k.slice(4,6));
+  return y+'년 '+m+'월 '+d+'일';
+}
 function getTodayKey(){ const d=new Date(); return String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
+function getWorkDateKey(){ return (_workDateKey && _workDateKey.length===6) ? _workDateKey : getTodayKey(); }
 function getNow(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function onWorkDateInput(input){
+  const raw = input.value.replace(/\D/g,'').slice(0,6);
+  input.value = raw;
+  if(raw.length===6){
+    _workDateKey = raw;
+    document.getElementById('mainDate').textContent = getToday();
+    loadLocal();
+    loadBatchForDate();
+  }
+}
+async function loadBatchForDate(){
+  if(!window._db) return;
+  const dateKey = getWorkDateKey();
+  try{
+    const [bSnap, iSnap] = await Promise.all([
+      window._db.collection('appData').doc('batchRecords_'+dateKey).get(),
+      window._db.collection('appData').doc('inputRecords_'+dateKey).get()
+    ]);
+    if(bSnap.exists && bSnap.data().data) window._fbBatchCache['batchRecords_'+dateKey]=JSON.parse(bSnap.data().data);
+    else delete window._fbBatchCache['batchRecords_'+dateKey];
+    if(iSnap.exists && iSnap.data().data) window._fbInputCache['inputRecords_'+dateKey]=JSON.parse(iSnap.data().data);
+    else delete window._fbInputCache['inputRecords_'+dateKey];
+  }catch(e){ console.warn('날짜별 로드 실패',e); }
+  renderBatchLotList();
+}
 function fmtDate(input){
   const d=input.value.replace(/\D/g,'').slice(0,6);
   if(d.length<=2) input.value=d;
@@ -638,7 +677,7 @@ function initFormPage(){
   const sel=document.getElementById('batchLotSel');
   if(sel&&S.batchLot) sel.value=S.batchLot;
   // 포장LOT 표시
-  const today=getTodayKey();
+  const today=getWorkDateKey();
   const pCode = S.product||S.batchLot?.split('-')[1]||'P';
   const existCount=S.todayRecords.filter(r=>r.productCode===pCode).length;
   const lot=`포장-${pCode}-${today}-${String(existCount+1).padStart(3,'0')}`;
@@ -766,9 +805,9 @@ function loadSettings(){ return window._packSettings||{workerName:''}; }
 function savePackSettings(s){ window._packSettings=s; if(window._db) window._db.collection('appData').doc('packSettings').set({data:JSON.stringify(s),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e)); }
 
 // 로컬 저장
-function saveLocal(){ localStorage.setItem('packRecords_'+getTodayKey(),JSON.stringify(S.todayRecords)); updateStats(); }
+function saveLocal(){ localStorage.setItem('packRecords_'+getWorkDateKey(),JSON.stringify(S.todayRecords)); updateStats(); }
 function loadLocal(){
-  const d=localStorage.getItem('packRecords_'+getTodayKey());
+  const d=localStorage.getItem('packRecords_'+getWorkDateKey());
   if(d) S.todayRecords=JSON.parse(d);
   updateStats(); renderTodayList();
 }
@@ -805,6 +844,8 @@ function goHome(){
 // 메인
 function initMain(){
   const s=loadSettings();
+  document.getElementById('workDateInput').value = getTodayKey();
+  _workDateKey = getTodayKey();
   document.getElementById('mainDate').textContent=getToday();
   document.getElementById('mainWorker').textContent=s.workerName ? s.workerName+' 작업자' : '👤 작업자 설정 (탭하세요)';
   loadDeviceSettings();
@@ -815,14 +856,14 @@ function initMain(){
 function renderBatchLotList(){
   const el=document.getElementById('batchLotList');
   if(!el) return;
-  const todayKey=getTodayKey();
+  const todayKey=getWorkDateKey();
   // 배합LOT
   const batchRecs=(window._fbBatchCache&&window._fbBatchCache['batchRecords_'+todayKey])||[];
   // 투입LOT
   const inputRecs=(window._fbInputCache&&window._fbInputCache['inputRecords_'+todayKey])||[];
 
   if(!batchRecs.length && !inputRecs.length){
-    el.innerHTML='<div class="tc txs" style="padding:24px 0;color:var(--text3)">오늘 완료된 배합/투입 LOT가 없습니다<br><span style="font-size:11px">배합일지 또는 투입일보에서 완료 후 동기화해주세요</span></div>';
+    el.innerHTML='<div class="tc txs" style="padding:24px 0;color:var(--text3)">해당 날짜의 배합/투입 LOT가 없습니다<br><span style="font-size:11px">배합일지 또는 투입일보에서 완료 후 동기화해주세요</span></div>';
     return;
   }
 
@@ -859,7 +900,7 @@ function selectBatchLot(code, lot, lotType){
   // topbar 업데이트 - 투입LOT면 제품명을 투입기록에서 가져오기
   let productName = RECIPE_DB[code]?.name||code;
   if(lotType==='투입'){
-    const todayKey=getTodayKey();
+    const todayKey=getWorkDateKey();
     const inputRecs=(window._fbInputCache&&window._fbInputCache['inputRecords_'+todayKey])||[];
     const found = inputRecs.find(r=>r.lot===lot);
     if(found && found.product) productName = found.product;
@@ -867,7 +908,7 @@ function selectBatchLot(code, lot, lotType){
   document.getElementById('tbTitle').textContent=productName;
   document.getElementById('tbSub').textContent=code||lot;
   // 포장LOT 생성
-  const today=getTodayKey();
+  const today=getWorkDateKey();
   const pCode = code||lot.split('-')[1]||'P';
   const existCount=S.todayRecords.filter(r=>r.productCode===pCode).length;
   document.getElementById('packLot')&&(document.getElementById('packLot').textContent=`포장-${pCode}-${today}-${String(existCount+1).padStart(3,'0')}`);
@@ -919,7 +960,7 @@ function toggleAcc(idx){
 function selectProduct(code){
   S.product=code; S.expiryMonths=null;
   const p=RECIPE_DB[code];
-  const today=getTodayKey();
+  const today=getWorkDateKey();
   S.mfgDate=today;
 
   // 포장로트 생성
@@ -954,7 +995,7 @@ function setExpiry(months){
   S.expiryMonths=months;
   document.querySelectorAll('.month-btn').forEach(b=>b.classList.remove('active'));
   event.target.classList.add('active');
-  const today=getTodayKey();
+  const today=getWorkDateKey();
   const yy=parseInt('20'+today.slice(0,2));
   const mm=parseInt(today.slice(2,4))-1;
   const dd=parseInt(today.slice(4,6));
@@ -1193,11 +1234,11 @@ function completeWithSign(){
 function completePackaging(signImg=''){
   const code=S.product;
   const p=RECIPE_DB[code];
-  const today=getTodayKey();
+  const today=getWorkDateKey();
   // 투입LOT 선택 시 제품명을 투입기록에서 가져오기
   let productName = p?.name||code;
   if(S.batchLotType==='투입'){
-    const todayKey=getTodayKey();
+    const todayKey=getWorkDateKey();
     const inputRecs=(window._fbInputCache&&window._fbInputCache['inputRecords_'+todayKey])||[];
     const found=inputRecs.find(r=>r.lot===S.batchLot);
     if(found&&found.product) productName=found.product;
