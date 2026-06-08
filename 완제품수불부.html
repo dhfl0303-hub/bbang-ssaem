@@ -113,6 +113,8 @@ tr:hover td{background:var(--bg);}
       <select class="search-input" id="fl-st-client" onchange="flRenderStock()"><option value="전체">전체 거래처</option></select>
       <select class="search-input" id="fl-st-group" onchange="flRenderStock()"><option value="전체">전체 그룹</option></select>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="fl-st-hide-zero" onchange="flRenderStock()"> 재고있는것만</label>
+      <button class="btn btn-sm" style="background:var(--success-light);color:var(--success);border:1px solid #8dc;" onclick="flBackup()">💾 백업</button>
+      <button class="btn btn-sm" style="background:var(--primary-light);color:var(--primary);border:1px solid #acd;" onclick="flRestore()">🔄 복원</button>
     </div>
     <div class="card"><div class="card-bd" style="padding:0"><div class="table-wrap"><table style="min-width:800px"><thead><tr><th>▸</th><th>그룹LOT</th><th>거래처</th><th>품명</th><th>제조일자</th><th>소비기한</th><th>입고</th><th>출고</th><th>잔량</th><th>완파렛트</th><th>잔여박스</th><th></th></tr></thead><tbody id="fl-stock-tbody"></tbody></table></div></div></div>
   </div>
@@ -490,7 +492,7 @@ function flRenderStock(){
       <td class="tc" style="font-weight:700;color:${g.remain_box>0?'var(--primary)':'var(--text3)'}">${g.remain_box.toLocaleString()}</td>
       <td class="tc">${palletStr}</td>
       <td class="tc">${remStr}</td>
-      <td class="tc" onclick="event.stopPropagation()"><button class="btn btn-sm btn-danger" onclick="flDeleteStockGroup('${g.key}')">삭제</button></td>
+      <td class="tc" onclick="event.stopPropagation()" style="white-space:nowrap"><button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;font-size:11px;padding:3px 6px;margin-right:4px" onclick="flOpenDispose('${g.key}')">폐기</button><button class="btn btn-sm btn-danger" onclick="flDeleteStockGroup('${g.key}')">삭제</button></td>
     </tr>`;
     if(exp){
       for(const l of g.lots){
@@ -529,6 +531,58 @@ function flDeleteStockGroup(gk){
   FL_STATE.expandedStock.delete(gk);
   flSave(); flRefreshOutboundCombos(); flRenderStock(); flRenderOutbound();
 }
+// ===== 백업/복원/폐기 =====
+async function flBackup(){
+  if(!window._db){alert('Firebase 연결 확인');return;}
+  if(!confirm('현재 완제품 재고를 백업하시겠습니까?'))return;
+  await window._db.collection('appData').doc('완제품_lots_backup').set({data:JSON.stringify(FL_STATE.lots),updatedAt:new Date().toISOString(),count:FL_STATE.lots.length});
+  alert('백업 완료! ('+FL_STATE.lots.length+'건)');
+}
+async function flRestore(){
+  if(!window._db){alert('Firebase 연결 확인');return;}
+  const snap=await window._db.collection('appData').doc('완제품_lots_backup').get();
+  if(!snap.exists||!snap.data().data){alert('저장된 백업이 없습니다.');return;}
+  const bd=JSON.parse(snap.data().data);
+  if(!confirm('백업으로 복원하시겠습니까? ('+bd.length+'건)\n현재 데이터는 사라집니다.'))return;
+  FL_STATE.lots=bd;
+  flSave();flRenderStock();flRefreshOutboundCombos();
+  alert('복원 완료!');
+}
+function flOpenDispose(gk){
+  const g=flGetGroups().find(x=>x.key===gk);
+  if(!g){alert('그룹을 찾을 수 없습니다');return;}
+  document.getElementById('flDispName').value=gk+' / '+g.name;
+  document.getElementById('flDispRemain').value=g.remain_box+' box';
+  document.getElementById('flDispQty').value='';
+  const td=new Date();
+  document.getElementById('flDispDate').value=String(td.getFullYear()).slice(2)+String(td.getMonth()+1).padStart(2,'0')+String(td.getDate()).padStart(2,'0');
+  document.getElementById('flDispReason').value='기한초과';
+  document.getElementById('flDisposeModal').dataset.gk=gk;
+  document.getElementById('flDisposeModal').classList.add('open');
+}
+function flSaveDispose(){
+  const gk=document.getElementById('flDisposeModal').dataset.gk;
+  const boxes=parseInt(document.getElementById('flDispQty').value)||0;
+  const date=document.getElementById('flDispDate').value;
+  const reason=document.getElementById('flDispReason').value;
+  if(!boxes){alert('폐기 박스수를 입력해주세요');return;}
+  const g=flGetGroups().find(x=>x.key===gk);
+  if(!g){alert('그룹을 찾을 수 없습니다');return;}
+  if(boxes>g.remain_box){alert('잔량('+g.remain_box+'box)보다 많습니다');return;}
+  // 잔량에서 차감 (출고와 동일한 방식)
+  let toDeduct=boxes;
+  const lots=FL_STATE.lots.filter(l=>flGroupKey(l.lot_number)===gk&&l.remain_box>0);
+  for(const l of lots){
+    if(toDeduct<=0)break;
+    const deduct=Math.min(toDeduct,l.remain_box);
+    l.outbound.push({box:deduct,client:'[폐기]'+reason,date:date});
+    l.remain_box-=deduct;
+    toDeduct-=deduct;
+  }
+  flSave();closeModal('flDisposeModal');flRenderStock();flRefreshOutboundCombos();
+  alert(gk+' '+boxes+'box 폐기 처리 완료');
+}
+
 function flAddProduct(){
   const lotCode=document.getElementById('fl-pm-lot-code').value.trim();
   const client=document.getElementById('fl-pm-client').value.trim();
@@ -661,7 +715,27 @@ function printFinishedLedger(){
     </tr></thead>
     <tbody>${bodyHtml}</tbody>
   </table>
-  </body></html>`);
+  
+<!-- 완제품 폐기 모달 -->
+<div class="modal-overlay" id="flDisposeModal">
+  <div class="modal" style="width:480px">
+    <div class="modal-hd"><div class="modal-title">🗑️ 완제품 폐기</div><button class="modal-close" onclick="closeModal('flDisposeModal')">×</button></div>
+    <div class="modal-bd">
+      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">폐기 처리하면 잔량에서 차감됩니다.</div>
+      <div class="form-row"><label class="form-label">그룹LOT / 품명</label><input class="form-input" id="flDispName" readonly style="background:#f4f6fa;font-weight:700"></div>
+      <div class="form-grid">
+        <div class="form-row"><label class="form-label">현재 잔량</label><input class="form-input" id="flDispRemain" readonly style="background:#f4f6fa"></div>
+        <div class="form-row"><label class="form-label">폐기 박스수</label><input class="form-input" id="flDispQty" type="number" placeholder="0"></div>
+        <div class="form-row"><label class="form-label">폐기일자 YYMMDD</label><input class="form-input" id="flDispDate" placeholder="260608" maxlength="6"></div>
+        <div class="form-row"><label class="form-label">폐기사유</label>
+          <select class="form-input" id="flDispReason"><option value="기한초과">기한초과</option><option value="파손">파손</option><option value="변질">변질</option><option value="불량">불량</option><option value="기타">기타</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('flDisposeModal')">취소</button><button class="btn" style="background:var(--danger);color:#fff;" onclick="flSaveDispose()">폐기 처리</button></div>
+  </div>
+</div>
+</body></html>`);
   printWin.document.close();
   setTimeout(()=>printWin.print(),500);
 }
@@ -679,5 +753,25 @@ function printFinishedLedger(){
   switchFlTab('outbound');
 })();
 </script>
+
+<!-- 완제품 폐기 모달 -->
+<div class="modal-overlay" id="flDisposeModal">
+  <div class="modal" style="width:480px">
+    <div class="modal-hd"><div class="modal-title">🗑️ 완제품 폐기</div><button class="modal-close" onclick="closeModal('flDisposeModal')">×</button></div>
+    <div class="modal-bd">
+      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">폐기 처리하면 잔량에서 차감됩니다.</div>
+      <div class="form-row"><label class="form-label">그룹LOT / 품명</label><input class="form-input" id="flDispName" readonly style="background:#f4f6fa;font-weight:700"></div>
+      <div class="form-grid">
+        <div class="form-row"><label class="form-label">현재 잔량</label><input class="form-input" id="flDispRemain" readonly style="background:#f4f6fa"></div>
+        <div class="form-row"><label class="form-label">폐기 박스수</label><input class="form-input" id="flDispQty" type="number" placeholder="0"></div>
+        <div class="form-row"><label class="form-label">폐기일자 YYMMDD</label><input class="form-input" id="flDispDate" placeholder="260608" maxlength="6"></div>
+        <div class="form-row"><label class="form-label">폐기사유</label>
+          <select class="form-input" id="flDispReason"><option value="기한초과">기한초과</option><option value="파손">파손</option><option value="변질">변질</option><option value="불량">불량</option><option value="기타">기타</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('flDisposeModal')">취소</button><button class="btn" style="background:var(--danger);color:#fff;" onclick="flSaveDispose()">폐기 처리</button></div>
+  </div>
+</div>
 </body>
 </html>

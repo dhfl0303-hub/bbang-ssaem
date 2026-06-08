@@ -201,6 +201,38 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
+
+<!-- 부자재 전체삭제 모달 -->
+<div class="modal-overlay" id="deleteAllSubModal" onclick="closeModalOutside(event,'deleteAllSubModal')">
+  <div class="modal" style="width:400px">
+    <div class="modal-hd"><div class="modal-title">⚠️ 수불내역 전체삭제</div><button class="modal-close" onclick="closeModal('deleteAllSubModal')">×</button></div>
+    <div class="modal-bd">
+      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:var(--danger);line-height:1.6">⚠️ <strong>주의!</strong> 부자재 수불내역이 <strong>모두 삭제</strong>됩니다.</div>
+      <div class="form-row"><label class="form-label">비밀번호</label><input class="form-input" id="deleteAllSubPw" type="password" placeholder="비밀번호 입력"></div>
+      <div id="deleteAllSubPwErr" style="color:var(--danger);font-size:12px;margin-top:6px;display:none">❌ 비밀번호가 올바르지 않습니다.</div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('deleteAllSubModal')">취소</button><button class="btn" style="background:#c00;color:#fff;" onclick="confirmDeleteAllSub()">전체 삭제</button></div>
+  </div>
+</div>
+
+<!-- 부자재 폐기 모달 -->
+<div class="modal-overlay" id="subDisposeModal">
+  <div class="modal" style="width:480px">
+    <div class="modal-hd"><div class="modal-title">🗑️ 부자재 폐기</div><button class="modal-close" onclick="closeModal('subDisposeModal')">×</button></div>
+    <div class="modal-bd">
+      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">폐기 처리하면 재고에서 차감됩니다.</div>
+      <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="sdName" readonly style="background:#f4f6fa;font-weight:700"></div>
+      <div class="form-grid">
+        <div class="form-row"><label class="form-label">폐기일자</label><input class="form-input" id="sdDate" type="date"></div>
+        <div class="form-row"><label class="form-label">폐기수량</label><input class="form-input" id="sdQty" type="number" step="1" placeholder="0"></div>
+      </div>
+      <div class="form-row"><label class="form-label">폐기사유</label>
+        <select class="form-input" id="sdReason"><option value="파손">파손</option><option value="불량">불량</option><option value="오염">오염</option><option value="기타">기타</option></select>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('subDisposeModal')">취소</button><button class="btn" style="background:var(--danger);color:#fff;" onclick="saveSubDispose()">폐기 처리</button></div>
+  </div>
+</div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
@@ -269,10 +301,10 @@ function calcSubLedgerRow(item,monthStart,selDate){
   // init = 전일재고, in = 입고, out = 출고
   const initQty=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='init'&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
   const prevIn=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='in'&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
-  const prevOut=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='out'&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
+  const prevOut=subLedgerRecords.filter(r=>r.name===item.name&&(r.type==='out'||r.type==='dispose')&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
   const prevStock=Math.max(0,initQty+prevIn-prevOut);
   const monthIn=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='in'&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
-  const monthOut=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='out'&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
+  const monthOut=subLedgerRecords.filter(r=>r.name===item.name&&(r.type==='out'||r.type==='dispose')&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
   const closing=Math.max(0,prevStock+monthIn-monthOut);
   return {prevStock,monthIn,monthOut,closing};
 }
@@ -527,10 +559,76 @@ async function loadFromFirebase(){
   }catch(e){ console.warn('Firebase 로드 실패',e); }
 }
 
+
+// ===== 전체삭제/백업/복원/폐기 =====
+function saveSubLedger(){
+  if(window._db) window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+}
+function openDeleteAllSub(){
+  document.getElementById('deleteAllSubPw').value='';
+  document.getElementById('deleteAllSubPwErr').style.display='none';
+  document.getElementById('deleteAllSubModal').classList.add('open');
+}
+async function confirmDeleteAllSub(){
+  if(document.getElementById('deleteAllSubPw').value!=='8004'){
+    document.getElementById('deleteAllSubPwErr').style.display='block';
+    return;
+  }
+  if(!confirm('부자재 수불내역 전체를 삭제하시겠습니까?')) return;
+  subLedgerRecords=[];
+  saveSubLedger();
+  closeModal('deleteAllSubModal'); renderSubLedger();
+  alert('전체 삭제 완료');
+}
+async function backupSubLedger(){
+  if(!window._db){ alert('Firebase 연결 확인'); return; }
+  if(!confirm('현재 부자재 수불내역을 백업하시겠습니까?')) return;
+  await window._db.collection('appData').doc('subLedgerRecords_backup').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString(),count:subLedgerRecords.length});
+  alert('백업 완료! ('+subLedgerRecords.length+'건)');
+}
+async function restoreSubLedger(){
+  if(!window._db){ alert('Firebase 연결 확인'); return; }
+  const snap=await window._db.collection('appData').doc('subLedgerRecords_backup').get();
+  if(!snap.exists||!snap.data().data){ alert('저장된 백업이 없습니다.'); return; }
+  const bd=JSON.parse(snap.data().data);
+  if(!confirm('백업으로 복원하시겠습니까? ('+bd.length+'건)\n현재 데이터는 사라집니다.')) return;
+  subLedgerRecords=bd;
+  saveSubLedger(); renderSubLedger();
+  alert('복원 완료!');
+}
+function openSubDispose(name){
+  document.getElementById('sdName').value=name;
+  document.getElementById('sdDate').value=new Date().toISOString().slice(0,10);
+  document.getElementById('sdQty').value='';
+  document.getElementById('sdReason').value='파손';
+  document.getElementById('subDisposeModal').classList.add('open');
+}
+function saveSubDispose(){
+  const name=document.getElementById('sdName').value;
+  const date=document.getElementById('sdDate').value;
+  const qty=parseInt(document.getElementById('sdQty').value)||0;
+  const reason=document.getElementById('sdReason').value;
+  if(!qty){ alert('폐기수량을 입력해주세요'); return; }
+  subLedgerRecords.push({date,name,code:'',qty,reason,type:'dispose'});
+  saveSubLedger();
+  closeModal('subDisposeModal'); renderSubLedger();
+  alert(name+' '+qty+'EA 폐기 처리 완료');
+}
+
 // ===== 초기화 =====
 (async ()=>{
   await loadFromFirebase();
   await initSubLedger();
+  // OF LOT 자동 보정
+  let ofFixed=false;
+  subLedgerRecords.forEach(r=>{
+    if(r.type==='init'&&!r.lot){
+      const code=r.code||'';
+      const datepart=(r.mfg||'').replace(/\./g,'');
+      if(code&&datepart){ r.lot=code+'-OF-'+datepart; ofFixed=true; }
+    }
+  });
+  if(ofFixed) saveSubLedger();
   document.getElementById('topbarDate').textContent=getToday();
   const _td=new Date(); const _yy=String(_td.getFullYear()).slice(2); const _mm=String(_td.getMonth()+1).padStart(2,'0'); const _dd=String(_td.getDate()).padStart(2,'0');
   const _sldEl=document.getElementById('subLedgerDate'); if(_sldEl){_sldEl.value=_yy+_mm+_dd; _sldEl.style.color='var(--primary)'; _sldEl.style.fontWeight='700';}
