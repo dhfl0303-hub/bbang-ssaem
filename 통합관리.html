@@ -1130,63 +1130,6 @@ function printLedger(){
     <tbody>${rows}</tbody>
   </table>
   
-<!-- 원료재고 전체삭제 모달 -->
-<div class="modal-overlay" id="deleteAllIngStockModal" onclick="if(event.target===this)closeModal('deleteAllIngStockModal')">
-  <div class="modal" style="width:400px">
-    <div class="modal-hd"><div class="modal-title">⚠️ 원료재고 전체삭제</div><button class="modal-close" onclick="closeModal('deleteAllIngStockModal')">×</button></div>
-    <div class="modal-bd">
-      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:var(--danger);line-height:1.6">
-        ⚠️ <strong>주의!</strong> 원료 재고현황 데이터가 <strong>모두 삭제</strong>됩니다.<br>
-        이 작업은 <strong>되돌릴 수 없습니다.</strong>
-      </div>
-      <div class="form-row">
-        <label class="form-label">비밀번호</label>
-        <input class="form-input" id="deleteAllIngStockPw" type="password" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')confirmDeleteAllIngStock()">
-      </div>
-      <div id="deleteAllIngStockPwError" style="color:var(--danger);font-size:12px;margin-top:6px;display:none">❌ 비밀번호가 올바르지 않습니다.</div>
-    </div>
-    <div class="modal-ft">
-      <button class="btn btn-outline" onclick="closeModal('deleteAllIngStockModal')">취소</button>
-      <button class="btn" style="background:#c00;color:#fff;" onclick="confirmDeleteAllIngStock()">전체 삭제</button>
-    </div>
-  </div>
-</div>
-
-<!-- 원료 폐기 모달 -->
-<div class="modal-overlay" id="disposeModal">
-  <div class="modal" style="width:480px">
-    <div class="modal-hd"><div class="modal-title">🗑️ 원료 폐기</div><button class="modal-close" onclick="closeModal('disposeModal')">×</button></div>
-    <div class="modal-bd">
-      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">
-        폐기 처리하면 재고에서 차감됩니다.
-      </div>
-      <div class="form-row"><label class="form-label">원료명</label><input class="form-input" id="dispName" readonly style="background:#f4f6fa;font-weight:700"></div>
-      <div class="form-grid">
-        <div class="form-row"><label class="form-label">LOT</label><input class="form-input" id="dispLot" readonly style="background:#f4f6fa"></div>
-        <div class="form-row"><label class="form-label">현재고</label><input class="form-input" id="dispCurQty" readonly style="background:#f4f6fa"></div>
-        <div class="form-row"><label class="form-label">폐기일자</label><input class="form-input" id="dispDate" type="date"></div>
-        <div class="form-row"><label class="form-label">폐기량 (kg)</label><input class="form-input" id="dispQty" type="number" step="0.001" placeholder="0"></div>
-      </div>
-      <div class="form-row">
-        <label class="form-label">폐기사유</label>
-        <select class="form-input" id="dispReason">
-          <option value="기한초과">기한초과</option>
-          <option value="변질">변질</option>
-          <option value="이물질">이물질</option>
-          <option value="기타">기타</option>
-        </select>
-      </div>
-      <div class="form-row" id="dispReasonEtcRow" style="display:none">
-        <label class="form-label">기타 사유</label>
-        <input class="form-input" id="dispReasonEtc" placeholder="사유 입력">
-      </div>
-    </div>
-    <div class="modal-ft">
-      <button class="btn btn-outline" onclick="closeModal('disposeModal')">취소</button>
-      <button class="btn" style="background:var(--danger);color:#fff;" onclick="saveDispose()">폐기 처리</button>
-    </div>
-  </div>
-</div>
 </body></html>`);
   printWin.document.close();
   setTimeout(()=>printWin.print(),500);
@@ -2151,68 +2094,11 @@ function printTrace(){
   <h2>LOT 추적 보고서</h2>
   <div class="sub">추적번호: ${input} / ${mode} / 출력일시: ${new Date().toLocaleString('ko-KR')}</div>
   ${content}
-  
-<!-- 원료재고 전체삭제 모달 -->
-<div class="modal-overlay" id="deleteAllIngStockModal" onclick="if(event.target===this)closeModal('deleteAllIngStockModal')">
-  <div class="modal" style="width:400px">
-    <div class="modal-hd"><div class="modal-title">⚠️ 원료재고 전체삭제</div><button class="modal-close" onclick="closeModal('deleteAllIngStockModal')">×</button></div>
-    <div class="modal-bd">
-      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:var(--danger);line-height:1.6">
-        ⚠️ <strong>주의!</strong> 원료 재고현황 데이터가 <strong>모두 삭제</strong>됩니다.<br>
-        이 작업은 <strong>되돌릴 수 없습니다.</strong>
-      </div>
-      <div class="form-row">
-        <label class="form-label">비밀번호</label>
-        <input class="form-input" id="deleteAllIngStockPw" type="password" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')confirmDeleteAllIngStock()">
-      </div>
-      <div id="deleteAllIngStockPwError" style="color:var(--danger);font-size:12px;margin-top:6px;display:none">❌ 비밀번호가 올바르지 않습니다.</div>
-    </div>
-    <div class="modal-ft">
-      <button class="btn btn-outline" onclick="closeModal('deleteAllIngStockModal')">취소</button>
-      <button class="btn" style="background:#c00;color:#fff;" onclick="confirmDeleteAllIngStock()">전체 삭제</button>
-    </div>
-  </div>
-</div>
-
-<!-- 원료 폐기 모달 -->
-<div class="modal-overlay" id="disposeModal">
-  <div class="modal" style="width:480px">
-    <div class="modal-hd"><div class="modal-title">🗑️ 원료 폐기</div><button class="modal-close" onclick="closeModal('disposeModal')">×</button></div>
-    <div class="modal-bd">
-      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">
-        폐기 처리하면 재고에서 차감됩니다.
-      </div>
-      <div class="form-row"><label class="form-label">원료명</label><input class="form-input" id="dispName" readonly style="background:#f4f6fa;font-weight:700"></div>
-      <div class="form-grid">
-        <div class="form-row"><label class="form-label">LOT</label><input class="form-input" id="dispLot" readonly style="background:#f4f6fa"></div>
-        <div class="form-row"><label class="form-label">현재고</label><input class="form-input" id="dispCurQty" readonly style="background:#f4f6fa"></div>
-        <div class="form-row"><label class="form-label">폐기일자</label><input class="form-input" id="dispDate" type="date"></div>
-        <div class="form-row"><label class="form-label">폐기량 (kg)</label><input class="form-input" id="dispQty" type="number" step="0.001" placeholder="0"></div>
-      </div>
-      <div class="form-row">
-        <label class="form-label">폐기사유</label>
-        <select class="form-input" id="dispReason">
-          <option value="기한초과">기한초과</option>
-          <option value="변질">변질</option>
-          <option value="이물질">이물질</option>
-          <option value="기타">기타</option>
-        </select>
-      </div>
-      <div class="form-row" id="dispReasonEtcRow" style="display:none">
-        <label class="form-label">기타 사유</label>
-        <input class="form-input" id="dispReasonEtc" placeholder="사유 입력">
-      </div>
-    </div>
-    <div class="modal-ft">
-      <button class="btn btn-outline" onclick="closeModal('disposeModal')">취소</button>
-      <button class="btn" style="background:var(--danger);color:#fff;" onclick="saveDispose()">폐기 처리</button>
-    </div>
-  </div>
-</div>
-</body></html>`);
+  </body></html>`);
   printWin.document.close();
   setTimeout(()=>printWin.print(),500);
 }
+
 
 // ===== 데이터 반환 함수들 =====
 function findRawMaterialData(lot){
@@ -3490,62 +3376,5 @@ function saveSubsidiary(){
 </script>
 
 
-<!-- 원료재고 전체삭제 모달 -->
-<div class="modal-overlay" id="deleteAllIngStockModal" onclick="if(event.target===this)closeModal('deleteAllIngStockModal')">
-  <div class="modal" style="width:400px">
-    <div class="modal-hd"><div class="modal-title">⚠️ 원료재고 전체삭제</div><button class="modal-close" onclick="closeModal('deleteAllIngStockModal')">×</button></div>
-    <div class="modal-bd">
-      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:var(--danger);line-height:1.6">
-        ⚠️ <strong>주의!</strong> 원료 재고현황 데이터가 <strong>모두 삭제</strong>됩니다.<br>
-        이 작업은 <strong>되돌릴 수 없습니다.</strong>
-      </div>
-      <div class="form-row">
-        <label class="form-label">비밀번호</label>
-        <input class="form-input" id="deleteAllIngStockPw" type="password" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')confirmDeleteAllIngStock()">
-      </div>
-      <div id="deleteAllIngStockPwError" style="color:var(--danger);font-size:12px;margin-top:6px;display:none">❌ 비밀번호가 올바르지 않습니다.</div>
-    </div>
-    <div class="modal-ft">
-      <button class="btn btn-outline" onclick="closeModal('deleteAllIngStockModal')">취소</button>
-      <button class="btn" style="background:#c00;color:#fff;" onclick="confirmDeleteAllIngStock()">전체 삭제</button>
-    </div>
-  </div>
-</div>
-
-<!-- 원료 폐기 모달 -->
-<div class="modal-overlay" id="disposeModal">
-  <div class="modal" style="width:480px">
-    <div class="modal-hd"><div class="modal-title">🗑️ 원료 폐기</div><button class="modal-close" onclick="closeModal('disposeModal')">×</button></div>
-    <div class="modal-bd">
-      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">
-        폐기 처리하면 재고에서 차감됩니다.
-      </div>
-      <div class="form-row"><label class="form-label">원료명</label><input class="form-input" id="dispName" readonly style="background:#f4f6fa;font-weight:700"></div>
-      <div class="form-grid">
-        <div class="form-row"><label class="form-label">LOT</label><input class="form-input" id="dispLot" readonly style="background:#f4f6fa"></div>
-        <div class="form-row"><label class="form-label">현재고</label><input class="form-input" id="dispCurQty" readonly style="background:#f4f6fa"></div>
-        <div class="form-row"><label class="form-label">폐기일자</label><input class="form-input" id="dispDate" type="date"></div>
-        <div class="form-row"><label class="form-label">폐기량 (kg)</label><input class="form-input" id="dispQty" type="number" step="0.001" placeholder="0"></div>
-      </div>
-      <div class="form-row">
-        <label class="form-label">폐기사유</label>
-        <select class="form-input" id="dispReason">
-          <option value="기한초과">기한초과</option>
-          <option value="변질">변질</option>
-          <option value="이물질">이물질</option>
-          <option value="기타">기타</option>
-        </select>
-      </div>
-      <div class="form-row" id="dispReasonEtcRow" style="display:none">
-        <label class="form-label">기타 사유</label>
-        <input class="form-input" id="dispReasonEtc" placeholder="사유 입력">
-      </div>
-    </div>
-    <div class="modal-ft">
-      <button class="btn btn-outline" onclick="closeModal('disposeModal')">취소</button>
-      <button class="btn" style="background:var(--danger);color:#fff;" onclick="saveDispose()">폐기 처리</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>

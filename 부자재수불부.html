@@ -78,7 +78,7 @@ tr:hover td{background:var(--bg);}
     <select class="search-input" id="subLedgerCategory" onchange="renderSubLedger()" style="min-width:140px">
       <option value="">전체 품목</option>
       <option value="필름포장지">필름포장지</option>
-      <option value="벌크비닐">벌크비닐</option>
+      <option value="비닐">벌크비닐</option>
       <option value="박스">박스</option>
       <option value="패키지박스">패키지박스</option>
       <option value="기타">기타</option>
@@ -152,7 +152,7 @@ tr:hover td{background:var(--bg);}
     <div class="modal-hd"><div class="modal-title">➕ 부자재 신규 등록</div><button class="modal-close" onclick="closeModal('newSubItemModal')">×</button></div>
     <div class="modal-bd">
       <div class="form-grid">
-        <div class="form-row"><label class="form-label">품목 분류</label><select class="form-input" id="nsiCategory" onchange="updateNsiCode()"><option value="필름포장지">필름포장지</option><option value="벌크비닐">벌크비닐</option><option value="박스">박스</option><option value="패키지박스">패키지박스</option><option value="기타">기타</option></select></div>
+        <div class="form-row"><label class="form-label">품목 분류</label><select class="form-input" id="nsiCategory" onchange="updateNsiCode()"><option value="필름포장지">필름포장지</option><option value="비닐">벌크비닐</option><option value="박스">박스</option><option value="패키지박스">패키지박스</option><option value="기타">기타</option></select></div>
         <div class="form-row"><label class="form-label">품목코드 (자동)</label><input class="form-input" id="nsiCode" readonly style="background:#f8f9fb;color:var(--primary);font-weight:700"></div>
         <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="nsiName" placeholder="품목명 입력"></div>
         <div class="form-row"><label class="form-label">규격</label><input class="form-input" id="nsiSpec" placeholder="규격 입력"></div>
@@ -255,8 +255,8 @@ function closeModalOutside(e,id){ if(e.target.id===id) closeModal(id); }
 function closeAllModals(){ document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open')); }
 
 // ===== 부자재수불부 =====
-const SUB_CATEGORIES=['필름포장지','벌크비닐','박스','패키지박스','기타'];
-const SUB_CAT_ICONS={'필름포장지':'🎞️','벌크비닐':'🗂️','박스':'📦','패키지박스':'🎁','기타':'📋'};
+const SUB_CATEGORIES=['필름포장지','비닐','박스','패키지박스','기타'];
+const SUB_CAT_ICONS={'필름포장지':'🎞️','비닐':'🗂️','박스':'📦','패키지박스':'🎁','기타':'📋'};
 let SUB_ITEM_DB=[];
 let subLedgerRecords=[];
 
@@ -272,7 +272,7 @@ async function initSubLedger(){
         const exists=subLedgerRecords.find(r=>r.lot===lot&&r.type==='in');
         if(!exists){
           const isoDate=rec.date||getTodayISO2();
-          const subCat=row.category||Object.keys({'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>row.item.includes(k))||'기타';
+          const rawCat=row.category==='벌크비닐'?'비닐':row.category; const subCat=rawCat||Object.keys({'필름포장지':'필름포장지','비닐':'비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>row.item.includes(k))||'기타';
           const subCode=autoSubCode(subCat);
           subLedgerRecords.push({date:isoDate,name:row.item,code:subCode,qty:parseFloat(row.qty)||0,mfg:row.mfg||'',lot,supplier:row.supplier||'',type:'in'});
         }
@@ -282,7 +282,7 @@ async function initSubLedger(){
   }catch(e){}
   subLedgerRecords.forEach(r=>{
     if(r.name&&!SUB_ITEM_DB.find(i=>i.name===r.name)){
-      const cat=Object.keys({'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>r.name.includes(k)||r.category===k)||'기타';
+      const cat=Object.keys({'필름포장지':'필름포장지','비닐':'비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>r.name.includes(k)||r.category===k||r.category==='벌크비닐'&&k==='비닐')||'기타';
       const newCode=autoSubCode(cat); SUB_ITEM_DB.push({code:newCode,name:r.name,category:cat,spec:'',unit:'EA',supplier:r.supplier||''});
     }
   });
@@ -290,7 +290,7 @@ async function initSubLedger(){
 }
 
 function autoSubCode(category){
-  const prefixMap={'필름포장지':'F','벌크비닐':'G','박스':'H','패키지박스':'P','기타':'Z'};
+  const prefixMap={'필름포장지':'F','비닐':'G','박스':'H','패키지박스':'P','기타':'Z'};
   const prefix=prefixMap[category]||'Z';
   const nums=SUB_ITEM_DB.filter(i=>i.category===category).map(i=>parseInt((i.code||'').replace(prefix,''))||0);
   const next=(nums.length?Math.max(...nums):0)+1;
@@ -550,7 +550,7 @@ async function loadFromFirebase(){
     if(itemSnap.exists && itemSnap.data().data) SUB_ITEM_DB = JSON.parse(itemSnap.data().data);
     if(ledgerSnap.exists && ledgerSnap.data().data) subLedgerRecords = JSON.parse(ledgerSnap.data().data);
     // 잘못 들어간 카테고리명(필름포장지 등) 항목 정리
-    const badNames=['필름포장지','벌크비닐','박스','패키지박스'];
+    const badNames=['필름포장지','비닐','벌크비닐','박스','패키지박스'];
     const before=subLedgerRecords.length;
     subLedgerRecords=subLedgerRecords.filter(r=>!badNames.includes(r.name));
     if(subLedgerRecords.length!==before){
@@ -619,6 +619,16 @@ function saveSubDispose(){
 (async ()=>{
   await loadFromFirebase();
   await initSubLedger();
+  // 기존 category '벌크비닐' → '비닐' 자동 변환
+  let catFixed=false;
+  subLedgerRecords.forEach(r=>{ if(r.category==='벌크비닐'){r.category='비닐';catFixed=true;} });
+  SUB_ITEM_DB.forEach(i=>{ if(i.category==='벌크비닐'){i.category='비닐';catFixed=true;} });
+  if(catFixed){
+    if(window._db){
+      window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+      window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+    }
+  }
   // OF LOT 자동 보정
   let ofFixed=false;
   subLedgerRecords.forEach(r=>{

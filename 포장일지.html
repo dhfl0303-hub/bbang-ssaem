@@ -580,7 +580,7 @@ function loadSubLots(){
   const recs=window._subLedgerRecords||[];
   const catMap={
     'filmLot':'필름포장지',
-    'bulkLot':'벌크비닐',
+    'bulkLot':'비닐',
     'boxLot':'박스',
     'pkgBoxLot':'패키지박스'
   };
@@ -1340,11 +1340,17 @@ async function syncToServer(){
     let subRecs = (subSnap.exists && subSnap.data().data) ? JSON.parse(subSnap.data().data) : [];
     recs.forEach(rec=>{
       const filmLot=rec.filmLot||''; const bulkLot=rec.bulkLot||''; const boxLot=rec.boxLot||''; const pkgBoxLot=rec.pkgBoxLot||'';
-      [{lot:filmLot,cat:'필름포장지'},{lot:bulkLot,cat:'벌크비닐'},{lot:boxLot,cat:'박스'},{lot:pkgBoxLot,cat:'패키지박스'}]
+      const rawDate=rec.date||'';
+      const isoDate=rawDate.length===6?'20'+rawDate.slice(0,2)+'-'+rawDate.slice(2,4)+'-'+rawDate.slice(4,6):(rawDate||new Date().toISOString().slice(0,10));
+      [{lot:filmLot,cat:'필름포장지'},{lot:bulkLot,cat:'비닐'},{lot:boxLot,cat:'박스'},{lot:pkgBoxLot,cat:'패키지박스'}]
         .filter(x=>x.lot)
         .forEach(x=>{
           const exists = subRecs.find(r=>r.type==='out'&&r.lot===x.lot&&r.packLot===rec.lot);
-          if(!exists) subRecs.push({date:rec.date||new Date().toISOString().slice(0,10),name:x.cat,lot:x.lot,qty:1,packLot:rec.lot,type:'out'});
+          if(!exists){
+            const matched=subRecs.find(r=>r.lot===x.lot&&(r.type==='in'||r.type==='init'));
+            const itemName=matched?matched.name:x.cat;
+            subRecs.push({date:isoDate,name:itemName,lot:x.lot,qty:1,packLot:rec.lot,type:'out'});
+          }
         });
     });
     await db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subRecs),updatedAt:new Date().toISOString()});

@@ -597,9 +597,9 @@ function printSingleRecord(idx){
     (br.ingredients||[]).forEach(ing=>{
       if(!totals[ing.name])totals[ing.name]={};
       ing.exps.forEach(e=>{
-        const key=e.lot||e.exp||'';
-        if(!key) return;
-        if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||'',exp:e.exp||'',amt:0};
+        let key=e.lot||e.exp||'';
+        if(!key) key=ing.name==='정제수'?'M000-'+r.date+'-'+r.date:'기타';
+        if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||(ing.name==='정제수'?'M000-'+r.date+'-'+r.date:''),exp:e.exp||'',amt:0};
         totals[ing.name][key].amt+=e.amount||0;
       });
     });
@@ -1077,8 +1077,8 @@ function showComplete(){
   S.batchRecords.forEach(r=>r.ingredients.forEach(ing=>{
     if(!totals[ing.name])totals[ing.name]={};
     ing.exps.forEach(e=>{
-      const key=e.lot||e.exp||'';
-      if(!key) return;
+      let key=e.lot||e.exp||'';
+      if(!key) key=ing.name==='정제수'?'M000-'+getTodayKey()+'-'+getTodayKey():'기타';
       if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||'',exp:e.exp||'',amt:0};
       totals[ing.name][key].amt+=e.amount||0;
     });
@@ -1104,8 +1104,8 @@ function genPrint(){
   S.batchRecords.forEach(r=>r.ingredients.forEach(ing=>{
     if(!totals[ing.name])totals[ing.name]={};
     ing.exps.forEach(e=>{
-      const key=e.lot||e.exp||'';
-      if(!key) return;
+      let key=e.lot||e.exp||'';
+      if(!key) key=ing.name==='정제수'?'M000-'+getTodayKey()+'-'+getTodayKey():'기타';
       if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||'',exp:e.exp||'',amt:0};
       totals[ing.name][key].amt+=e.amount||0;
     });
@@ -1354,7 +1354,9 @@ async function syncToServer(){
             const exists = ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===br.lot&&r.exp===e.exp);
             if(!exists){
               const code = INGREDIENT_DB_STATIC[ing.name]||'';
-              ledgerRecords.push({ date:rec.date||getTodayKey(), name:ing.name, code, qty:(e.qty||ing.amount||0)/1000, lot:e.lot||'', exp:e.exp||'', batchLot:br.lot, type:'out' });
+              const rawDate=rec.date||getTodayKey();
+              const isoDate=rawDate.length===6?'20'+rawDate.slice(0,2)+'-'+rawDate.slice(2,4)+'-'+rawDate.slice(4,6):rawDate;
+              ledgerRecords.push({ date:isoDate, name:ing.name, code, qty:(e.qty||ing.amount||0)/1000, lot:e.lot||'', exp:e.exp||'', batchLot:br.lot, type:'out' });
             }
           });
         });
