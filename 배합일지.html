@@ -766,7 +766,7 @@ function onExpInput(input){
   updateAutoCalc(input.closest('.ing-block'));
 }
 
-// ledgerRecords(init+in)에서 원료별 LOT 목록 가져오기
+// ledgerRecords(init+in)에서 원료별 LOT 목록 가져오기 + 잔여재고 계산
 function getIngLots(ingName){
   try{
     const lots=[];
@@ -774,34 +774,61 @@ function getIngLots(ingName){
     const ledger = window._ledgerRecords||JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
     const ingN=ingName.trim().replace(/\n/g,' ');
 
+    // 원료명 매칭 함수
+    function nameMatch(recName){
+      const rn=(recName||'').trim().replace(/\n/g,' ');
+      return rn===ingN || rn.includes(ingN) || ingN.includes(rn);
+    }
+
+    // 1) LOT별 입고량 합산 (init + in)
+    const inQty={};
     ledger.forEach(r=>{
       if(r.type!=='init' && r.type!=='in') return;
-      const recName=(r.name||'').trim().replace(/\n/g,' ');
-      if(recName!==ingN && !recName.includes(ingN) && !ingN.includes(recName)) return;
+      if(!nameMatch(r.name)) return;
+      if(!r.lot) return;
+      inQty[r.lot]=(inQty[r.lot]||0)+(parseFloat(r.qty)||0);
+    });
+
+    // 2) LOT별 출고량 합산 (out)
+    const outQty={};
+    ledger.forEach(r=>{
+      if(r.type!=='out') return;
+      if(!nameMatch(r.name)) return;
+      if(!r.lot) return;
+      outQty[r.lot]=(outQty[r.lot]||0)+(parseFloat(r.qty)||0);
+    });
+
+    // 3) LOT 목록 생성 + 잔여재고 표시
+    ledger.forEach(r=>{
+      if(r.type!=='init' && r.type!=='in') return;
+      if(!nameMatch(r.name)) return;
       if(!r.lot || seen.has(r.lot)) return;
       seen.add(r.lot);
 
+      const remaining = Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
+      const stockLbl = remaining>0 ? ` [재고:${remaining}kg]` : ' [재고없음]';
+
       if(r.type==='init'){
-        // 초기재고: 코드-OI-소비기한or제조일자
         const hasExp = !!(r.exp);
         const dateLbl = hasExp ? '소비:'+fmtExp(r.exp) : '제조:'+fmtExp(r.mfg||'');
         lots.push({
           lot:r.lot,
-          label:r.lot+' (초기재고 '+dateLbl+')',
+          label:r.lot+' (초기재고 '+dateLbl+')'+stockLbl,
           exp:fmtExp(r.exp||r.mfg||''),
           date:'',
-          isOI:true
+          isOI:true,
+          remaining
         });
       } else {
-        // 입고: 코드-입고일자-소비기한or제조일자
         const hasExp = !!(r.exp);
         const dateLbl = hasExp ? '소비:'+fmtExp(r.exp) : '제조:'+fmtExp(r.mfg||'');
         lots.push({
           lot:r.lot,
-          label:r.lot+' (입고:'+r.date+' '+dateLbl+')',
+          label:r.lot+' (입고:'+r.date+' '+dateLbl+')'+stockLbl,
           exp:fmtExp(r.exp||r.mfg||''),
           date:r.date||'',
-          isOI:false
+          isOI:false,
+          remaining
         });
       }
     });
