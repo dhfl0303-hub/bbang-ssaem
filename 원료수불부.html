@@ -383,23 +383,7 @@ function getInitDateVal(id){
 function openInitStock(e){
   if(e){e.preventDefault();e.stopPropagation();}
   closeAllModals();
-  // 전일 마감재고 자동 계산해서 initRows에 채움
-  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
-  const yISO = yesterday.toISOString().slice(0,10);
   initRows = [];
-  const hasInit = ledgerRecords.some(r=>r.type==='init');
-  if(hasInit){
-    // 전일 마감재고 계산
-    const autoRows = [];
-    INGREDIENT_DB.forEach(ing=>{
-      const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
-      const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<=yISO).reduce((s,r)=>s+r.qty,0);
-      const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date<=yISO).reduce((s,r)=>s+r.qty,0);
-      const closing=prevInit+prevIn-prevOut;
-      if(closing>0) autoRows.push({date:yISO,name:ing.name,code:ing.code,qty:closing,exp:'',type:'init',_auto:true});
-    });
-    if(autoRows.length) initRows = autoRows;
-  }
   const tb=document.getElementById('initStockTbody');
   if(tb) tb.innerHTML='';
   const initDate=document.getElementById('initDate');
