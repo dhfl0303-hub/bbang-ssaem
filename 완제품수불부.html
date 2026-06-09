@@ -127,7 +127,7 @@ tr:hover td{background:var(--bg);}
       </div>
       <div>
         <div class="card"><div class="card-hd"><div class="card-hd-title">🏢 출고처 관리</div></div><div class="card-bd"><div style="display:flex;gap:8px;margin-bottom:10px;"><input class="form-input" id="fl-cl-new" placeholder="출고처명 입력"><button class="btn btn-primary btn-sm" onclick="flAddClient()">추가</button></div><div class="table-wrap"><table style="min-width:200px"><thead><tr><th>출고처명</th><th></th></tr></thead><tbody id="fl-client-tbody"></tbody></table></div></div></div>
-        <div class="card"><div class="card-hd"><div class="card-hd-title">⚙ 데이터 관리</div></div><div class="card-bd" style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-danger btn-sm" style="width:100%" onclick="flResetData()">🗑 전체 데이터 초기화</button></div></div>
+        <div class="card"><div class="card-hd"><div class="card-hd-title">⚙ 데이터 관리</div></div><div class="card-bd" style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-primary btn-sm" style="width:100%" onclick="flSyncFromPack()">🔄 포장 데이터 동기화</button><button class="btn btn-outline btn-sm" style="width:100%" onclick="flClearDeletedLots()">♻️ 삭제이력 초기화 후 재동기화</button><button class="btn btn-danger btn-sm" style="width:100%" onclick="flResetData()">🗑 전체 데이터 초기화</button></div></div>
       </div>
     </div>
   </div>
@@ -335,22 +335,41 @@ function flSyncFromPack(silent=false){
   const keys=Object.keys(window._fbPackCache||{});
   const lotMapping=window._lotMapping||[];
   const deletedLots=flGetDeletedLots();
-  let count=0;
+  let count=0, updated=0;
   keys.forEach(k=>{
     const recs=(window._fbPackCache&&window._fbPackCache[k])||[];
     recs.forEach(r=>{
       if(!r.lot||!r.productCode) return;
-      if(deletedLots.includes(r.lot)) return; // 삭제된 것 건너뜀
-      const existing=FL_STATE.lots.find(l=>l.pkg_lot===r.lot);
-      if(existing) return;
-      const prod=FL_STATE.products.find(p=>p.lot_code===r.productCode);
-      const mfg=r.date||'';
-      // lotMapping에서 productCode에 해당하는 wLot 코드 찾기 (N6, B1 등)
+
       const mappingEntry=lotMapping.find(m=>m.pLot===r.productCode);
+      // deletedLots에 있어도 매핑이 있으면 재동기화 허용
+      if(deletedLots.includes(r.lot)){
+        if(!mappingEntry) return;
+        const idx=deletedLots.indexOf(r.lot);
+        if(idx>=0){ deletedLots.splice(idx,1); window._deletedLots=deletedLots; if(window._db) window._db.collection('appData').doc('완제품_deleted_lots').set({data:JSON.stringify(deletedLots),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e)); }
+      }
       const wLotCode=mappingEntry&&mappingEntry.wLots.length ? mappingEntry.wLots[0].lot : r.productCode;
-      const wLotName=mappingEntry&&mappingEntry.wLots.length ? mappingEntry.wLots[0].name : (r.product||prod?.name||'');
-      const wLotClient=mappingEntry&&mappingEntry.wLots.length ? mappingEntry.wLots[0].client : (prod?prod.client:'');
-      // 완제품 LOT 형식: N6-260601-01
+      const wLotName=mappingEntry&&mappingEntry.wLots.length ? mappingEntry.wLots[0].name : (r.product||'');
+      const wLotClient=mappingEntry&&mappingEntry.wLots.length ? mappingEntry.wLots[0].client : '';
+      const prod=FL_STATE.products.find(p=>p.lot_code===wLotCode);
+
+      const existing=FL_STATE.lots.find(l=>l.pkg_lot===r.lot);
+      if(existing){
+        // 매핑 변경됐으면 업데이트
+        if(existing.lot_code_base!==wLotCode){
+          const mfg=existing.mfg_date||r.date||'';
+          const existCount=FL_STATE.lots.filter(l=>l.pkg_lot!==r.lot&&l.lot_code_base===wLotCode&&l.mfg_date===mfg).length;
+          existing.lot_number=`${wLotCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
+          existing.lot_code_base=wLotCode;
+          existing.name=wLotName;
+          existing.client=wLotClient;
+          existing.spec=prod?.spec||existing.spec||'';
+          updated++;
+        }
+        return;
+      }
+
+      const mfg=r.date||'';
       const existCount=FL_STATE.lots.filter(l=>l.lot_code_base===wLotCode&&l.mfg_date===mfg).length;
       const lotNum=`${wLotCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
       FL_STATE.lots.push({
@@ -367,8 +386,22 @@ function flSyncFromPack(silent=false){
     });
   });
   flSave();
-  if(!silent) alert(`동기화 완료: ${count}건 추가`);
+  if(!silent){
+    let msg=`동기화 완료: ${count}건 추가`;
+    if(updated) msg+=`, ${updated}건 매핑 업데이트`;
+    alert(msg);
+  }
   flRenderStock();flRefreshOutboundCombos();
+}
+
+// deletedLots 초기화 (재동기화용)
+async function flClearDeletedLots(){
+  if(!confirm('삭제 이력을 초기화하고 포장 데이터를 다시 동기화하시겠습니까?')) return;
+  window._deletedLots=[];
+  if(window._db){
+    try{ await window._db.collection('appData').doc('완제품_deleted_lots').set({data:'[]',updatedAt:new Date().toISOString()}); }catch(e){}
+  }
+  flSyncFromPack();
 }
 function initFinishedLedger(){flLoad();flSyncFromPack(true);}
 function switchFlTab(tab){
