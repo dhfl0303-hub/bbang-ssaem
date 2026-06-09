@@ -404,17 +404,13 @@ tr:hover td{background:var(--bg);}
                 <tr>
                   <th>포장LOT</th><th>제품명</th><th>작업자</th>
                   <th>시작</th><th>종료</th><th>포장수량(ea)</th>
-                  <th>박스수</th><th>필름</th><th>벌크비닐</th><th>박스</th>
+                  <th>박스수</th><th>필름</th><th>벌크비닐</th><th>박스</th><th>관리</th>
                 </tr>
               </thead>
               <tbody id="packStatusTbody">
-                <tr><td colspan="10" class="tc" style="padding:24px;color:var(--text3);">조회 날짜를 선택하고 조회 버튼을 눌러주세요</td></tr>
+                <tr><td colspan="11" class="tc" style="padding:24px;color:var(--text3);">조회 날짜를 선택하고 조회 버튼을 눌러주세요</td></tr>
               </tbody>
             </table>
-          </div>
-          <div style="display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;">
-            <button class="btn btn-sm btn-outline" onclick="openEditIncoming(${i})">수정</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteIncoming(${i})">삭제</button>
           </div>
         </div>
       </div>
@@ -1816,14 +1812,14 @@ function loadPackStatus(){
 
   const tbody = document.getElementById('packStatusTbody');
   if(!records.length){
-    tbody.innerHTML = '<tr><td colspan="10" class="tc" style="padding:24px;color:var(--text3);">해당 날짜의 포장 기록이 없습니다</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="tc" style="padding:24px;color:var(--text3);">해당 날짜의 포장 기록이 없습니다</td></tr>';
     document.getElementById('psPcs').textContent='-';
     document.getElementById('psBoxes').textContent='-';
     document.getElementById('psFilm').textContent='-';
     return;
   }
 
-  tbody.innerHTML = records.map(r=>{
+  tbody.innerHTML = records.map((r,i)=>{
     totalPcs += parseInt(r.qtyPcs)||0;
     totalBoxes += parseInt(r.qtyBoxes)||0;
     totalFilm += parseInt(r.filmQty)||0;
@@ -1838,12 +1834,32 @@ function loadPackStatus(){
       <td style="text-align:center;">${r.filmQty||0}</td>
       <td style="text-align:center;">${r.bulkQty||0}</td>
       <td style="text-align:center;">${r.boxQty||0}</td>
+      <td style="text-align:center;"><button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:11px;" onclick="deletePackLot('${key}',${i})">삭제</button></td>
     </tr>`;
   }).join('');
 
   document.getElementById('psPcs').textContent = totalPcs.toLocaleString();
   document.getElementById('psBoxes').textContent = totalBoxes.toLocaleString();
   document.getElementById('psFilm').textContent = totalFilm.toLocaleString();
+}
+
+async function deletePackLot(dateKey, idx){
+  const records = (window._fbCache&&window._fbCache['packRecords_'+dateKey])||[];
+  const r = records[idx];
+  if(!r) return;
+  if(!confirm(`"${r.product} (${r.lot})" 포장 기록을 삭제하시겠습니까?`)) return;
+  records.splice(idx, 1);
+  window._fbCache['packRecords_'+dateKey] = records;
+  if(window._db){
+    try{
+      if(records.length){
+        await window._db.collection('appData').doc('packRecords_'+dateKey).set({data:JSON.stringify(records),updatedAt:new Date().toISOString()});
+      } else {
+        await window._db.collection('appData').doc('packRecords_'+dateKey).delete();
+      }
+    }catch(e){ console.error('삭제 실패',e); }
+  }
+  loadPackStatus();
 }
 
 // ===== 추적성 =====
@@ -2432,12 +2448,16 @@ function loadYield(){
     return;
   }
 
-  // 제품별 배합 투입량 계산
+  // 제품별 배합 투입량 계산 (정제수 등 기타원재료 포함)
   const batchMap={};
   batchRecs.forEach(r=>{
     if(!batchMap[r.productCode]) batchMap[r.productCode]={name:r.product,input:0,pcs:0,boxes:0};
     if(r.batchRecords) r.batchRecords.forEach(b=>{
       b.ingredients&&b.ingredients.forEach(ing=>{ batchMap[r.productCode].input+=ing.total||0; });
+    });
+    // 기타사용원재료 (정제수 등) 투입량 합산
+    if(r.extraIngredients) r.extraIngredients.forEach(ext=>{
+      batchMap[r.productCode].input += (parseFloat(ext.amount)||0);
     });
   });
   // 투입일보 투입량 합산 (제품명 기준)
