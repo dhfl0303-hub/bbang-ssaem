@@ -130,6 +130,15 @@ tr:hover td{background:var(--bg);}
 .ing-del{width:28px;height:28px;border-radius:50%;background:var(--danger-light);border:1px solid #fcc;color:var(--danger);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;}
 
 /* LOT 매핑 */
+.bs-acc{border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden;background:#fff;}
+.bs-acc-hd{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;gap:10px;transition:background .15s;}
+.bs-acc-hd:hover{background:var(--bg2);}
+.bs-acc-hd .arr{transition:transform .2s;font-size:12px;color:var(--text3);}
+.bs-acc.open .arr{transform:rotate(180deg);}
+.bs-acc-bd{display:none;padding:0 12px 12px;}.bs-acc.open .bs-acc-bd{display:block;}
+.bs-acc-bd table{width:100%;border-collapse:collapse;font-size:13px;}
+.bs-acc-bd th,.bs-acc-bd td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;}
+.bs-acc-bd th{background:var(--bg2);font-weight:700;font-size:12px;color:var(--text2);}
 .mapping-item{background:#fff;border:1.5px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
 .mapping-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg);}
 .mapping-plot{font-size:13px;font-weight:700;color:var(--primary);}
@@ -317,24 +326,8 @@ tr:hover td{background:var(--bg);}
           <div class="card-hd-title">🥣 배합 현황</div>
           <span class="badge badge-blue" id="bsDateBadge"></span>
         </div>
-        <div class="card-bd" style="padding:0;">
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>배합LOT</th><th>제품명</th><th>작업자</th><th>원료코드</th><th>원료명</th>
-                  <th>소비기한</th><th>실사용량(g)</th><th>총배합수</th>
-                </tr>
-              </thead>
-              <tbody id="batchStatusTbody">
-                <tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3);">조회 날짜를 선택하고 조회 버튼을 눌러주세요</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div style="display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;">
-            <button class="btn btn-sm btn-outline" onclick="openEditIncoming(${i})">수정</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteIncoming(${i})">삭제</button>
-          </div>
+        <div class="card-bd" style="padding:8px;" id="batchStatusList">
+          <div class="tc" style="padding:24px;color:var(--text3);">조회 날짜를 선택하고 조회 버튼을 눌러주세요</div>
         </div>
       </div>
     </div>
@@ -842,6 +835,23 @@ tr:hover td{background:var(--bg);}
   <div class="modal"><div class="modal-hd"><div class="modal-title">부자재 입고 등록</div><button class="modal-close" onclick="closeModal('subsidiaryModal')">×</button></div>
   <div class="modal-bd"><div class="form-row"><label class="form-label">품목</label><select class="form-input" id="sbItem"><option value="film">필름포장지</option></select></div></div>
   <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('subsidiaryModal')">취소</button></div></div>
+</div>
+
+<!-- LOT 매핑 모달 -->
+<div class="modal-overlay" id="mappingModal" onclick="closeModalOutside(event,'mappingModal')">
+  <div class="modal" style="width:520px">
+    <div class="modal-hd"><div class="modal-title" id="mappingModalTitle">LOT 매핑 추가</div><button class="modal-close" onclick="closeModal('mappingModal')">×</button></div>
+    <div class="modal-bd">
+      <div class="form-row"><label class="form-label">포장코드 (pLot)</label><select class="form-input" id="mPLot"></select></div>
+      <div class="form-row"><label class="form-label">완제품 LOT코드</label><input class="form-input" id="mWLot" placeholder="예: O1, N6, B1"></div>
+      <div class="form-row"><label class="form-label">완제품명</label><input class="form-input" id="mWName" placeholder="예: 티요프레즐"></div>
+      <div class="form-row"><label class="form-label">거래처</label><input class="form-input" id="mClient" placeholder="예: 탐앤탐스"></div>
+      <div class="form-row"><label class="form-label">비고</label><input class="form-input" id="mNote" placeholder="비고"></div>
+      <input type="hidden" id="mEditIdx" value="-1">
+      <input type="hidden" id="mEditWIdx" value="-1">
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('mappingModal')">취소</button><button class="btn btn-primary" onclick="saveMapping()">저장</button></div>
+  </div>
 </div>
 
 
@@ -1637,65 +1647,69 @@ function loadBatchStatus(){
 
   let totalBatches=0, totalLots=0;
   document.getElementById('bsCnt').textContent = records.length;
+  const container = document.getElementById('batchStatusList');
 
   if(!records.length){
-    document.getElementById('batchStatusTbody').innerHTML = '<tr><td colspan="7" class="tc" style="padding:24px;color:var(--text3);">해당 날짜의 배합 기록이 없습니다</td></tr>';
+    container.innerHTML = '<div class="tc" style="padding:24px;color:var(--text3);">해당 날짜의 배합 기록이 없습니다</div>';
     document.getElementById('bsBatch').textContent='-';
     document.getElementById('bsLot').textContent='-';
     return;
   }
 
-  const tbody = document.getElementById('batchStatusTbody');
-  let rows = [];
-  records.forEach(r=>{
+  let html = '';
+  records.forEach((r,ri)=>{
     const batches = r.batchRecords||[];
     const worker = r.worker||r.workerName||'-';
     totalBatches += r.totalBatches||batches.length;
     totalLots += batches.length;
-    batches.forEach(b=>{
+
+    batches.forEach((b,bi)=>{
       const ings = b.ingredients||[];
       const batchWorker = b.workerName||worker;
+      const totalG = ings.reduce((s,ing)=>s+(ing.total||ing.exps?.reduce((ss,e)=>ss+(e.amount||0),0)||0),0);
+
+      html += `<div class="bs-acc" onclick="this.classList.toggle('open')">
+        <div class="bs-acc-hd">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span class="badge badge-blue">${b.lot||'-'}</span>
+            <span style="font-weight:700;">${r.product||'-'}</span>
+            <span class="badge badge-gray">${batchWorker}</span>
+            <span style="font-size:12px;color:var(--text3);">원료 ${ings.length}종 · ${totalG.toLocaleString()}g</span>
+          </div>
+          <span class="arr">▼</span>
+        </div>
+        <div class="bs-acc-bd">
+          <table>
+            <thead><tr><th>원료코드</th><th>원료명</th><th>LOT</th><th>소비기한</th><th style="text-align:right">사용량(g)</th></tr></thead>
+            <tbody>`;
+
       if(!ings.length){
-        rows.push(`<tr>
-          <td><span class="badge badge-blue">${b.lot||'-'}</span></td>
-          <td style="font-weight:700;">${r.product||'-'}</td>
-          <td>${batchWorker}</td>
-          <td>-</td><td>-</td><td>-</td><td>-</td>
-          <td style="text-align:center;">${r.totalBatches||batches.length}</td>
-          
-        </tr>`);
+        html += `<tr><td colspan="5" class="tc" style="color:var(--text3);">원료 정보 없음</td></tr>`;
       } else {
-        ings.forEach((ing,ii)=>{
+        ings.forEach(ing=>{
           const ingDB = (typeof INGREDIENT_DB!=='undefined') ? INGREDIENT_DB.find(x=>x.name===ing.name) : null;
           const code = ingDB ? ingDB.code : '-';
           const exps = ing.exps||[];
           if(!exps.length){
-            rows.push(`<tr>
-              ${ii===0?`<td rowspan="${ings.length}"><span class="badge badge-blue">${b.lot||'-'}</span></td><td rowspan="${ings.length}" style="font-weight:700;">${r.product||'-'}</td><td rowspan="${ings.length}">${batchWorker}</td>`:''}
-              <td><span class="badge badge-gray" style="font-size:10px;">${code}</span></td>
-              <td>${ing.name}</td><td>-</td>
-              <td style="text-align:right;">${(ing.total||0).toLocaleString()}</td>
-              ${ii===0?`<td rowspan="${ings.length}" style="text-align:center;">${r.totalBatches||batches.length}</td>`:''}
-            </tr>`);
+            html += `<tr><td><span class="badge badge-gray" style="font-size:10px;">${code}</span></td><td>${ing.name}</td><td>-</td><td>-</td><td style="text-align:right;">${(ing.total||0).toLocaleString()}</td></tr>`;
           } else {
             exps.forEach((e,ei)=>{
-              const isFirst = ii===0 && ei===0;
-              const totalRows = ings.reduce((s,x)=>s+Math.max(1,(x.exps||[]).length),0);
-              rows.push(`<tr>
-                ${isFirst?`<td rowspan="${totalRows}"><span class="badge badge-blue">${b.lot||'-'}</span></td><td rowspan="${totalRows}" style="font-weight:700;">${r.product||'-'}</td><td rowspan="${totalRows}">${batchWorker}</td>`:''}
+              html += `<tr>
                 ${ei===0?`<td rowspan="${exps.length}"><span class="badge badge-gray" style="font-size:10px;">${code}</span></td><td rowspan="${exps.length}">${ing.name}</td>`:''}
+                <td style="font-size:12px;">${e.lot||'-'}</td>
                 <td style="font-size:12px;">${e.exp||'-'}</td>
                 <td style="text-align:right;">${(e.amount||0).toLocaleString()}</td>
-                ${isFirst?`<td rowspan="${totalRows}" style="text-align:center;">${r.totalBatches||batches.length}</td>`:''}
-              </tr>`);
+              </tr>`;
             });
           }
         });
       }
+
+      html += `</tbody></table></div></div>`;
     });
   });
-  tbody.innerHTML = rows.join('') || '<tr><td colspan="8" class="tc" style="padding:24px;color:var(--text3);">해당 날짜의 배합 기록이 없습니다</td></tr>';
 
+  container.innerHTML = html;
   document.getElementById('bsBatch').textContent = totalBatches;
   document.getElementById('bsLot').textContent = totalLots;
 }
@@ -3188,8 +3202,8 @@ function deleteDevice(i){ if(!confirm('삭제하시겠습니까?'))return; devic
 // ===== ④ LOT 매핑 관리 =====
 function renderMapping(q=''){
   if(!document.getElementById('mappingList')) return;
-  const filtered=lotMapping.filter(m=>!q||m.pName.includes(q)||m.pLot.includes(q)||m.wLots.some(w=>w.lot.includes(q)||w.name.includes(q)||w.client.includes(q)));
-  document.getElementById('mappingList').innerHTML=filtered.map((m,i)=>`
+  const filtered=lotMapping.map((m,i)=>({...m,_i:i})).filter(m=>!q||m.pName.includes(q)||m.pLot.includes(q)||m.wLots.some(w=>w.lot.includes(q)||w.name.includes(q)||w.client.includes(q)));
+  document.getElementById('mappingList').innerHTML=filtered.map(m=>`
     <div class="mapping-item">
       <div class="mapping-hd">
         <div style="display:flex;align-items:center;gap:10px">
@@ -3198,37 +3212,63 @@ function renderMapping(q=''){
           ${m.note?`<span class="badge badge-gray">${m.note}</span>`:''}
         </div>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-sm btn-outline" onclick="openEditMapping(${i})">편집</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteMapping(${i})">삭제</button>
+          <button class="btn btn-sm btn-outline" onclick="openAddWLot(${m._i})">+추가</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteMapping(${m._i})">삭제</button>
         </div>
       </div>
       ${m.wLots.length?`<div class="mapping-bd">
         ${m.wLots.map((w,j)=>`
-          <div class="mapping-wlot-row">
+          <div class="mapping-wlot-row" style="display:flex;align-items:center;gap:8px">
             <span class="badge badge-blue">${w.lot}</span>
             <span style="font-size:13px;font-weight:600">${w.name}</span>
             <span class="badge badge-green">${w.client}</span>
+            <button class="btn btn-sm btn-outline" style="margin-left:auto;padding:2px 8px;font-size:11px" onclick="openEditWLot(${m._i},${j})">편집</button>
+            <button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:11px" onclick="deleteWLot(${m._i},${j})">삭제</button>
           </div>`).join('')}
       </div>`:''}
     </div>`).join('');
-  // pLot 셀렉트 채우기
   const mPLotEl=document.getElementById('mPLot'); if(mPLotEl) mPLotEl.innerHTML=Object.keys(DB).map(c=>`<option value="${c}">${c} - ${DB[c].name}</option>`).join('');
 }
 function filterMapping(){ renderMapping(document.getElementById('mappingSearch').value.trim()); }
 function openAddMapping(){
   closeAllModals();
   document.getElementById('mappingModalTitle').textContent='LOT 매핑 추가';
+  document.getElementById('mPLot').disabled=false;
   document.getElementById('mWLot').value='';
   document.getElementById('mWName').value='';
   document.getElementById('mClient').value='';
   document.getElementById('mNote').value='';
+  document.getElementById('mEditIdx').value='-1';
+  document.getElementById('mEditWIdx').value='-1';
   document.getElementById('mappingModal').classList.add('open');
 }
-function openEditMapping(i){
+function openAddWLot(i){
+  closeAllModals();
   const m=lotMapping[i];
-  document.getElementById('mappingModalTitle').textContent='LOT 매핑 편집';
+  document.getElementById('mappingModalTitle').textContent='완제품LOT 추가 ('+m.pName+')';
   document.getElementById('mPLot').value=m.pLot;
+  document.getElementById('mPLot').disabled=true;
+  document.getElementById('mWLot').value='';
+  document.getElementById('mWName').value='';
+  document.getElementById('mClient').value='';
   document.getElementById('mNote').value=m.note||'';
+  document.getElementById('mEditIdx').value=i;
+  document.getElementById('mEditWIdx').value='-1';
+  document.getElementById('mappingModal').classList.add('open');
+}
+function openEditWLot(i,j){
+  closeAllModals();
+  const m=lotMapping[i];
+  const w=m.wLots[j];
+  document.getElementById('mappingModalTitle').textContent='완제품LOT 편집';
+  document.getElementById('mPLot').value=m.pLot;
+  document.getElementById('mPLot').disabled=true;
+  document.getElementById('mWLot').value=w.lot;
+  document.getElementById('mWName').value=w.name;
+  document.getElementById('mClient').value=w.client||'';
+  document.getElementById('mNote').value=m.note||'';
+  document.getElementById('mEditIdx').value=i;
+  document.getElementById('mEditWIdx').value=j;
   document.getElementById('mappingModal').classList.add('open');
 }
 function saveMapping(){
@@ -3237,15 +3277,30 @@ function saveMapping(){
   const wName=document.getElementById('mWName').value.trim();
   const client=document.getElementById('mClient').value.trim();
   const note=document.getElementById('mNote').value.trim();
+  const editIdx=parseInt(document.getElementById('mEditIdx').value);
+  const editWIdx=parseInt(document.getElementById('mEditWIdx').value);
   if(!wLot||!wName){ alert('완제품LOT와 완제품명을 입력해주세요'); return; }
   const pName=DB[pLot]?DB[pLot].name:pLot;
-  const existing=lotMapping.find(m=>m.pLot===pLot);
-  if(existing){ existing.wLots.push({lot:wLot,name:wName,client}); existing.note=note; }
-  else lotMapping.push({pLot,pName,wLots:[{lot:wLot,name:wName,client}],note});
+
+  if(editIdx>=0 && editWIdx>=0){
+    // 기존 wLot 편집
+    lotMapping[editIdx].wLots[editWIdx]={lot:wLot,name:wName,client};
+    lotMapping[editIdx].note=note;
+  } else if(editIdx>=0){
+    // 기존 매핑에 wLot 추가
+    lotMapping[editIdx].wLots.push({lot:wLot,name:wName,client});
+    lotMapping[editIdx].note=note;
+  } else {
+    // 신규 매핑
+    const existing=lotMapping.find(m=>m.pLot===pLot);
+    if(existing){ existing.wLots.push({lot:wLot,name:wName,client}); existing.note=note; }
+    else lotMapping.push({pLot,pName,wLots:[{lot:wLot,name:wName,client}],note});
+  }
   saveData('lotMapping',lotMapping);
   closeModal('mappingModal'); renderMapping();
 }
 function deleteMapping(i){ if(!confirm('삭제하시겠습니까?'))return; lotMapping.splice(i,1); saveData('lotMapping',lotMapping); renderMapping(); }
+function deleteWLot(i,j){ if(!confirm('이 완제품LOT를 삭제하시겠습니까?'))return; lotMapping[i].wLots.splice(j,1); if(!lotMapping[i].wLots.length) lotMapping.splice(i,1); saveData('lotMapping',lotMapping); renderMapping(); }
 
 // ===== ⑤ 완제품 재고 =====
 function renderFinished(q='',client=''){
