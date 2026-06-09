@@ -135,7 +135,8 @@ tr:hover td{background:var(--bg);}
 .bs-acc-hd:hover{background:var(--bg2);}
 .bs-acc-hd .arr{transition:transform .2s;font-size:12px;color:var(--text3);}
 .bs-acc.open .arr{transform:rotate(180deg);}
-.bs-acc-bd{display:none;padding:0 12px 12px;}.bs-acc.open .bs-acc-bd{display:block;}
+.bs-acc-bd{display:none;padding:0 12px 12px;}.bs-acc.open>.bs-acc-bd{display:block;}
+.bs-acc-inner{background:var(--bg2);}
 .bs-acc-bd table{width:100%;border-collapse:collapse;font-size:13px;}
 .bs-acc-bd th,.bs-acc-bd td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;}
 .bs-acc-bd th{background:var(--bg2);font-weight:700;font-size:12px;color:var(--text2);}
@@ -1662,25 +1663,40 @@ function loadBatchStatus(){
     const worker = r.worker||r.workerName||'-';
     totalBatches += r.totalBatches||batches.length;
     totalLots += batches.length;
+    const totalG = batches.reduce((s,b)=>{
+      return s+(b.ingredients||[]).reduce((ss,ing)=>ss+(ing.total||ing.exps?.reduce((sss,e)=>sss+(e.amount||0),0)||0),0);
+    },0);
 
+    // 대표LOT 아코디언
+    html += `<div class="bs-acc" onclick="if(event.target.closest('.bs-acc-inner'))return;this.classList.toggle('open')">
+      <div class="bs-acc-hd">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span class="badge badge-pink">${r.productCode||'-'}</span>
+          <span style="font-weight:700;font-size:15px;">${r.product||'-'}</span>
+          <span class="badge badge-gray">${worker}</span>
+          <span style="font-size:12px;color:var(--text3);">${batches.length}배합 · ${totalG.toLocaleString()}g</span>
+        </div>
+        <span class="arr">▼</span>
+      </div>
+      <div class="bs-acc-bd">`;
+
+    // 개별 배합LOT 아코디언
     batches.forEach((b,bi)=>{
       const ings = b.ingredients||[];
       const batchWorker = b.workerName||worker;
-      const totalG = ings.reduce((s,ing)=>s+(ing.total||ing.exps?.reduce((ss,e)=>ss+(e.amount||0),0)||0),0);
+      const batchG = ings.reduce((s,ing)=>s+(ing.total||ing.exps?.reduce((ss,e)=>ss+(e.amount||0),0)||0),0);
 
-      html += `<div class="bs-acc" onclick="this.classList.toggle('open')">
-        <div class="bs-acc-hd">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <span class="badge badge-blue">${b.lot||'-'}</span>
-            <span style="font-weight:700;">${r.product||'-'}</span>
-            <span class="badge badge-gray">${batchWorker}</span>
-            <span style="font-size:12px;color:var(--text3);">원료 ${ings.length}종 · ${totalG.toLocaleString()}g</span>
+      html += `<div class="bs-acc-inner bs-acc" onclick="event.stopPropagation();this.classList.toggle('open')" style="margin-bottom:6px;border:1px solid var(--border);border-radius:8px;">
+        <div class="bs-acc-hd" style="padding:8px 12px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="badge badge-blue" style="font-size:11px;">${b.lot||'-'}</span>
+            <span style="font-size:13px;color:var(--text2);">원료 ${ings.length}종 · ${batchG.toLocaleString()}g</span>
           </div>
           <span class="arr">▼</span>
         </div>
         <div class="bs-acc-bd">
           <table>
-            <thead><tr><th>원료코드</th><th>원료명</th><th>LOT</th><th>소비기한</th><th style="text-align:right">사용량(g)</th></tr></thead>
+            <thead><tr><th>코드</th><th>원료명</th><th>LOT</th><th>소비기한</th><th style="text-align:right">사용량(g)</th></tr></thead>
             <tbody>`;
 
       if(!ings.length){
@@ -1707,6 +1723,8 @@ function loadBatchStatus(){
 
       html += `</tbody></table></div></div>`;
     });
+
+    html += `</div></div>`;
   });
 
   container.innerHTML = html;
