@@ -528,22 +528,51 @@ function flRenderStock(){
       <td class="tc" onclick="event.stopPropagation()" style="white-space:nowrap"><button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;font-size:11px;padding:3px 6px;margin-right:4px" onclick="flOpenDispose('${g.key}')">폐기</button><button class="btn btn-sm btn-danger" onclick="flDeleteStockGroup('${g.key}')">삭제</button></td>
     </tr>`;
     if(exp){
-      for(const l of g.lots){
-        const totalOut=l.outbound.reduce((s,o)=>s+o.box,0);
-        const lFull=palletQty>0?Math.floor(l.remain_box/palletQty):0;
-        const lRem=palletQty>0?l.remain_box%palletQty:0;
-        const li=FL_STATE.lots.indexOf(l);
-        html+=`<tr style="background:var(--bg);font-size:12px;">
-          <td></td>
-          <td colspan="3" style="color:var(--text2);padding-left:24px">${l.lot_number}</td>
-          <td></td><td></td>
-          <td class="tc">${l.total_box}</td>
-          <td class="tc">${totalOut}</td>
-          <td class="tc" style="color:${l.remain_box>0?'var(--success)':'var(--text3)'}">${l.remain_box}</td>
-          <td class="tc" style="font-size:11px">${palletQty>0?lFull+'P':'-'}</td>
-          <td class="tc" style="font-size:11px">${palletQty>0?lRem+'box':'-'}</td>
-          <td class="tc"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 8px" onclick="flDeleteStockLot(${li})">삭제</button></td>
-        </tr>`;
+      if(palletQty>0){
+        // 완파렛트 기준 가상 서브로트 표시
+        const totalPallets=Math.ceil(g.total_box/palletQty);
+        let outRemain=g.total_out; // 출고량을 앞 파렛트부터 차감
+        for(let pi=1;pi<=totalPallets;pi++){
+          const isLast=pi===totalPallets;
+          const palletBox=isLast?(g.total_box-(totalPallets-1)*palletQty):palletQty;
+          const consumed=Math.min(outRemain,palletBox);
+          outRemain-=consumed;
+          const remainBox=palletBox-consumed;
+          const isEmpty=remainBox<=0;
+          const isFullPallet=palletBox===palletQty;
+          const subLot=`${g.key}-${String(pi).padStart(2,'0')}`;
+          const pLabel=isFullPallet?'1P':'';
+          const boxLabel=isEmpty?'출고완료':`${remainBox}box`;
+          const boxColor=isEmpty?'var(--text3)':remainBox===palletBox?'var(--success)':'var(--warning)';
+          html+=`<tr style="background:var(--bg);font-size:12px;${isEmpty?'color:var(--text3);text-decoration:line-through;':''}">
+            <td></td>
+            <td colspan="3" style="padding-left:24px;${isEmpty?'':'color:var(--text2)'}">${subLot}${!isFullPallet?' <span style="font-size:10px;color:var(--warning)">(잔여)</span>':''}</td>
+            <td></td><td></td>
+            <td class="tc">${palletBox}</td>
+            <td class="tc" style="color:var(--danger)">${consumed||''}</td>
+            <td class="tc" style="color:${boxColor};font-weight:700">${remainBox}</td>
+            <td class="tc" style="font-size:11px">${isEmpty?'-':pLabel}</td>
+            <td class="tc" style="font-size:11px">${isEmpty?'-':boxLabel}</td>
+            <td></td>
+          </tr>`;
+        }
+      } else {
+        // pallet_qty=0: 기존 방식 (실제 LOT 표시)
+        for(const l of g.lots){
+          const totalOut=l.outbound.reduce((s,o)=>s+o.box,0);
+          const li=FL_STATE.lots.indexOf(l);
+          html+=`<tr style="background:var(--bg);font-size:12px;">
+            <td></td>
+            <td colspan="3" style="color:var(--text2);padding-left:24px">${l.lot_number}</td>
+            <td></td><td></td>
+            <td class="tc">${l.total_box}</td>
+            <td class="tc">${totalOut}</td>
+            <td class="tc" style="color:${l.remain_box>0?'var(--success)':'var(--text3)'}">${l.remain_box}</td>
+            <td class="tc">-</td>
+            <td class="tc">-</td>
+            <td class="tc"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 8px" onclick="flDeleteStockLot(${li})">삭제</button></td>
+          </tr>`;
+        }
       }
     }
   }
