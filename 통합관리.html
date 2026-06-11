@@ -3006,7 +3006,7 @@ function renderIngStock(){
   if(alerts.length){
     alertCard.style.display='';
     document.getElementById('alertList').innerHTML=alerts.map(a=>{
-      const aIdx=ingStock.findIndex(s=>s.name===a.name&&s.expiry===a.expiry&&s.qty===a.qty);
+      const aIdx=ingStock.findIndex(s=>s._syncKey===a._syncKey);
       return `<div class="alert-item ${a.type==='expired'?'alert-red':'alert-orange'}">
         <div style="flex:1">
           <div class="alert-name">${a.name}</div>
@@ -3065,7 +3065,7 @@ function renderIngStock(){
     </tr>`;
     if(expanded){
       g.items.forEach(s=>{
-        const origIdx=ingStock.indexOf(ingStock.find(x=>x._syncKey===s._syncKey&&x.name===s.name&&x.qty===s.qty));
+        const origIdx=ingStock.findIndex(x=>x._syncKey===s._syncKey);
         const diff=daysDiff(s.expiry);
         const hasExp=s.expiry&&s.expiry!=='-'&&!isNaN(diff);
         const badge=!hasExp?'badge-gray':diff<0?'badge-red':diff<=7?'badge-orange':'badge-green';
