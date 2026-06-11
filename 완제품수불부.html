@@ -73,7 +73,7 @@ tr:hover td{background:var(--bg);}
 <div class="content">
   <div style="display:flex;gap:4px;margin-bottom:16px;background:#fff;border-radius:10px;padding:6px;box-shadow:var(--shadow);">
     <button class="fl-tab active" id="fl-tab-outbound" onclick="switchFlTab('outbound')" style="flex:1;">🚚 출고등록</button>
-    <button class="fl-tab" id="fl-tab-stock" onclick="switchFlTab('stock')" style="flex:1;">📊 재고조회</button>
+    <button class="fl-tab" id="fl-tab-stock" onclick="switchFlTab('stock')" style="flex:1;">📊 완제품수불부</button>
     <button class="fl-tab" id="fl-tab-manage" onclick="switchFlTab('manage')" style="flex:1;">⚙️ 관리</button>
   </div>
 
@@ -117,6 +117,7 @@ tr:hover td{background:var(--bg);}
           </div>
           <input class="search-input" id="fl-st-search" placeholder="품명 검색..." oninput="flRenderStock()">
           <button class="btn btn-sm btn-primary" onclick="flRenderStock()">조회</button>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="fl-st-hide-zero" onchange="flRenderStock()"> 재고있는것만</label>
           <button class="btn btn-sm" style="background:var(--warning-light);color:var(--warning);border:1px solid #f0c080" onclick="openFlInitStock()">📋 전일재고 등록</button>
           <button class="btn btn-sm" style="background:var(--success-light);color:var(--success);border:1px solid #8dc;" onclick="flBackup()">💾 백업</button>
           <button class="btn btn-sm" style="background:var(--primary-light);color:var(--primary);border:1px solid #acd;" onclick="flRestore()">🔄 복원</button>
@@ -524,6 +525,7 @@ function yymmddToISO2(v){
 function flRenderStock(){
   const selDate=getStockDateISO();
   const q=(document.getElementById('fl-st-search')?.value||'').trim().toLowerCase();
+  const hideZero=document.getElementById('fl-st-hide-zero')?.checked||false;
   document.getElementById('fl-st-date-display').textContent=selDate;
 
   // 제품 마스터 기준 (FL_STATE.products)
@@ -582,6 +584,10 @@ function flRenderStock(){
     });
 
     const closing=Math.max(0,prevStock+todayIn-todayOut);
+
+    // 재고있는것만 필터
+    if(hideZero && closing===0) return;
+
     const exp=FL_STATE.expandedStock.has(prod.lot_code);
 
     html+=`<tr style="cursor:pointer;" onclick="flToggleStock('${prod.lot_code}')">
