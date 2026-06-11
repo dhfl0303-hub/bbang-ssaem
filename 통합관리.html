@@ -456,7 +456,8 @@ tr:hover td{background:var(--bg);}
           </select>
         </div>
         <button class="btn btn-primary btn-sm" onclick="loadYield()">🔄 조회</button>
-        <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="deleteYield()">🗑️ 삭제</button>
+        <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="deleteYield()">🗑️ 전체삭제</button>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="showDeletedYield" onchange="loadYield()"> 삭제항목 보기</label>
       </div>
       <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
         <div class="stat-box"><div class="stat-label">평균 수율</div><div class="stat-value stat-green" id="avgYield">-</div><div class="stat-sub">%</div></div>
@@ -471,17 +472,13 @@ tr:hover td{background:var(--bg);}
               <thead>
                 <tr>
                   <th>제품명</th><th>배합 투입량(g)</th><th>포장 생산량(ea)</th>
-                  <th>포장 생산량(box)</th><th>수율(%)</th><th>로스율(%)</th><th>비고</th>
+                  <th>포장 생산량(box)</th><th>수율(%)</th><th>로스율(%)</th><th>비고</th><th style="width:120px">관리</th>
                 </tr>
               </thead>
               <tbody id="yieldTbody">
-                <tr><td colspan="7" class="tc" style="padding:24px;color:var(--text3);">조회 날짜를 선택하고 조회 버튼을 눌러주세요</td></tr>
+                <tr><td colspan="8" class="tc" style="padding:24px;color:var(--text3);">조회 날짜를 선택하고 조회 버튼을 눌러주세요</td></tr>
               </tbody>
             </table>
-          </div>
-          <div style="display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;">
-            <button class="btn btn-sm btn-outline" onclick="openEditIncoming(${i})">수정</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteIncoming(${i})">삭제</button>
           </div>
         </div>
       </div>
@@ -2500,17 +2497,22 @@ function loadYield(){
   const inputRecs = (window._fbCache&&window._fbCache['inputRecords_'+key])||[];
 
   if(!batchRecs.length && !packRecs.length && !inputRecs.length){
-    tbody.innerHTML='<tr><td colspan="7" class="tc" style="padding:24px;color:var(--text3);">해당 날짜의 데이터가 없습니다</td></tr>';
+    tbody.innerHTML='<tr><td colspan="8" class="tc" style="padding:24px;color:var(--text3);">해당 날짜의 데이터가 없습니다</td></tr>';
     document.getElementById('avgYield').textContent='-';
     document.getElementById('avgLoss').textContent='-';
     document.getElementById('yieldCnt').textContent='-';
     return;
   }
 
+  const showDeleted=document.getElementById('showDeletedYield')?.checked||false;
+
   // 제품별 배합 투입량 계산 (정제수 등 기타원재료 포함)
   const batchMap={};
   batchRecs.forEach(r=>{
-    if(!batchMap[r.productCode]) batchMap[r.productCode]={name:r.product,input:0,pcs:0,boxes:0};
+    if(!batchMap[r.productCode]) batchMap[r.productCode]={name:r.product,input:0,pcs:0,boxes:0,_deleted:false};
+    // _deleted 상태 확인
+    if(r._deleted) batchMap[r.productCode]._deleted=true;
+    if(r._deleted) return;
     if(r.batchRecords) r.batchRecords.forEach(b=>{
       b.ingredients&&b.ingredients.forEach(ing=>{ batchMap[r.productCode].input+=ing.total||0; });
     });
@@ -2522,20 +2524,21 @@ function loadYield(){
   // 투입일보 투입량 합산 (제품명 기준)
   inputRecs.forEach(r=>{
     if(!r.product) return;
-    // productCode 매핑: 제품명으로 찾기
-    let pCode = Object.keys(batchMap).find(k=>batchMap[k].name===r.product);
+    if(r._deleted) return;
+    // productCode가 있으면 그대로, 없으면 이름 매칭
+    let pCode = r.productCode || Object.keys(batchMap).find(k=>batchMap[k].name===r.product);
     if(!pCode){
-      // batchMap에 없으면 임시 키로 생성
       pCode = 'INPUT_'+r.product;
-      batchMap[pCode] = {name:r.product, input:0, pcs:0, boxes:0};
     }
+    if(!batchMap[pCode]) batchMap[pCode] = {name:r.product, input:0, pcs:0, boxes:0, _deleted:r._deleted||false};
     (r.ingredients||[]).forEach(ing=>{
       batchMap[pCode].input += (parseFloat(ing.qty)||0)*1000; // kg→g
     });
   });
   // 포장 생산량
   packRecs.forEach(r=>{
-    if(!batchMap[r.productCode]) batchMap[r.productCode]={name:r.product,input:0,pcs:0,boxes:0,itemWeight:0};
+    if(!batchMap[r.productCode]) batchMap[r.productCode]={name:r.product,input:0,pcs:0,boxes:0,itemWeight:0,_deleted:false};
+    if(r._deleted){ batchMap[r.productCode]._deleted=true; return; }
     batchMap[r.productCode].pcs  += parseInt(r.qtyPcs)||0;
     batchMap[r.productCode].boxes+= parseInt(r.qtyBoxes)||0;
     // itemWeight: 저장된 값 우선, 없으면 완제품_products의 spec에서 중량 추출
@@ -2560,27 +2563,104 @@ function loadYield(){
 
   const rows = Object.entries(batchMap);
   let yieldSum=0, yieldCnt=0;
-  tbody.innerHTML = rows.map(([code,d])=>{
+  const activeRows = rows.filter(([code,d])=>showDeleted||!d._deleted);
+  tbody.innerHTML = activeRows.map(([code,d])=>{
     const inputKg = d.input;
-    const weight = d.itemWeight || 65; // 제품중량(g), 미입력시 65g 기본값
+    const weight = d.itemWeight || 65;
     const outputKg = d.pcs * weight;
-    const yieldPct = inputKg>0 ? Math.round((outputKg/inputKg)*1000)/10 : '-';
-    const lossPct  = inputKg>0 ? Math.round(((inputKg-outputKg)/inputKg)*1000)/10 : '-';
+    const yieldPct = inputKg>0&&!d._deleted ? Math.round((outputKg/inputKg)*1000)/10 : '-';
+    const lossPct  = inputKg>0&&!d._deleted ? Math.round(((inputKg-outputKg)/inputKg)*1000)/10 : '-';
     if(typeof yieldPct==='number'){ yieldSum+=yieldPct; yieldCnt++; }
-    return `<tr>
-      <td style="font-weight:700;">${d.name}</td>
+    const isDeleted = d._deleted;
+    return `<tr style="${isDeleted?'opacity:0.4;text-decoration:line-through;':''}">
+      <td style="font-weight:700;">${d.name}${isDeleted?' <span class="badge badge-gray" style="font-size:9px">삭제됨</span>':''}</td>
       <td style="text-align:center;">${inputKg>0?inputKg.toLocaleString()+' g':'-'}</td>
       <td style="text-align:center;">${d.pcs>0?d.pcs.toLocaleString()+' ea':'-'}</td>
       <td style="text-align:center;">${d.boxes>0?d.boxes.toLocaleString()+' box':'-'}</td>
       <td style="text-align:center;font-weight:700;color:var(--success);">${typeof yieldPct==='number'?yieldPct+'%':'-'}</td>
       <td style="text-align:center;font-weight:700;color:var(--danger);">${typeof lossPct==='number'?lossPct+'%':'-'}</td>
       <td style="font-size:11px;color:var(--text3);">※ ${weight}g 기준</td>
+      <td style="white-space:nowrap;text-align:center;">${isDeleted
+        ?`<button class="btn btn-sm btn-primary" style="font-size:10px;padding:2px 8px" onclick="yieldRestore('${code}')">복원</button>
+           <button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 8px" onclick="yieldForceDelete('${code}')">강제삭제</button>`
+        :`<button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 8px;margin-right:2px" onclick="yieldSoftDelete('${code}')">삭제</button>
+           <button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 8px" onclick="yieldForceDelete('${code}')">강제삭제</button>`
+      }</td>
     </tr>`;
-  }).join('');
+  }).join('')||`<tr><td colspan="8" class="tc" style="padding:24px;color:var(--text3);">데이터가 없습니다</td></tr>`;
 
   document.getElementById('avgYield').textContent = yieldCnt>0 ? (yieldSum/yieldCnt).toFixed(1)+'%' : '-';
   document.getElementById('avgLoss').textContent  = yieldCnt>0 ? (100-(yieldSum/yieldCnt)).toFixed(1)+'%' : '-';
-  document.getElementById('yieldCnt').textContent = rows.length;
+  document.getElementById('yieldCnt').textContent = activeRows.filter(([,d])=>!d._deleted).length;
+}
+
+// 수율 항목별 삭제/복원
+async function yieldSoftDelete(code){
+  const dateVal=document.getElementById('yieldDate').value;
+  const key=dateToYYMMDD(dateVal);
+  if(!confirm('이 항목을 삭제하시겠습니까?\n(삭제항목 보기에서 복원 가능)')) return;
+  _yieldMarkDeleted(key, code, true);
+  loadYield();
+}
+async function yieldRestore(code){
+  const dateVal=document.getElementById('yieldDate').value;
+  const key=dateToYYMMDD(dateVal);
+  _yieldMarkDeleted(key, code, false);
+  loadYield();
+}
+async function yieldForceDelete(code){
+  const dateVal=document.getElementById('yieldDate').value;
+  const key=dateToYYMMDD(dateVal);
+  if(!confirm('이 항목을 완전 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+  // batchRecords에서 해당 productCode 제거
+  let batchRecs=(window._fbCache&&window._fbCache['batchRecords_'+key])||[];
+  batchRecs=batchRecs.filter(r=>r.productCode!==code);
+  window._fbCache['batchRecords_'+key]=batchRecs;
+  // packRecords에서 해당 productCode 제거
+  let packRecs=(window._fbCache&&window._fbCache['packRecords_'+key])||[];
+  packRecs=packRecs.filter(r=>r.productCode!==code);
+  window._fbCache['packRecords_'+key]=packRecs;
+  // inputRecords에서 해당 제품명 제거 (INPUT_ prefix)
+  if(code.startsWith('INPUT_')){
+    const prodName=code.replace('INPUT_','');
+    let inputRecs=(window._fbCache&&window._fbCache['inputRecords_'+key])||[];
+    inputRecs=inputRecs.filter(r=>r.product!==prodName);
+    window._fbCache['inputRecords_'+key]=inputRecs;
+    if(window._db) try{ await window._db.collection('appData').doc('inputRecords_'+key).set({data:JSON.stringify(inputRecs),updatedAt:new Date().toISOString()}); }catch(e){}
+  }
+  // Firebase 저장
+  if(window._db){
+    try{
+      if(batchRecs.length) await window._db.collection('appData').doc('batchRecords_'+key).set({data:JSON.stringify(batchRecs),updatedAt:new Date().toISOString()});
+      else{ await window._db.collection('appData').doc('batchRecords_'+key).delete(); addDeletedKey('batchRecords_'+key); }
+      if(packRecs.length) await window._db.collection('appData').doc('packRecords_'+key).set({data:JSON.stringify(packRecs),updatedAt:new Date().toISOString()});
+      else{ await window._db.collection('appData').doc('packRecords_'+key).delete(); addDeletedKey('packRecords_'+key); }
+    }catch(e){ console.warn('강제삭제 저장 오류',e); }
+  }
+  loadYield();
+  alert('강제 삭제 완료');
+}
+function _yieldMarkDeleted(key, code, deleted){
+  // batchRecords에서 해당 productCode에 _deleted 표시
+  const batchRecs=(window._fbCache&&window._fbCache['batchRecords_'+key])||[];
+  batchRecs.forEach(r=>{ if(r.productCode===code) r._deleted=deleted; });
+  // packRecords에서 해당 productCode에 _deleted 표시
+  const packRecs=(window._fbCache&&window._fbCache['packRecords_'+key])||[];
+  packRecs.forEach(r=>{ if(r.productCode===code) r._deleted=deleted; });
+  // inputRecords에서 해당 제품명에 _deleted 표시
+  if(code.startsWith('INPUT_')){
+    const prodName=code.replace('INPUT_','');
+    const inputRecs=(window._fbCache&&window._fbCache['inputRecords_'+key])||[];
+    inputRecs.forEach(r=>{ if(r.product===prodName) r._deleted=deleted; });
+    if(window._db) try{ window._db.collection('appData').doc('inputRecords_'+key).set({data:JSON.stringify(inputRecs),updatedAt:new Date().toISOString()}); }catch(e){}
+  }
+  // Firebase 저장
+  if(window._db){
+    try{
+      window._db.collection('appData').doc('batchRecords_'+key).set({data:JSON.stringify(batchRecs),updatedAt:new Date().toISOString()});
+      window._db.collection('appData').doc('packRecords_'+key).set({data:JSON.stringify(packRecs),updatedAt:new Date().toISOString()});
+    }catch(e){}
+  }
 }
 
 // ===== 날짜 드롭다운 채우기 =====

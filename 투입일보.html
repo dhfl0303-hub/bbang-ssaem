@@ -712,6 +712,7 @@ function saveInputRecord(){
   const record = {
     lot,
     product: document.getElementById('inputProduct').value.trim()||'',
+    productCode: S.selectedProductCode||'',
     worker: S.workerName,
     date: getWorkDateKey(),
     ingredients,
