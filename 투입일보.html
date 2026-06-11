@@ -125,8 +125,16 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
   <!-- 메인 페이지 -->
   <div class="page active" id="page-main">
     <div class="main-hd">
-      <div class="main-date" id="mainDate"></div>
-      <div class="main-worker" id="mainWorker">👤 작업자 설정 (탭하세요)</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div class="main-date" id="mainDate"></div>
+          <div class="main-worker" id="mainWorker">👤 작업자 설정 (탭하세요)</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:700;">작업일:</span>
+          <input id="workDateInput" type="text" inputmode="numeric" maxlength="6" placeholder="YYMMDD" oninput="onWorkDateInput(this)" style="width:80px;padding:6px 10px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:#fff;font-size:15px;font-weight:700;font-family:'Noto Sans KR',sans-serif;text-align:center;outline:none;">
+        </div>
+      </div>
       <div class="main-stats">
         <div class="stat-box"><div class="stat-lbl">오늘 투입</div><div class="stat-val" id="statDone">0건</div></div>
         <div class="stat-box"><div class="stat-lbl">총 투입량</div><div class="stat-val" id="statTotal">0kg</div></div>
@@ -236,9 +244,25 @@ let INPUT_DB = {};
 let S = { todayRecords:[], workerName:'', ingRows:[], selectedProductCode:'', _skipInit:false, _lastRecord:null };
 
 // ===== 유틸 =====
+let _workDateKey = ''; // 사용자 지정 작업날짜 (YYMMDD), 비어있으면 오늘
 function getTodayKey(){ const d=new Date(); return String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
-function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
+function getWorkDateKey(){ return (_workDateKey && _workDateKey.length===6) ? _workDateKey : getTodayKey(); }
+function getToday(){
+  const k = getWorkDateKey();
+  const y = 2000+parseInt(k.slice(0,2)); const m = parseInt(k.slice(2,4)); const d = parseInt(k.slice(4,6));
+  return y+'년 '+m+'월 '+d+'일';
+}
 function getNowTime(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function onWorkDateInput(input){
+  const raw = input.value.replace(/\D/g,'').slice(0,6);
+  input.value = raw;
+  if(raw.length===6){
+    _workDateKey = raw;
+    document.getElementById('mainDate').textContent = getToday();
+    loadLocal();
+    renderInputProductList();
+  }
+}
 
 // ===== 페이지 전환 =====
 function showPage(id){
@@ -367,7 +391,7 @@ function printReport(){ window.print(); }
 
 // ===== 폼 초기화 =====
 function initForm(){
-  const today = getTodayKey();
+  const today = getWorkDateKey();
   const seq = S.todayRecords.length+1;
   const pCode = S.selectedProductCode||'';
   document.getElementById('inputLot').textContent = `투입-${pCode?pCode+'-':''}${today}-${String(seq).padStart(3,'0')}`;
@@ -591,7 +615,7 @@ function saveInputRecord(){
     lot,
     product: document.getElementById('inputProduct').value.trim()||'',
     worker: S.workerName,
-    date: getTodayKey(),
+    date: getWorkDateKey(),
     ingredients,
     savedAt: new Date().toISOString()
   };
@@ -603,11 +627,11 @@ function saveInputRecord(){
 
 // ===== 로컬 저장 =====
 function saveLocal(){
-  localStorage.setItem('inputRecords_'+getTodayKey(), JSON.stringify(S.todayRecords));
+  localStorage.setItem('inputRecords_'+getWorkDateKey(), JSON.stringify(S.todayRecords));
   updateStats();
 }
 function loadLocal(){
-  const d = localStorage.getItem('inputRecords_'+getTodayKey());
+  const d = localStorage.getItem('inputRecords_'+getWorkDateKey());
   if(d) S.todayRecords = JSON.parse(d);
   updateStats(); renderTodayList();
 }
@@ -826,7 +850,7 @@ function selectInputProduct(code){
   });
   // initForm 건너뛰고 폼으로 이동
   S._skipInit = true;
-  const today = getTodayKey();
+  const today = getWorkDateKey();
   const seq = S.todayRecords.length+1;
   showPage('form');
   document.getElementById('inputLot').textContent = `투입-${code}-${today}-${String(seq).padStart(3,'0')}`;
@@ -839,6 +863,8 @@ function selectInputProduct(code){
   await loadFromFirebase();
   const s = loadSettings();
   S.workerName = s.workerName||'';
+  _workDateKey = getTodayKey();
+  document.getElementById('workDateInput').value = getTodayKey();
   document.getElementById('mainDate').textContent = getToday();
   document.getElementById('mainWorker').textContent = S.workerName ? S.workerName+' 작업자' : '👤 작업자 설정 (탭하세요)';
   document.getElementById('mainWorker').onclick = openAdmin;
