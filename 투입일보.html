@@ -429,45 +429,98 @@ function getIngLots(ingName){
   try{
     const lots=[];
     const seen=new Set();
-
-    // 1. ledgerRecords type:'init' → OI LOT 우선
     const ledger = window._ledgerRecords||[];
+    const ingN=ingName.trim().replace(/\n/g,' ');
+
+    function nameMatch(recName){
+      const rn=(recName||'').trim().replace(/\n/g,' ');
+      return rn===ingN || rn.includes(ingN) || ingN.includes(rn);
+    }
+
+    // 1) LOT별 입고량 합산 (init + in)
+    const inQty={};
     ledger.forEach(r=>{
-      if(r.type!=='init') return;
-      const recName=r.name.trim(); const ingN=ingName.trim();
-      if(recName===ingN||recName.includes(ingN)||ingN.includes(recName)){
-        if(r.lot && !seen.has(r.lot)){
-          seen.add(r.lot);
-          lots.push({lot:r.lot, exp:r.exp||'', date:'', isOI:true});
-        }
-      }
+      if(r.type!=='init' && r.type!=='in') return;
+      if(!nameMatch(r.name)) return;
+      if(!r.lot) return;
+      inQty[r.lot]=(inQty[r.lot]||0)+(parseFloat(r.qty)||0);
     });
 
-    // 2. incomingRecords → 입고 LOT
+    // 2) LOT별 출고량 합산 (out + dispose + return)
+    const outQty={};
+    ledger.forEach(r=>{
+      if(r.type!=='out' && r.type!=='dispose' && r.type!=='return') return;
+      if(!nameMatch(r.name)) return;
+      if(!r.lot) return;
+      outQty[r.lot]=(outQty[r.lot]||0)+(parseFloat(r.qty)||0);
+    });
+
+    // 2-1) 현재 세션(S.todayRecords)에서 이미 사용한 양 추가 차감
+    (S.todayRecords||[]).forEach(tr=>{
+      (tr.ingredients||[]).forEach(ing=>{
+        if(!nameMatch(ing.name)) return;
+        (ing.lots||[]).forEach(l=>{
+          if(!l.lot || !l.qty) return;
+          outQty[l.lot]=(outQty[l.lot]||0)+(parseFloat(l.qty)||0);
+        });
+      });
+    });
+
+    // 3) LOT 목록 생성 + 잔여재고 표시
+    function fmtExp(v){ return (v||'').replace(/^20/,'').replace(/-/g,'.'); }
+
+    // 3-1) init LOT
+    ledger.forEach(r=>{
+      if(r.type!=='init') return;
+      if(!nameMatch(r.name)) return;
+      if(!r.lot || seen.has(r.lot)) return;
+      seen.add(r.lot);
+      const remaining = Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
+      const stockLbl = remaining>0 ? ` [재고:${remaining}kg]` : ' [재고없음]';
+      const hasExp = !!(r.exp);
+      const dateLbl = hasExp ? '소비:'+fmtExp(r.exp) : '제조:'+fmtExp(r.mfg||'');
+      lots.push({lot:r.lot, exp:fmtExp(r.exp||r.mfg||''), date:'', isOI:true, label:'초기재고 '+dateLbl+stockLbl, remaining});
+    });
+
+    // 3-2) in LOT (입고검사)
+    ledger.forEach(r=>{
+      if(r.type!=='in') return;
+      if(!nameMatch(r.name)) return;
+      if(!r.lot || seen.has(r.lot)) return;
+      seen.add(r.lot);
+      const remaining = Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
+      const stockLbl = remaining>0 ? ` [재고:${remaining}kg]` : ' [재고없음]';
+      const hasExp = !!(r.exp);
+      const dateLbl = hasExp ? '소비:'+fmtExp(r.exp) : '제조:'+fmtExp(r.mfg||'');
+      lots.push({lot:r.lot, exp:fmtExp(r.exp||r.mfg||''), date:r.date||'', isOI:false, label:'입고:'+r.date+' '+dateLbl+stockLbl, remaining});
+    });
+
+    // 3-3) incomingRecords 보충 (ledger에 없는 LOT)
     const recs = window._incomingRecords||[];
     recs.forEach(rec=>{
       (rec.rows||[]).forEach(row=>{
         if(!row.product) return;
-        const recName=row.product.trim(); const ingN=ingName.trim();
-        if(recName===ingN||recName.includes(ingN)||ingN.includes(recName)){
-          if(row.lot && !seen.has(row.lot)){
-            seen.add(row.lot);
-            const hasExp = !!(row.expVal||row.exp);
-            const expDisp = row.expVal||row.exp||'';
-            const mfgDisp = row.mfg||'';
-            const datePart = `입고:${rec.date||''}`;
-            const dateLbl = hasExp ? `${datePart} 소비:${expDisp}` : `${datePart} 제조:${mfgDisp}`;
-            lots.push({lot:row.lot, exp:expDisp, date:rec.date||'', isOI:false, label:dateLbl});
-          }
-        }
+        if(!nameMatch(row.product)) return;
+        if(!row.lot || seen.has(row.lot)) return;
+        seen.add(row.lot);
+        const remaining = Math.round(((inQty[row.lot]||0)-(outQty[row.lot]||0))*1000)/1000;
+        const stockLbl = remaining>0 ? ` [재고:${remaining}kg]` : ' [재고없음]';
+        const expDisp = row.expVal||row.exp||'';
+        const mfgDisp = row.mfg||'';
+        const hasExp = !!expDisp;
+        const dateLbl = hasExp ? '소비:'+fmtExp(expDisp) : '제조:'+fmtExp(mfgDisp);
+        lots.push({lot:row.lot, exp:fmtExp(expDisp||mfgDisp||''), date:rec.date||'', isOI:false, label:'입고:'+(rec.date||'')+' '+dateLbl+stockLbl, remaining});
       });
     });
 
-    // OI 먼저, 그 다음 입고일 오래된 순
+    // FIFO 정렬: 재고 있는 것 우선 → 소비기한 짧은 순
     lots.sort((a,b)=>{
-      if(a.isOI && !b.isOI) return -1;
-      if(!a.isOI && b.isOI) return 1;
-      return (a.date||'') < (b.date||'') ? -1 : 1;
+      if(a.remaining>0 && b.remaining<=0) return -1;
+      if(a.remaining<=0 && b.remaining>0) return 1;
+      const expA=(a.exp||'99.99.99').replace(/\./g,'');
+      const expB=(b.exp||'99.99.99').replace(/\./g,'');
+      if(expA!==expB) return expA<expB?-1:1;
+      return (a.date||'').localeCompare(b.date||'');
     });
     return lots;
   }catch(e){ return []; }
@@ -483,7 +536,7 @@ function renderIngList(){
       const lotOptions = availLots.length
         ? `<select class="ing-input" id="lot_sel_${lr.lotId}" onchange="onLotSelChange(${row.id},${lr.lotId})" style="margin-bottom:4px;">
             <option value="">-- LOT 선택 --</option>
-            ${availLots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===lr.lot?'selected':''}>${l.lot} ${l.isOI?'(초기재고 소비:'+l.exp+')':'('+l.label+')'}</option>`).join('')}
+            ${availLots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===lr.lot?'selected':''}>${l.lot} (${l.label})</option>`).join('')}
            </select>` : '';
       return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
         ${lotOptions}
@@ -791,7 +844,18 @@ function renderAdminLogs(){
 
 // ===== Firebase 로드 =====
 async function loadFromFirebase(){
-  if(!window._db) return;
+  if(!window._db){
+    // 오프라인: localStorage 캐시에서 로드
+    const cachedLedger = localStorage.getItem('ledgerRecords');
+    window._ledgerRecords = cachedLedger ? JSON.parse(cachedLedger) : [];
+    const cachedIncoming = localStorage.getItem('incomingRecords');
+    window._incomingRecords = cachedIncoming ? JSON.parse(cachedIncoming) : [];
+    const cachedIngDB = localStorage.getItem('ingredientDB');
+    if(cachedIngDB) INGREDIENT_DB = JSON.parse(cachedIngDB);
+    const cachedInputDB = localStorage.getItem('inputDB');
+    if(cachedInputDB) INPUT_DB = JSON.parse(cachedInputDB);
+    return;
+  }
   try{
     const [ingSnap, inputDBSnap, incomingSnap, ledgerSnap] = await Promise.all([
       window._db.collection('appData').doc('ingredientDB').get(),
@@ -799,13 +863,33 @@ async function loadFromFirebase(){
       window._db.collection('appData').doc('incomingRecords').get(),
       window._db.collection('appData').doc('ledgerRecords').get()
     ]);
-    if(ingSnap.exists && ingSnap.data().data) INGREDIENT_DB = JSON.parse(ingSnap.data().data);
-    if(inputDBSnap.exists && inputDBSnap.data().data) INPUT_DB = JSON.parse(inputDBSnap.data().data);
-    if(incomingSnap.exists && incomingSnap.data().data) window._incomingRecords = JSON.parse(incomingSnap.data().data);
-    else window._incomingRecords = [];
-    if(ledgerSnap.exists && ledgerSnap.data().data) window._ledgerRecords = JSON.parse(ledgerSnap.data().data);
-    else window._ledgerRecords = [];
-  }catch(e){ console.warn('Firebase 로드 실패',e); }
+    if(ingSnap.exists && ingSnap.data().data){
+      INGREDIENT_DB = JSON.parse(ingSnap.data().data);
+      localStorage.setItem('ingredientDB', JSON.stringify(INGREDIENT_DB));
+    }
+    if(inputDBSnap.exists && inputDBSnap.data().data){
+      INPUT_DB = JSON.parse(inputDBSnap.data().data);
+      localStorage.setItem('inputDB', JSON.stringify(INPUT_DB));
+    }
+    if(incomingSnap.exists && incomingSnap.data().data){
+      window._incomingRecords = JSON.parse(incomingSnap.data().data);
+      localStorage.setItem('incomingRecords', JSON.stringify(window._incomingRecords));
+    } else window._incomingRecords = [];
+    if(ledgerSnap.exists && ledgerSnap.data().data){
+      window._ledgerRecords = JSON.parse(ledgerSnap.data().data);
+      localStorage.setItem('ledgerRecords', JSON.stringify(window._ledgerRecords));
+    } else window._ledgerRecords = [];
+  }catch(e){
+    console.warn('Firebase 로드 실패, 캐시 사용',e);
+    const cachedLedger = localStorage.getItem('ledgerRecords');
+    window._ledgerRecords = cachedLedger ? JSON.parse(cachedLedger) : [];
+    const cachedIncoming = localStorage.getItem('incomingRecords');
+    window._incomingRecords = cachedIncoming ? JSON.parse(cachedIncoming) : [];
+    const cachedIngDB = localStorage.getItem('ingredientDB');
+    if(cachedIngDB) INGREDIENT_DB = JSON.parse(cachedIngDB);
+    const cachedInputDB = localStorage.getItem('inputDB');
+    if(cachedInputDB) INPUT_DB = JSON.parse(cachedInputDB);
+  }
 }
 
 // ===== 투입비 연동 =====
