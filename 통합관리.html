@@ -846,6 +846,8 @@ tr:hover td{background:var(--bg);}
 <div class="modal-overlay" id="subsidiaryModal" onclick="closeModalOutside(event,'subsidiaryModal')">
   <div class="modal"><div class="modal-hd"><div class="modal-title">부자재 입고 등록</div><button class="modal-close" onclick="closeModal('subsidiaryModal')">×</button></div>
   <div class="modal-bd"><div class="form-row"><label class="form-label">품목</label><select class="form-input" id="sbItem"><option value="film">필름포장지</option></select></div></div>
+  <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('subsidiaryModal')">취소</button></div></div>
+</div>
 
 <!-- 폐기 모달 -->
 <div class="modal-overlay" id="disposeModal" onclick="closeModalOutside(event,'disposeModal')">
@@ -889,8 +891,6 @@ tr:hover td{background:var(--bg);}
     </div>
     <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('returnModal')">취소</button><button class="btn" style="background:#e67e22;color:#fff;" onclick="saveReturn()">반품 처리</button></div>
   </div>
-</div>
-  <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('subsidiaryModal')">취소</button></div></div>
 </div>
 
 <!-- LOT 매핑 모달 -->
@@ -3110,6 +3110,7 @@ function deleteIngStock(i){ if(!confirm('삭제하시겠습니까?'))return; ing
 function openDispose(idx){
   const s = ingStock[idx];
   if(!s) return;
+  closeAllModals();
   document.getElementById('dispName').value = s.name;
   document.getElementById('dispLot').value = s.lot||'-';
   document.getElementById('dispCurQty').value = s.qty.toFixed(3)+' kg';
@@ -3373,7 +3374,7 @@ function renderMapping(q=''){
     <div class="mapping-item">
       <div class="mapping-hd">
         <div style="display:flex;align-items:center;gap:10px">
-          <span class="badge badge-pink">${m.pLot}</span>
+          <span class="badge ${parseInt(m.pLot.replace('P',''))>=500?'badge-orange':'badge-pink'}">${m.pLot}</span>
           <span class="mapping-pname">${m.pName}</span>
           ${m.note?`<span class="badge badge-gray">${m.note}</span>`:''}
         </div>
@@ -3393,7 +3394,11 @@ function renderMapping(q=''){
           </div>`).join('')}
       </div>`:''}
     </div>`).join('');
-  const mPLotEl=document.getElementById('mPLot'); if(mPLotEl) mPLotEl.innerHTML=Object.keys(DB).map(c=>`<option value="${c}">${c} - ${DB[c].name}</option>`).join('');
+  const mPLotEl=document.getElementById('mPLot'); if(mPLotEl){
+    const dbOpts=Object.keys(DB).sort().map(c=>`<option value="${c}">${c} - ${DB[c].name}</option>`).join('');
+    const inputOpts=Object.keys(inputDB).sort((a,b)=>parseInt(a.replace('P',''))-parseInt(b.replace('P',''))).map(c=>`<option value="${c}">${c} - ${inputDB[c].name}</option>`).join('');
+    mPLotEl.innerHTML=dbOpts+(inputOpts?'<option disabled>── 투입비 (P500+) ──</option>'+inputOpts:'');
+  }
 }
 function filterMapping(){ renderMapping(document.getElementById('mappingSearch').value.trim()); }
 function openAddMapping(){
@@ -3446,7 +3451,7 @@ function saveMapping(){
   const editIdx=parseInt(document.getElementById('mEditIdx').value);
   const editWIdx=parseInt(document.getElementById('mEditWIdx').value);
   if(!wLot||!wName){ alert('완제품LOT와 완제품명을 입력해주세요'); return; }
-  const pName=DB[pLot]?DB[pLot].name:pLot;
+  const pName=DB[pLot]?DB[pLot].name:(inputDB[pLot]?inputDB[pLot].name:pLot);
 
   if(editIdx>=0 && editWIdx>=0){
     // 기존 wLot 편집
