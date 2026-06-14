@@ -1062,12 +1062,12 @@ function renderLedger(){
   tbody.innerHTML=ings.map(ing=>{
     // 전월재고: 이번달 시작일 이전 모든 입출고 합산
     const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='in'||r.type==='init')&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
-    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
+    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='return'||r.type==='dispose')&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
     const prevStock=Math.max(0,prevIn-prevOut);
 
     // 당월 입고/출고 (선택날짜까지)
     const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='in'||r.type==='init')&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
-    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='out'&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
+    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='return'||r.type==='dispose')&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
     const closing=Math.max(0,prevStock+monthIn-monthOut);
 
     // 스토리지 뱃지
