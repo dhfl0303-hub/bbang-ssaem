@@ -354,12 +354,12 @@ function renderLedger(){
     // 전일재고: init은 날짜 무관, in/out은 selDate 이전
     const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
     const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
-    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose')&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
     const prevStock=Math.max(0,prevInit+prevIn-prevOut);
 
     // 당일 입고/출고
     const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
-    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose')&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
+    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
     const closing=Math.max(0,prevStock+monthIn-monthOut);
 
     // 스토리지 뱃지
@@ -707,10 +707,10 @@ function printLedger(){
   ings.forEach(ing=>{
     const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
     const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
-    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose')&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
     const prevStock=Math.max(0,prevInit+prevIn-prevOut);
     const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
-    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose')&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
+    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
     const closing=Math.max(0,prevStock+monthIn-monthOut);
     bodyHtml+=`<tr>
       <td>${ing.code}</td>
