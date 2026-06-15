@@ -824,10 +824,10 @@ function getIngLots(ingName){
       inQty[r.lot]=(inQty[r.lot]||0)+(parseFloat(r.qty)||0);
     });
 
-    // 2) LOT별 출고량 합산 (out) - ledger 기준
+    // 2) LOT별 출고량 합산 (out/dispose/return) - ledger 기준
     const outQty={};
     ledger.forEach(r=>{
-      if(r.type!=='out') return;
+      if(r.type!=='out' && r.type!=='dispose' && r.type!=='return') return;
       if(!nameMatch(r.name)) return;
       if(!r.lot) return;
       outQty[r.lot]=(outQty[r.lot]||0)+(parseFloat(r.qty)||0);
