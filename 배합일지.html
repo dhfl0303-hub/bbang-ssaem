@@ -582,6 +582,7 @@ function renderTodayList(){
       <div class="accordion-body" id="acc-body-${idx}">
         ${r.batchRecords ? buildAccTable(r.batchRecords, r.extraIngredients) : '<div class="txs">상세 정보 없음</div>'}
         <button class="acc-print-btn" onclick="printSingleRecord(${idx})">🖨️ PDF 출력</button>
+        <button class="acc-print-btn" style="background:#fff0f0;color:var(--danger);border-color:var(--danger);margin-top:6px;" onclick="deleteBatchRecord(${idx})">🗑️ 삭제</button>
       </div>
     </div>`;
   }).join('');
@@ -1526,6 +1527,17 @@ function completeWithSign(){signImg=hasSign?document.getElementById('signCanvas'
 
 initDB();
 initMain();
+
+// ===== 개별 배합 기록 삭제 =====
+function deleteBatchRecord(idx){
+  const r=S.todayRecords[idx];
+  if(!r) return;
+  if(!confirm(`"${r.product||''} (${r.productCode}-${r.date})" 배합 기록을 삭제하시겠습니까?`)) return;
+  S.todayRecords.splice(idx,1);
+  localStorage.setItem('batchRecords_'+getWorkDateKey(),JSON.stringify(S.todayRecords));
+  renderTodayList();
+  updateStats();
+}
 
 // ===== 동기화 =====
 async function syncToServer(){

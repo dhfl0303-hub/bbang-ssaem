@@ -217,6 +217,9 @@ tr:hover td{background:var(--bg);}
     <div class="nav-item" onclick="showPanel('device')">
       <span class="nav-icon">⚙️</span>설비 세팅값
     </div>
+    <div class="nav-item" onclick="showPanel('product-name-map')">
+      <span class="nav-icon">🏷️</span>완제품명 매핑
+    </div>
     <div class="nav-item" onclick="showPanel('batch-status')">
       <span class="nav-icon">🥣</span>배합현황
     </div>
@@ -624,6 +627,39 @@ tr:hover td{background:var(--bg);}
               <thead><tr><th>제품코드</th><th>제품명</th><th>센터온도 전/후(℃)</th><th>캇타온도 상/하(℃)</th><th>실링기(℃)</th><th>관리</th></tr></thead>
               <tbody id="deviceTbody"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 완제품명 매핑 관리 -->
+    <div class="panel" id="panel-product-name-map">
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-hd-title">완제품명 매핑</div>
+          <button class="btn btn-pink btn-sm" onclick="openAddPnMap()">+ 매핑 추가</button>
+        </div>
+        <div class="card-bd" style="padding:12px">
+          <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">같은 배합비로 여러 완제품을 만드는 경우, 포장일지에서 완제품명을 선택할 수 있게 합니다.</p>
+          <div id="pnMapList"></div>
+        </div>
+      </div>
+      <!-- 매핑 추가/수정 모달 -->
+      <div class="modal-overlay" id="pnMapModal" style="display:none">
+        <div class="modal-content" style="max-width:440px">
+          <div class="modal-title" id="pnMapModalTitle">완제품명 매핑 추가</div>
+          <div class="form-row"><label class="form-label">배합코드</label>
+            <select class="form-input" id="pnMapCode">
+              <option value="">-- 선택 --</option>
+            </select>
+          </div>
+          <div class="form-row"><label class="form-label">배합 제품명</label><input class="form-input" id="pnMapBaseName" readonly style="background:#f5f5f5"></div>
+          <div class="form-row"><label class="form-label">완제품명 목록 (줄바꿈으로 구분)</label>
+            <textarea class="form-input" id="pnMapVariants" rows="5" placeholder="고메버터소금빵&#10;소금빵(욤)&#10;..."></textarea>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closePnMapModal()">취소</button>
+            <button class="btn btn-pink" onclick="savePnMap()">저장</button>
           </div>
         </div>
       </div>
@@ -1340,7 +1376,8 @@ async function loadFromFirebase(){
       'deviceSettings','customIngredients','editedIngredients',
       '완제품_lots','완제품_products','완제품_clients',
       'subIncomingRecords','subLedgerRecords','subItemDB','subsidiaryStock',
-      'workerList','packSettings','batchSettings','ingredientDB','inputDB'
+      'workerList','packSettings','batchSettings','ingredientDB','inputDB',
+      'productNameMapping'
     ];
     const snaps = await Promise.all(keys.map(k=>window._db.collection('appData').doc(k).get()));
     snaps.forEach((snap,i)=>{
@@ -1358,6 +1395,7 @@ async function loadFromFirebase(){
         if(key==='customIngredients') window._customIngredients = parsed;
         if(key==='editedIngredients') window._editedIngredients = parsed;
         if(key==='inputDB') inputDB = parsed;
+        if(key==='productNameMapping') productNameMapping = parsed;
         if(key==='subsidiaryStock') subsidiaryStock = parsed;
         if(key==='ingredientDB') {
           if(parsed.length){
@@ -2742,7 +2780,7 @@ function showPanel(id){
   event.currentTarget.classList.add('active');
   const titles={
     'material-ledger':'원료수불부','recipe':'배합비 관리','ingredient-stock':'원료 재고 현황','device':'설비 세팅값',
-    'lot-mapping':'LOT 매핑 관리','finished-stock':'완제품 재고 현황',
+    'product-name-map':'완제품명 매핑','lot-mapping':'LOT 매핑 관리','finished-stock':'완제품 재고 현황',
     'production':'생산 현황','subsidiary':'부자재 수불','incoming':'입고 현황'
   };
   document.getElementById('topbarTitle').textContent=titles[id]||'';
@@ -2751,6 +2789,7 @@ function showPanel(id){
   if(id==='input-recipe') renderInputRecipe();
   if(id==='ingredient-stock') renderIngStock();
   if(id==='device') renderDevice();
+  if(id==='product-name-map') renderPnMap();
   if(id==='lot-mapping') renderMapping();
   if(id==='finished-stock') renderFinished();
   if(id==='subsidiary') renderSubsidiary();
@@ -3695,6 +3734,79 @@ function saveSubsidiary(){
   subsidiaryStock.push({item,qty,date,note,type:'in'});
   saveData('subsidiaryStock',subsidiaryStock);
   closeModal('subsidiaryModal'); renderSubsidiary();
+}
+
+// ===== 완제품명 매핑 관리 =====
+let productNameMapping = {}; // {P026:["고메버터소금빵","소금빵(욤)"], ...}
+
+function renderPnMap(){
+  const el=document.getElementById('pnMapList');
+  if(!el) return;
+  const codes=Object.keys(productNameMapping);
+  if(!codes.length){ el.innerHTML='<div class="tc txs" style="padding:20px 0;color:var(--text3)">등록된 매핑이 없습니다</div>'; return; }
+  el.innerHTML=codes.map(code=>{
+    const name=RECIPE_DB[code]?.name||code;
+    const variants=productNameMapping[code]||[];
+    return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div><span style="font-weight:700;font-size:15px;">${name}</span> <span style="font-size:12px;color:var(--text3);">(${code})</span></div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-outline btn-sm" onclick="openEditPnMap('${code}')">수정</button>
+          <button class="btn btn-sm" style="background:var(--danger);color:#fff;border:none;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;" onclick="deletePnMap('${code}')">삭제</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${variants.map(v=>`<span style="background:var(--primary-light);color:var(--primary);padding:4px 10px;border-radius:6px;font-size:13px;font-weight:600;">🏷️ ${v}</span>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openAddPnMap(){
+  document.getElementById('pnMapModalTitle').textContent='완제품명 매핑 추가';
+  const sel=document.getElementById('pnMapCode');
+  sel.innerHTML='<option value="">-- 선택 --</option>'+Object.keys(RECIPE_DB).map(c=>`<option value="${c}">${RECIPE_DB[c].name} (${c})</option>`).join('');
+  sel.disabled=false;
+  sel.onchange=()=>{ document.getElementById('pnMapBaseName').value=RECIPE_DB[sel.value]?.name||''; };
+  document.getElementById('pnMapBaseName').value='';
+  document.getElementById('pnMapVariants').value='';
+  document.getElementById('pnMapModal').style.display='flex';
+}
+
+function openEditPnMap(code){
+  document.getElementById('pnMapModalTitle').textContent='완제품명 매핑 수정';
+  const sel=document.getElementById('pnMapCode');
+  sel.innerHTML=`<option value="${code}">${RECIPE_DB[code]?.name||code} (${code})</option>`;
+  sel.value=code; sel.disabled=true;
+  document.getElementById('pnMapBaseName').value=RECIPE_DB[code]?.name||'';
+  document.getElementById('pnMapVariants').value=(productNameMapping[code]||[]).join('\n');
+  document.getElementById('pnMapModal').style.display='flex';
+}
+
+function closePnMapModal(){ document.getElementById('pnMapModal').style.display='none'; }
+
+function savePnMap(){
+  const code=document.getElementById('pnMapCode').value;
+  if(!code){ alert('배합코드를 선택해주세요'); return; }
+  const raw=document.getElementById('pnMapVariants').value.trim();
+  const variants=raw.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!variants.length){ alert('완제품명을 1개 이상 입력해주세요'); return; }
+  productNameMapping[code]=variants;
+  savePnMapToFirebase();
+  closePnMapModal();
+  renderPnMap();
+  alert('저장 완료');
+}
+
+function deletePnMap(code){
+  if(!confirm(`${RECIPE_DB[code]?.name||code} 매핑을 삭제하시겠습니까?`)) return;
+  delete productNameMapping[code];
+  savePnMapToFirebase();
+  renderPnMap();
+}
+
+function savePnMapToFirebase(){
+  if(window._db) window._db.collection('appData').doc('productNameMapping').set({data:JSON.stringify(productNameMapping),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
 }
 
 // ===== 고아 배합출고 정리 (배합 삭제됐는데 수불부에 남은 출고 제거) =====

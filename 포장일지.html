@@ -66,12 +66,6 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 .product-item:active{background:var(--primary-light);border-color:var(--primary);}
 .product-name{font-size:17px;font-weight:700;}
 .product-code{font-size:12px;color:var(--text3);margin-top:2px;}
-.batch-group{border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;background:#fff;}
-.batch-group .product-item{border:none;border-radius:0;}
-.batch-group-toggle{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:var(--bg);cursor:pointer;font-size:12px;color:var(--text2);border-top:1px solid var(--border);}
-.batch-group-detail{display:none;}
-.batch-group-detail.open{display:block;}
-.batch-group-sub{padding:10px 16px;border-top:1px solid var(--border);background:var(--bg);}
 
 /* 설비 세팅 */
 .setting-box{background:var(--warning-light);border:1px solid #f0c080;border-radius:10px;padding:14px;margin-bottom:10px;}
@@ -862,7 +856,9 @@ function renderBatchLotList(){
   const el=document.getElementById('batchLotList');
   if(!el) return;
   const todayKey=getWorkDateKey();
+  // 배합LOT
   const batchRecs=(window._fbBatchCache&&window._fbBatchCache['batchRecords_'+todayKey])||[];
+  // 투입LOT
   const inputRecs=(window._fbInputCache&&window._fbInputCache['inputRecords_'+todayKey])||[];
 
   if(!batchRecs.length && !inputRecs.length){
@@ -873,55 +869,19 @@ function renderBatchLotList(){
   let html = '';
   if(batchRecs.length){
     html += `<div style="font-size:12px;font-weight:700;color:var(--text2);padding:6px 4px 4px;">배합 LOT</div>`;
-    // 제품명 기준 그룹핑
-    const groups = groupBatchByProduct(batchRecs);
-    window._batchGroups = groups; // selectBatchGroup에서 참조
-
-    groups.forEach((g,gi)=>{
-      if(g.recs.length===1){
-        // 단독 제품
-        const r=g.recs[0];
-        html += `
-          <div class="product-item" style="margin-bottom:8px;" onclick="selectBatchGroup(${gi})">
-            <div>
-              <div class="product-name">${r.product} <span style="font-size:12px;color:var(--primary);font-weight:500;">[배합]</span></div>
-              <div class="product-code">${r.productCode} · ${r.batchRecords?r.batchRecords.map(b=>b.lot).join(', '):r.lot}</div>
-            </div>
-            <div style="color:var(--text3);font-size:20px">›</div>
-          </div>`;
-      } else {
-        // 그룹 제품 (반죽+속+분말 등)
-        const labels=g.recs.map(r=>{
-          const suffix=r.product.replace(g.baseName,'').trim();
-          return suffix||'반죽';
-        });
-        html += `
-          <div class="batch-group">
-            <div class="product-item" onclick="selectBatchGroup(${gi})">
-              <div>
-                <div class="product-name">${g.baseName} <span style="font-size:12px;color:var(--success);font-weight:600;">[${labels.join('+')}]</span></div>
-                <div class="product-code">대표: ${g.recs[0].productCode} · ${g.recs.length}개 배합</div>
-              </div>
-              <div style="color:var(--text3);font-size:20px">›</div>
-            </div>
-            <div class="batch-group-toggle" onclick="event.stopPropagation();this.nextElementSibling.classList.toggle('open');this.querySelector('span').textContent=this.nextElementSibling.classList.contains('open')?'▲':'▼'">
-              배합LOT 상세보기 <span>▼</span>
-            </div>
-            <div class="batch-group-detail">
-              ${g.recs.map(r=>`
-                <div class="batch-group-sub">
-                  <div style="font-weight:700;font-size:14px;margin-bottom:2px;">${r.product} <span style="font-size:11px;color:var(--primary);">(${r.productCode})</span></div>
-                  <div style="font-size:11px;color:var(--text3);word-break:break-all;">${r.batchRecords?r.batchRecords.map(b=>b.lot).join(', '):r.lot}</div>
-                </div>`).join('')}
-            </div>
-          </div>`;
-      }
-    });
+    html += batchRecs.map(r=>`
+      <div class="product-item" onclick="selectBatchLot('${r.productCode}','${r.batchRecords?r.batchRecords[0]?.lot||r.lot:r.lot}','배합')">
+        <div>
+          <div class="product-name">${r.product} <span style="font-size:12px;color:var(--primary);font-weight:500;">[배합]</span></div>
+          <div class="product-code">${r.productCode} · ${r.batchRecords?r.batchRecords.map(b=>b.lot).join(', '):r.lot}</div>
+        </div>
+        <div style="color:var(--text3);font-size:20px">›</div>
+      </div>`).join('');
   }
   if(inputRecs.length){
     html += `<div style="font-size:12px;font-weight:700;color:var(--text2);padding:10px 4px 4px;">투입 LOT</div>`;
     html += inputRecs.map(r=>`
-      <div class="product-item" style="margin-bottom:8px;" onclick="selectBatchLot('${r.lot.split('-')[1]||''}','${r.lot}','투입')">
+      <div class="product-item" onclick="selectBatchLot('${r.lot.split('-')[1]||''}','${r.lot}','투입')">
         <div>
           <div class="product-name">${r.product||'제품명 미입력'} <span style="font-size:12px;color:var(--warning);font-weight:500;">[투입]</span></div>
           <div class="product-code">${r.lot}</div>
@@ -932,68 +892,10 @@ function renderBatchLotList(){
   el.innerHTML = html;
 }
 
-// 배합 레코드를 제품명 기준으로 그룹핑
-function groupBatchByProduct(recs){
-  // 이름 길이순 정렬 (짧은게 메인)
-  const sorted=[...recs].sort((a,b)=>(a.product||'').length-(b.product||'').length);
-  const groups=[]; // [{baseName, recs:[...]}]
-  const used=new Set();
-
-  sorted.forEach(r=>{
-    if(used.has(r.productCode)) return;
-    const name=r.product||'';
-    // 이 제품을 메인으로 하는 서브 제품 찾기
-    const subs=sorted.filter(s=>!used.has(s.productCode) && s.productCode!==r.productCode && (s.product||'').startsWith(name));
-    if(subs.length>0){
-      used.add(r.productCode);
-      subs.forEach(s=>used.add(s.productCode));
-      groups.push({baseName:name, recs:[r,...subs]});
-    }
-  });
-  // 그룹에 안 들어간 나머지 → 단독
-  sorted.forEach(r=>{
-    if(!used.has(r.productCode)){
-      groups.push({baseName:r.product||'', recs:[r]});
-    }
-  });
-  return groups;
-}
-
-// 그룹 선택 → 포장일지 작성
-function selectBatchGroup(gi){
-  const g=window._batchGroups[gi];
-  if(!g) return;
-  const mainRec=g.recs[0];
-  const code=mainRec.productCode;
-  const mainLot=mainRec.batchRecords?mainRec.batchRecords[0]?.lot||mainRec.lot:mainRec.lot;
-  // 모든 서브 배합LOT 수집
-  const allLots=[];
-  g.recs.forEach(r=>{
-    if(r.batchRecords) r.batchRecords.forEach(b=>{ if(b.lot) allLots.push(b.lot); });
-    else if(r.lot) allLots.push(r.lot);
-  });
-  S.product=code;
-  S.batchLot=mainLot;
-  S.batchLotType='배합';
-  S.groupRecs=g.recs; // 그룹 레코드 저장
-  S.allBatchLots=allLots; // 전체 배합LOT 저장
-
-  const productName=g.baseName||RECIPE_DB[code]?.name||code;
-  document.getElementById('tbTitle').textContent=productName;
-  document.getElementById('tbSub').textContent=g.recs.map(r=>r.productCode).join('+');
-  const today=getWorkDateKey();
-  const pCode=code;
-  const existCount=S.todayRecords.filter(r=>r.productCode===pCode).length;
-  document.getElementById('packLot')&&(document.getElementById('packLot').textContent=`포장-${pCode}-${today}-${String(existCount+1).padStart(3,'0')}`);
-  showPage('form');
-}
-
 function selectBatchLot(code, lot, lotType){
   S.product=code;
   S.batchLot=lot;
   S.batchLotType=lotType||'배합'; // '배합' or '투입'
-  S.groupRecs=null;
-  S.allBatchLots=[];
   // topbar 업데이트 - 투입LOT면 제품명을 투입기록에서 가져오기
   let productName = RECIPE_DB[code]?.name||code;
   if(lotType==='투입'){
@@ -1032,7 +934,7 @@ function renderTodayList(){
       <div class="accordion-body" id="acc-${idx}">
         <table class="acc-table">
           <tr><th>항목</th><th>내용</th></tr>
-          <tr><td>${r.batchLotType==='투입'?'투입LOT':'배합LOT'}</td><td style="font-size:11px;word-break:break-all;">${r.allBatchLots&&r.allBatchLots.length?r.allBatchLots.join(', '):r.batchLot||'-'}</td></tr>
+          <tr><td>${r.batchLotType==='투입'?'투입LOT':'배합LOT'}</td><td>${r.batchLot||'-'}</td></tr>
           <tr><td>소비기한</td><td>${r.expiryDate}</td></tr>
           <tr><td>생산수량</td><td>${r.qtyPcs}개 / ${r.qtyBoxes}박스</td></tr>
           <tr><td>잔량</td><td>${r.remaining}개</td></tr>
@@ -1043,6 +945,7 @@ function renderTodayList(){
           <tr><td>박스</td><td>${r.boxQty}개</td></tr>
         </table>
         <button class="acc-print-btn" onclick="printRecord(${idx})">🖨️ PDF 출력</button>
+        <button class="acc-print-btn" style="background:var(--danger-light);color:var(--danger);border-color:var(--danger);margin-top:6px;" onclick="deletePackRecord(${idx})">🗑️ 삭제</button>
       </div>
     </div>`;
   }).join('');
@@ -1148,7 +1051,7 @@ function genPrint(r){
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">포장로트</td>
         <td style="border:1px solid #999;padding:4px 8px;font-weight:700">${r.lot}</td>
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">${r.batchLotType==='투입'?'투입LOT':'배합LOT'}</td>
-        <td style="border:1px solid #999;padding:4px 8px;font-size:9px;word-break:break-all;">${r.allBatchLots&&r.allBatchLots.length?r.allBatchLots.join(', '):r.batchLot||'-'}</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.batchLot||'-'}</td>
       </tr>
       <tr>
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">작성자</td>
@@ -1364,9 +1267,8 @@ function completePackaging(signImg=''){
   const record={
     lot, productCode:pCode, product:productName,
     date:today, time:getNow(),
-    batchLot:document.getElementById('batchLotSel')?.value||S.batchLot||'-',
+    batchLot:document.getElementById('batchLotSel')?.value||'-',
     batchLotType:S.batchLotType||'배합',
-    allBatchLots:S.allBatchLots||[],
     workers:document.getElementById('workers').value||'-',
     startTime:getTimeVal('startTime'),
     endTime:getTimeVal('endTime'),
@@ -1466,30 +1368,31 @@ async function syncToServer(){
     if(!window._db) throw new Error('Firebase 연결 없음');
     const db = window._db;
 
-    // 1. packRecords localStorage → Firebase (먼저 동기화)
-    const keys = Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
-    let recs = []; keys.forEach(k=>{ recs = recs.concat(JSON.parse(localStorage.getItem(k)||'[]')); });
-    if(!recs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
-
-    for(const key of keys){
-      const dayRecs = JSON.parse(localStorage.getItem(key)||'[]');
-      if(dayRecs.length) await db.collection('appData').doc(key).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
-    }
-
-    // 2. 통합관리에서 삭제된 키 확인 → 동기화 완료 후 localStorage 정리
+    // 1. 통합관리에서 삭제된 키 먼저 확인 → localStorage 정리
     let deletedKeys = [];
     try{
       const dkSnap = await db.collection('appData').doc('deletedKeys').get();
       if(dkSnap.exists && dkSnap.data().data) deletedKeys = JSON.parse(dkSnap.data().data);
     }catch(e){}
     const packDeleted = deletedKeys.filter(k=>k.startsWith('packRecords_'));
-    // 방금 동기화한 키는 삭제하지 않음 (새 데이터 보호)
     packDeleted.forEach(k=>{
-      if(!keys.includes(k)) localStorage.removeItem(k);
+      localStorage.removeItem(k);
+      // 오늘 날짜면 todayRecords도 초기화
+      if(k==='packRecords_'+getWorkDateKey()){ S.todayRecords=[]; }
     });
     if(packDeleted.length){
       const remaining = deletedKeys.filter(k=>!k.startsWith('packRecords_'));
       await db.collection('appData').doc('deletedKeys').set({data:JSON.stringify(remaining),updatedAt:new Date().toISOString()});
+    }
+
+    // 2. 정리 후 남은 packRecords localStorage → Firebase
+    const keys = Object.keys(localStorage).filter(k=>k.startsWith('packRecords_'));
+    let recs = []; keys.forEach(k=>{ recs = recs.concat(JSON.parse(localStorage.getItem(k)||'[]')); });
+    if(!recs.length){ updateStats(); btn.textContent='✅ 정리 완료'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
+
+    for(const key of keys){
+      const dayRecs = JSON.parse(localStorage.getItem(key)||'[]');
+      if(dayRecs.length) await db.collection('appData').doc(key).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
     }
 
     // 3. 부자재수불부 출고 반영
@@ -1519,6 +1422,17 @@ async function syncToServer(){
     btn.textContent = '❌ 실패';
     setTimeout(()=>{ btn.textContent='🔄 동기화'; btn.disabled=false; }, 2000);
   }
+}
+
+// ===== 개별 포장 기록 삭제 =====
+function deletePackRecord(idx){
+  const r=S.todayRecords[idx];
+  if(!r) return;
+  if(!confirm(`"${r.product||''} (${r.lot||''})" 포장 기록을 삭제하시겠습니까?`)) return;
+  S.todayRecords.splice(idx,1);
+  saveLocal();
+  renderTodayList();
+  updateStats();
 }
 </script>
 </body>
