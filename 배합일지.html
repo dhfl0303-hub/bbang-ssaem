@@ -929,13 +929,28 @@ function renderIngredients(ings){
     block.dataset.lotOptions=JSON.stringify(lots);
     const expRows=block.querySelector('.exp-rows');
 
-    // 매 배합마다 FIFO 자동 분배 (S.batchRecords의 이미 사용량이 차감된 재고 기준)
-    const fifoRows = calcFifoDistribution(lots, total);
-    if(fifoRows.length){
-      fifoRows.forEach((fr,ri)=>addExpRowEl(expRows,fr.lot,fr.amount,total,ri,fifoRows.length,lots,code));
+    // 정제수(M000)는 무한수 → 자동 LOT 생성 + 금액 자동입력
+    if(code==='M000'){
+      const autoLot='M000-'+getWorkDateKey()+'-'+getWorkDateKey();
+      addExpRowEl(expRows,autoLot,total,total,0,1,[{lot:autoLot,label:autoLot+' (정제수-자동)',exp:'',dateType:'exp',remaining:99999}],code);
+      // LOT 선택 비활성화 (읽기전용)
+      const sel=expRows.querySelector('select');
+      if(sel){sel.disabled=true;sel.style.opacity='0.7';}
+      const amtInput=expRows.querySelector('input[type="number"],input[type="text"]');
+      if(amtInput){amtInput.readOnly=true;amtInput.style.background='#e8f0fb';amtInput.style.fontWeight='700';}
+      const addBtn=block.querySelector('.add-exp-btn');
+      if(addBtn) addBtn.style.display='none';
+      const toggleBtn=expRows.querySelector('[onclick*="toggleLotInput"]');
+      if(toggleBtn) toggleBtn.style.display='none';
     } else {
-      // LOT 정보 없으면 빈 행 1개
-      addExpRowEl(expRows,'','',total,0,1,lots,code);
+      // 매 배합마다 FIFO 자동 분배 (S.batchRecords의 이미 사용량이 차감된 재고 기준)
+      const fifoRows = calcFifoDistribution(lots, total);
+      if(fifoRows.length){
+        fifoRows.forEach((fr,ri)=>addExpRowEl(expRows,fr.lot,fr.amount,total,ri,fifoRows.length,lots,code));
+      } else {
+        // LOT 정보 없으면 빈 행 1개
+        addExpRowEl(expRows,'','',total,0,1,lots,code);
+      }
     }
     updateAutoCalc(block);
     list.appendChild(block);
