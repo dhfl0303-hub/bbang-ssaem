@@ -2451,11 +2451,24 @@ async function deleteBatchStatus(){
   const recs = (window._fbCache&&window._fbCache['batchRecords_'+key])||[];
   if(!recs.length){ alert('해당 날짜의 배합 데이터가 없습니다'); return; }
   if(!confirm(`${yymmddToDisplay(key)} 배합 데이터 ${recs.length}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  // 삭제할 배합LOT 수집
+  const batchLots = new Set();
+  recs.forEach(r=>(r.batchRecords||[]).forEach(b=>{ if(b.lot) batchLots.add(b.lot); }));
+  // ledgerRecords에서 해당 batchLot의 out 레코드 제거
+  if(batchLots.size>0){
+    const before = ledgerRecords.length;
+    ledgerRecords = ledgerRecords.filter(r=>!(r.type==='out' && r.batchLot && batchLots.has(r.batchLot)));
+    if(ledgerRecords.length < before){
+      saveLedger();
+      syncIngStockFromLedger();
+    }
+  }
   if(window._fbCache) delete window._fbCache['batchRecords_'+key];
   if(window._db){ try{ await window._db.collection('appData').doc('batchRecords_'+key).delete(); await addDeletedKey('batchRecords_'+key); }catch(e){} }
   fillDateDropdown('batchStatusDate','batchRecords_');
   loadBatchStatus();
-  alert('삭제 완료');
+  renderIngStock();
+  alert('삭제 완료 (원료수불부 출고내역도 정리됨)');
 }
 async function deletePackStatus(){
   const dateVal = document.getElementById('packStatusDate').value;
@@ -2478,12 +2491,24 @@ async function deleteYield(){
   const packRecs  = (window._fbCache&&window._fbCache['packRecords_'+key])||[];
   if(!batchRecs.length && !packRecs.length){ alert('해당 날짜의 데이터가 없습니다'); return; }
   if(!confirm(`${yymmddToDisplay(key)} 배합(${batchRecs.length}건) + 포장(${packRecs.length}건) 데이터를 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  // 삭제할 배합LOT 수집
+  const batchLots = new Set();
+  batchRecs.forEach(r=>(r.batchRecords||[]).forEach(b=>{ if(b.lot) batchLots.add(b.lot); }));
+  if(batchLots.size>0){
+    const before = ledgerRecords.length;
+    ledgerRecords = ledgerRecords.filter(r=>!(r.type==='out' && r.batchLot && batchLots.has(r.batchLot)));
+    if(ledgerRecords.length < before){
+      saveLedger();
+      syncIngStockFromLedger();
+    }
+  }
   if(window._fbCache) delete window._fbCache['batchRecords_'+key];
   if(window._fbCache) delete window._fbCache['packRecords_'+key];
   if(window._db){ try{ await Promise.all([ window._db.collection('appData').doc('batchRecords_'+key).delete(), window._db.collection('appData').doc('packRecords_'+key).delete(), addDeletedKey('batchRecords_'+key), addDeletedKey('packRecords_'+key) ]); }catch(e){} }
   fillYieldDateDropdown();
   loadYield();
-  alert('삭제 완료');
+  renderIngStock();
+  alert('삭제 완료 (원료수불부 출고내역도 정리됨)');
 }
 
 // ===== 수율 =====
@@ -3672,10 +3697,32 @@ function saveSubsidiary(){
   closeModal('subsidiaryModal'); renderSubsidiary();
 }
 
+// ===== 고아 배합출고 정리 (배합 삭제됐는데 수불부에 남은 출고 제거) =====
+async function cleanOrphanedBatchOut(){
+  try{
+    // 현존하는 모든 배합LOT 수집
+    const existingLots = new Set();
+    Object.keys(window._fbCache||{}).filter(k=>k.startsWith('batchRecords_')).forEach(k=>{
+      (window._fbCache[k]||[]).forEach(r=>{
+        (r.batchRecords||[]).forEach(b=>{ if(b.lot) existingLots.add(b.lot); });
+      });
+    });
+    // batchLot이 있는 out 레코드 중 현존 배합에 없는 것 = 고아
+    const orphaned = ledgerRecords.filter(r=>r.type==='out' && r.batchLot && !existingLots.has(r.batchLot));
+    if(orphaned.length>0){
+      console.log(`[정리] 고아 배합출고 ${orphaned.length}건 발견 → 제거`);
+      ledgerRecords = ledgerRecords.filter(r=>!(r.type==='out' && r.batchLot && !existingLots.has(r.batchLot)));
+      saveLedger();
+      syncIngStockFromLedger();
+    }
+  }catch(e){ console.warn('cleanOrphanedBatchOut 오류',e); }
+}
+
 // ===== 초기화 =====
 (async ()=>{
   await loadFromFirebase();
   initData();
+  await cleanOrphanedBatchOut();
   syncIngStockFromLedger();
   document.getElementById('topbarDate').textContent=getToday();
   const _ld=document.getElementById('ledgerDate'); if(_ld) _ld.value=getTodayISO2();
