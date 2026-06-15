@@ -51,7 +51,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 .product-code{font-size:13px;color:var(--text3);margin-top:2px;}
 
 /* 배합 설정 */
-.machine-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.machine-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
 .machine-btn{padding:14px 8px;text-align:center;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);cursor:pointer;transition:all 0.15s;}
 .machine-btn.active{border:2px solid var(--primary);background:var(--primary-light);}
 .machine-btn.off{opacity:0.35;cursor:not-allowed;}
@@ -600,7 +600,7 @@ function buildAccTable(batchRecords, extraIngredients){
     ing.exps.forEach(e=>{
       const key=e.lot||e.exp||'';
       if(!key) return;
-      if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||'',exp:e.exp||'',amt:0};
+      if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||'',exp:e.exp||'',dateType:e.dateType||'exp',amt:0};
       totals[ing.name][key].amt+=e.amount||0;
     });
   }));
@@ -609,17 +609,17 @@ function buildAccTable(batchRecords, extraIngredients){
     if(!ing.name || !(parseFloat(ing.qty)>0)) return;
     if(!totals[ing.name]) totals[ing.name]={};
     const key=ing.lot||ing.exp||ing.name;
-    if(!totals[ing.name][key]) totals[ing.name][key]={lot:ing.lot||'',exp:ing.exp||'',amt:0};
+    if(!totals[ing.name][key]) totals[ing.name][key]={lot:ing.lot||'',exp:ing.exp||'',dateType:'exp',amt:0};
     totals[ing.name][key].amt+=(parseFloat(ing.qty)||0)*1000;
   });
   const ingDB=JSON.parse(localStorage.getItem('customIngredients')||'[]');
   return `<table class="acc-table">
-    <tr><th>원료코드</th><th>원료명</th><th>LOT</th><th>소비기한</th><th>총 사용량(g)</th></tr>
+    <tr><th>원료코드</th><th>원료명</th><th>LOT</th><th>소비기한/제조일자</th><th>총 사용량(g)</th></tr>
     ${Object.entries(totals).map(([n,keys])=>{
       const found=ingDB.find(i=>i.name===n)||{code:''};
       const code=found.code||INGREDIENT_DB_STATIC[n]||'';
       return Object.entries(keys).map(([k,v])=>
-        `<tr><td style="color:var(--primary);font-weight:700">${code}</td><td>${n}</td><td>${v.lot||'-'}</td><td>${v.exp||'-'}</td><td>${Math.round(v.amt).toLocaleString()}</td></tr>`
+        `<tr><td style="color:var(--primary);font-weight:700">${code}</td><td>${n}</td><td>${v.lot||'-'}</td><td>${fmtDateLabel(v.exp,v.dateType)}</td><td>${Math.round(v.amt).toLocaleString()}</td></tr>`
       ).join('');
     }).join('')}
   </table>`;
@@ -636,7 +636,7 @@ function printSingleRecord(idx){
       ing.exps.forEach(e=>{
         let key=e.lot||e.exp||'';
         if(!key) key=ing.name==='정제수'?'M000-'+r.date+'-'+r.date:'기타';
-        if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||(ing.name==='정제수'?'M000-'+r.date+'-'+r.date:''),exp:e.exp||'',amt:0};
+        if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||(ing.name==='정제수'?'M000-'+r.date+'-'+r.date:''),exp:e.exp||'',dateType:e.dateType||'exp',amt:0};
         totals[ing.name][key].amt+=e.amount||0;
       });
     });
@@ -646,7 +646,7 @@ function printSingleRecord(idx){
     if(!ing.name || !(parseFloat(ing.qty)>0)) return;
     if(!totals[ing.name]) totals[ing.name]={};
     const key=ing.lot||ing.exp||ing.name;
-    if(!totals[ing.name][key]) totals[ing.name][key]={lot:ing.lot||'',exp:ing.exp||'',amt:0};
+    if(!totals[ing.name][key]) totals[ing.name][key]={lot:ing.lot||'',exp:ing.exp||'',dateType:'exp',amt:0};
     totals[ing.name][key].amt+=(parseFloat(ing.qty)||0)*1000;
   });
   const lots=(r.batchRecords||[]).map(br=>br.lot);
@@ -678,7 +678,7 @@ function printSingleRecord(idx){
         <th style="border:1px solid #999;padding:4px;text-align:center;width:8%">원료코드</th>
         <th style="border:1px solid #999;padding:4px;text-align:left;width:20%">원료명</th>
         <th style="border:1px solid #999;padding:4px;text-align:center;width:42%">LOT</th>
-        <th style="border:1px solid #999;padding:4px;text-align:center;width:15%">소비기한</th>
+        <th style="border:1px solid #999;padding:4px;text-align:center;width:15%">소비기한/제조일자</th>
         <th style="border:1px solid #999;padding:4px;text-align:right;width:15%">총 사용량(g)</th>
       </tr>
       ${Object.entries(totals).map(([n,keys])=>{
@@ -688,7 +688,7 @@ function printSingleRecord(idx){
           <td style="border:1px solid #999;padding:4px;text-align:center;color:#1a5fa8;font-weight:700">${code}</td>
           <td style="border:1px solid #999;padding:4px">${n}</td>
           <td style="border:1px solid #999;padding:4px;text-align:center">${v.lot||k||'-'}</td>
-          <td style="border:1px solid #999;padding:4px;text-align:center">${fmtExp(v.exp)}</td>
+          <td style="border:1px solid #999;padding:4px;text-align:center">${fmtDateLabel(v.exp,v.dateType)}</td>
           <td style="border:1px solid #999;padding:4px;text-align:right">${Math.round(v.amt).toLocaleString()}</td>
         </tr>`).join('');
       }).join('')}
@@ -705,7 +705,7 @@ function printSingleRecord(idx){
 function selectProduct(code){
   S.product=code; S.machine=null;
   const p=DB[code];
-  document.getElementById('machineGrid').innerHTML=['1','2','3'].map(m=>{
+  document.getElementById('machineGrid').innerHTML=['1','2','3','4'].map(m=>{
     const md=p.batches[m];
     const off=!md?'off':'';
     let flour='';
@@ -729,7 +729,7 @@ function selectProduct(code){
 }
 function selectMachine(m){
   S.machine=m;
-  document.querySelectorAll('.machine-btn').forEach((el,i)=>el.classList.toggle('active',['1','2','3'][i]===m));
+  document.querySelectorAll('.machine-btn').forEach((el,i)=>el.classList.toggle('active',['1','2','3','4'][i]===m));
   updateSummary();
 }
 function changeCount(d){ const v=parseInt(document.getElementById('countInput').value||1)+d; if(v<1||v>30)return; document.getElementById('countInput').value=v; S.totalBatches=v; updateSummary(); }
@@ -768,7 +768,7 @@ function renderBatchPage(){
     return `<div class="pdot ${cls}">${i+1}</div>`;
   }).join('');
   // 기계 미니
-  document.getElementById('machineMini').innerHTML=['1','2','3'].map(mc=>{
+  document.getElementById('machineMini').innerHTML=['1','2','3','4'].map(mc=>{
     const md2=p.batches[mc]; const off=!md2?'off':'';
     const w=md2?Number(md2.weight).toLocaleString()+'g':'-';
     const fn2 = md2 ? "changeMachine('"+mc+"')" : '';
@@ -779,7 +779,7 @@ function renderBatchPage(){
 function changeMachine(m){
   S.machine=m;
   const md=DB[S.product].batches[m];
-  document.querySelectorAll('.mm-btn').forEach((el,i)=>el.classList.toggle('active',['1','2','3'][i]===m));
+  document.querySelectorAll('.mm-btn').forEach((el,i)=>el.classList.toggle('active',['1','2','3','4'][i]===m));
   renderIngredients(md.ingredients);
 }
 
@@ -789,6 +789,12 @@ function fmtExp(val){
   if(d.length<=2) return d;
   if(d.length<=4) return d.slice(0,2)+'.'+d.slice(2);
   return d.slice(0,2)+'.'+d.slice(2,4)+'.'+d.slice(4);
+}
+function fmtDateLabel(exp, dateType){
+  const f=fmtExp(exp);
+  if(!f||f==='-') return '-';
+  if(dateType==='mfg') return '제조:'+f;
+  return f;
 }
 function onExpInput(input){
   const raw=input.value.replace(/\D/g,'').slice(0,6);
@@ -861,6 +867,7 @@ function getIngLots(ingName){
           lot:r.lot,
           label:r.lot+' (초기재고 '+dateLbl+')'+stockLbl,
           exp:fmtExp(r.exp||r.mfg||''),
+          dateType:hasExp?'exp':'mfg',
           date:'',
           isOI:true,
           remaining
@@ -872,6 +879,7 @@ function getIngLots(ingName){
           lot:r.lot,
           label:r.lot+' (입고:'+r.date+' '+dateLbl+')'+stockLbl,
           exp:fmtExp(r.exp||r.mfg||''),
+          dateType:hasExp?'exp':'mfg',
           date:r.date||'',
           isOI:false,
           remaining
@@ -946,7 +954,7 @@ function calcFifoDistribution(lots, totalG){
   for(const lot of available){
     if(remaining<=0) break;
     const use = Math.min(lot.remaining, remaining);
-    rows.push({ lot:lot.lot, exp:lot.exp, amount:Math.round(use*1000) });
+    rows.push({ lot:lot.lot, exp:lot.exp, dateType:lot.dateType||'exp', amount:Math.round(use*1000) });
     remaining -= use;
     if(rows.length>=3) break; // 최대 3개 LOT
   }
@@ -965,7 +973,7 @@ function addExpRowEl(container,lotVal,amtVal,total,rowIdx,totalRows,lots,ingCode
   const isLast=rowIdx===totalRows-1&&totalRows>1;
   const row=document.createElement('div'); row.className='exp-row'+(isLast?' auto-row':'');
   const lotOptions=(lots||[]).length
-    ? (lots||[]).map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===lotVal?'selected':''}>${l.label}</option>`).join('')
+    ? (lots||[]).map(l=>`<option value="${l.lot}" data-exp="${l.exp}" data-date-type="${l.dateType||'exp'}" ${l.lot===lotVal?'selected':''}>${l.label}</option>`).join('')
     : `<option value="${lotVal||''}">${lotVal||'입고기록없음'}</option>`;
   row.innerHTML=`
     <div style="display:flex;flex-direction:column;gap:3px;flex:1;">
@@ -990,7 +998,7 @@ function addExpRowEl(container,lotVal,amtVal,total,rowIdx,totalRows,lots,ingCode
     sel.value=lotVal;
     // 초기 exp 세팅
     const opt=sel.options[sel.selectedIndex];
-    if(opt) sel.dataset.exp=opt.dataset.exp||'';
+    if(opt) { sel.dataset.exp=opt.dataset.exp||''; sel.dataset.dateType=opt.dataset.dateType||'exp'; }
   }
   container.appendChild(row);
 }
@@ -1036,6 +1044,7 @@ function fmtExp(exp){
 function onLotSelect(sel){
   const opt=sel.options[sel.selectedIndex];
   sel.dataset.exp=opt.dataset.exp||'';
+  sel.dataset.dateType=opt.dataset.dateType||'exp';
   updateAutoCalc(sel.closest('.ing-block'));
 }
 
@@ -1129,18 +1138,20 @@ function completeBatch(){
         !inp.classList.contains('lot-manual-exp')&&
         !inp.classList.contains('lot-manual-full')
       );
-      let lotVal='', expVal='';
+      let lotVal='', expVal='', dtType='exp';
       if(manual&&manual.style.display==='flex'){
         const hidden=row.querySelector('.lot-manual-full');
         lotVal=hidden?hidden.value.trim():'';
         const expInput=row.querySelector('.lot-manual-exp');
         expVal=expInput?fmtExp(expInput.value.trim()):'';
+        dtType='exp';
       } else if(sel){
         lotVal=sel.value.trim();
         expVal=sel.dataset.exp||sel.options[sel.selectedIndex]?.dataset.exp||'';
+        dtType=sel.dataset.dateType||sel.options[sel.selectedIndex]?.dataset.dateType||'exp';
       }
       const av=amtInput?amtInput.value:'';
-      if(lotVal) exps.push({lot:lotVal, exp:expVal, amount:parseFloat(av)||0});
+      if(lotVal) exps.push({lot:lotVal, exp:expVal, dateType:dtType, amount:parseFloat(av)||0});
     });
     if(!exps.length) exps.push({lot:'',exp:'',amount:total});
     ingredients.push({name,total,exps});
@@ -1244,7 +1255,7 @@ function showComplete(){
     ing.exps.forEach(e=>{
       let key=e.lot||e.exp||'';
       if(!key) key=ing.name==='정제수'?'M000-'+getWorkDateKey()+'-'+getWorkDateKey():'기타';
-      if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||'',exp:e.exp||'',amt:0};
+      if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||'',exp:e.exp||'',dateType:e.dateType||'exp',amt:0};
       totals[ing.name][key].amt+=e.amount||0;
     });
   }));
@@ -1252,20 +1263,20 @@ function showComplete(){
   (S.inputIngredients||[]).filter(ing=>ing.name && parseFloat(ing.qty)>0).forEach(ing=>{
     if(!totals[ing.name]) totals[ing.name]={};
     const key=ing.lot||ing.exp||ing.name;
-    if(!totals[ing.name][key]) totals[ing.name][key]={lot:ing.lot||'',exp:ing.exp||'',amt:0};
+    if(!totals[ing.name][key]) totals[ing.name][key]={lot:ing.lot||'',exp:ing.exp||'',dateType:'exp',amt:0};
     totals[ing.name][key].amt+=(parseFloat(ing.qty)||0)*1000; // kg→g
   });
   const ingDB=JSON.parse(localStorage.getItem('customIngredients')||'[]');
   const sortedRows=Object.entries(totals)
-    .flatMap(([name,keys])=>Object.entries(keys).map(([k,v])=>({name,lot:v.lot||k,exp:v.exp,amt:v.amt})))
+    .flatMap(([name,keys])=>Object.entries(keys).map(([k,v])=>({name,lot:v.lot||k,exp:v.exp,dateType:v.dateType||'exp',amt:v.amt})))
     .sort((a,b)=>b.amt-a.amt);
   document.getElementById('doneResult').innerHTML=`
     <div class="sec" style="margin-top:0">생성된 배합로트</div>
     ${S.batchRecords.map(r=>`<div class="done-item"><div><div class="done-lot">${r.lot}</div><div class="done-time">배합${r.machine} · ${r.time}</div></div><div class="done-badge">완료</div></div>`).join('')}
     <div class="sec">원료별 총 사용량</div>
     <table class="result-table">
-      <tr><th>원료명</th><th>LOT</th><th>소비기한</th><th>사용량(g)</th></tr>
-      ${sortedRows.map(({name:n,lot:l,exp:e,amt:a})=>`<tr><td>${n}</td><td style="font-size:11px">${l||'-'}</td><td>${fmtExp(e)}</td><td>${Math.round(a).toLocaleString()}</td></tr>`).join('')}
+      <tr><th>원료명</th><th>LOT</th><th>소비기한/제조일자</th><th>사용량(g)</th></tr>
+      ${sortedRows.map(({name:n,lot:l,exp:e,dateType:dt,amt:a})=>`<tr><td>${n}</td><td style="font-size:11px">${l||'-'}</td><td>${fmtDateLabel(e,dt)}</td><td>${Math.round(a).toLocaleString()}</td></tr>`).join('')}
     </table>`;
   genPrint(); showPage('done');
 }
@@ -1278,7 +1289,7 @@ function genPrint(){
     ing.exps.forEach(e=>{
       let key=e.lot||e.exp||'';
       if(!key) key=ing.name==='정제수'?'M000-'+getWorkDateKey()+'-'+getWorkDateKey():'기타';
-      if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||'',exp:e.exp||'',amt:0};
+      if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||'',exp:e.exp||'',dateType:e.dateType||'exp',amt:0};
       totals[ing.name][key].amt+=e.amount||0;
     });
   }));
@@ -1286,7 +1297,7 @@ function genPrint(){
   (S.inputIngredients||[]).filter(ing=>ing.name && parseFloat(ing.qty)>0).forEach(ing=>{
     if(!totals[ing.name]) totals[ing.name]={};
     const key=ing.lot||ing.exp||ing.name;
-    if(!totals[ing.name][key]) totals[ing.name][key]={lot:ing.lot||'',exp:ing.exp||'',amt:0};
+    if(!totals[ing.name][key]) totals[ing.name][key]={lot:ing.lot||'',exp:ing.exp||'',dateType:'exp',amt:0};
     totals[ing.name][key].amt+=(parseFloat(ing.qty)||0)*1000;
   });
   const lots=S.batchRecords.map(r=>r.lot);
@@ -1330,7 +1341,7 @@ function genPrint(){
         <th style="border:1px solid #999;padding:4px;text-align:center;width:8%">원료코드</th>
         <th style="border:1px solid #999;padding:4px;text-align:left;width:20%">원료명</th>
         <th style="border:1px solid #999;padding:4px;text-align:center;width:42%">LOT</th>
-        <th style="border:1px solid #999;padding:4px;text-align:center;width:15%">소비기한</th>
+        <th style="border:1px solid #999;padding:4px;text-align:center;width:15%">소비기한/제조일자</th>
         <th style="border:1px solid #999;padding:4px;text-align:right;width:15%">총 사용량(g)</th>
       </tr>
       ${Object.entries(totals).map(([n,keys])=>{
@@ -1341,7 +1352,7 @@ function genPrint(){
           <td style="border:1px solid #999;padding:4px;text-align:center;color:#1a5fa8;font-weight:700">${code}</td>
           <td style="border:1px solid #999;padding:4px">${n}</td>
           <td style="border:1px solid #999;padding:4px;text-align:center">${v.lot||k||'-'}</td>
-          <td style="border:1px solid #999;padding:4px;text-align:center">${fmtExp(v.exp)}</td>
+          <td style="border:1px solid #999;padding:4px;text-align:center">${fmtDateLabel(v.exp,v.dateType)}</td>
           <td style="border:1px solid #999;padding:4px;text-align:right">${Math.round(v.amt).toLocaleString()}</td>
         </tr>`).join('');
       }).join('')}
