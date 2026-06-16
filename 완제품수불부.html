@@ -81,20 +81,8 @@ tr:hover td{background:var(--bg);}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div class="card">
         <div class="card-hd"><div class="card-hd-title">🚚 출고 등록</div></div>
-        <div class="card-bd">
-          <div class="form-row"><label class="form-label">포장LOT 선택</label><select class="form-input" id="fl-ob-group" onchange="flOnGroupSelected()"><option value="">-- 선택 --</option></select></div>
-          <div id="fl-ob-info" style="display:none;background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text2)">품명</span><span id="fl-ob-info-name" style="font-weight:700">-</span></div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text2)">거래처</span><span id="fl-ob-info-client">-</span></div>
-            <div style="display:flex;justify-content:space-between;"><span style="color:var(--text2)">잔량</span><span id="fl-ob-info-remain" style="font-weight:700;color:var(--success)">-</span></div>
-          </div>
-          <div class="form-row"><label class="form-label">출고처</label><select class="form-input" id="fl-ob-client"><option value="">-- 선택 --</option></select></div>
-          <div class="form-row"><label class="form-label">완제품명 <span style="font-size:11px;color:var(--text3);font-weight:400;">(다른 완제품으로 출고 시 변경)</span></label><select class="form-input" id="fl-ob-product" style="font-weight:700;"><option value="">-- 포장LOT 먼저 선택 --</option></select></div>
-          <div class="form-grid">
-            <div class="form-row"><label class="form-label">출고일</label><input class="form-input" id="fl-ob-date" type="text" placeholder="예: 260601" maxlength="8" oninput="fmtObDate(this)"></div>
-            <div class="form-row"><label class="form-label">출고 박스수</label><input class="form-input" id="fl-ob-boxes" type="number" placeholder="0"></div>
-          </div>
-          <button class="btn btn-success" style="width:100%;margin-top:8px;" onclick="flRegisterOutbound()">🚚 출고 등록</button>
+        <div class="card-bd" style="padding:8px">
+          <div id="fl-ob-lot-list" style="display:flex;flex-direction:column;gap:6px;"></div>
         </div>
       </div>
       <div class="card">
@@ -442,86 +430,87 @@ function switchFlTab(tab){
 }
 function flRefreshOutboundCombos(){
   const grps=flGetGroups(true);
-  const sel=document.getElementById('fl-ob-group');
-  if(!sel) return;
-  const cur=sel.value;
-  sel.innerHTML='<option value="">-- 선택 --</option>'+grps.map(g=>{
-    // pkg_lot에서 포장코드 추출 (포장-P032-260611-001 → P032)
+  const el=document.getElementById('fl-ob-lot-list');
+  if(!el) return;
+  const clientOpts=FL_STATE.clients.map(c=>`<option value="${c}">${c}</option>`).join('');
+  const td=getTodayISO2();
+  if(!grps.length){ el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">잔량이 있는 포장LOT가 없습니다</div>'; return; }
+  el.innerHTML=grps.map((g,gi)=>{
     const firstLot=g.lots[0];
     const pkgLot=firstLot?.pkg_lot||'';
     const pCode=pkgLot.startsWith('포장-')?pkgLot.split('-')[1]:'';
     const displayCode=pCode?pCode+'-'+g.key.split('-').slice(1).join('-'):g.key;
-    return `<option value="${g.key}">${displayCode} / ${g.name} / 잔량:${g.remain_box}box</option>`;
-  }).join('');
-  if(cur) sel.value=cur;
-  const csel=document.getElementById('fl-ob-client');
-  if(csel) csel.innerHTML='<option value="">-- 선택 --</option>'+FL_STATE.clients.map(c=>`<option value="${c}">${c}</option>`).join('');
-  flOnGroupSelected();
-}
-function flOnGroupSelected(){
-  const gk=document.getElementById('fl-ob-group')?.value;
-  const info=document.getElementById('fl-ob-info');
-  const prodSel=document.getElementById('fl-ob-product');
-  if(!gk||!info){if(info)info.style.display='none';if(prodSel)prodSel.innerHTML='<option value="">-- 포장LOT 먼저 선택 --</option>';return;}
-  const g=flGetGroups().find(x=>x.key===gk);
-  if(!g) return;
-  info.style.display='block';
-  document.getElementById('fl-ob-info-name').textContent=g.name;
-  document.getElementById('fl-ob-info-client').textContent=g.client;
-  document.getElementById('fl-ob-info-remain').textContent=g.remain_box+' box';
-  // 완제품코드 드롭다운 채우기 (매핑 누적 데이터 우선 + 전체 제품)
-  if(prodSel){
-    const pCode=g.key.split('-')[0]||'';
+    // 매핑 누적 데이터
     const mapping=window._productNameMapping||{};
-    const recentNames=mapping[pCode]||[];
-    let html=`<option value="" data-name="${g.name}" data-client="${g.client}">${g.name} (기본)</option>`;
-    // 이전에 사용한 완제품명 (매핑 누적)
+    const recentNames=mapping[pCode]||mapping[g.key.split('-')[0]]||[];
+    let dlOpts='';
     if(recentNames.length){
-      html+=`<optgroup label="── 이전 출고 완제품 ──">`;
-      recentNames.forEach(rn=>{
-        const prod=FL_STATE.products.find(p=>p.name===rn);
-        html+=`<option value="${prod?.lot_code||''}" data-name="${rn}" data-client="${prod?.client||''}">${prod?'['+prod.lot_code+'] ':''}${rn}${prod?.client?' ('+prod.client+')':''}</option>`;
-      });
-      html+=`</optgroup>`;
+      recentNames.forEach(rn=>{const prod=FL_STATE.products.find(p=>p.name===rn);dlOpts+=`<option value="${rn}">[${prod?.lot_code||'★'}] ${rn}</option>`;});
     }
-    // 전체 등록 제품
-    html+=`<optgroup label="── 전체 등록 제품 ──">`;
-    html+=FL_STATE.products.filter(p=>!recentNames.includes(p.name)).map(p=>
-      `<option value="${p.lot_code}" data-name="${p.name}" data-client="${p.client||''}">[${p.lot_code}] ${p.name}${p.client?' ('+p.client+')':''}</option>`
-    ).join('');
-    html+=`</optgroup>`;
-    prodSel.innerHTML=html;
-  }
+    FL_STATE.products.filter(p=>!recentNames.includes(p.name)).forEach(p=>{dlOpts+=`<option value="${p.name}">[${p.lot_code}] ${p.name}</option>`;});
+    return `<div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;">
+      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.ob-arrow').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:var(--bg);">
+        <div>
+          <div style="font-weight:700;font-size:15px;">${g.name}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;">${displayCode}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-weight:700;font-size:16px;color:var(--success);">${g.remain_box.toLocaleString()} box</span>
+          <button onclick="event.stopPropagation();flDeleteGroupLot(${gi})" style="background:var(--danger);color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">삭제</button>
+          <span class="ob-arrow" style="color:var(--text3);">▶</span>
+        </div>
+      </div>
+      <div style="display:none;padding:14px 16px;border-top:1px solid var(--border);">
+        <div class="form-row"><label class="form-label">출고처</label><select class="form-input" id="fl-ob-client-${gi}"><option value="">-- 선택 --</option>${clientOpts}</select></div>
+        <div class="form-row"><label class="form-label">완제품명 <span style="font-size:11px;color:var(--text3);font-weight:400;">타이핑하면 자동완성</span></label><input class="form-input" id="fl-ob-product-${gi}" list="fl-ob-dl-${gi}" value="${g.name}" style="font-weight:700;font-size:15px;" autocomplete="off"><datalist id="fl-ob-dl-${gi}">${dlOpts}</datalist></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="form-row"><label class="form-label">출고일</label><input class="form-input" id="fl-ob-date-${gi}" type="text" placeholder="예: 260601" maxlength="8" value="${td}" oninput="fmtObDate(this)"></div>
+          <div class="form-row"><label class="form-label">출고 박스수</label><input class="form-input" id="fl-ob-boxes-${gi}" type="number" placeholder="0"></div>
+        </div>
+        <button class="btn btn-success" style="width:100%;margin-top:8px;" onclick="flRegisterOutboundByIdx(${gi})">🚚 출고 등록</button>
+      </div>
+    </div>`;
+  }).join('');
+  window._obGroups=grps;
 }
-function flRegisterOutbound(){
-  const gk=document.getElementById('fl-ob-group').value;
-  if(!gk){alert('포장LOT를 선택해주세요');return;}
-  const client=document.getElementById('fl-ob-client').value;
+function flOnGroupSelected(){}
+function flRegisterOutboundByIdx(gi){
+  const g=window._obGroups[gi];
+  if(!g){alert('LOT 정보를 찾을 수 없습니다');return;}
+  const gk=g.key;
+  const client=document.getElementById('fl-ob-client-'+gi)?.value;
   if(!client){alert('출고처를 선택해주세요');return;}
-  const date=getObDateVal();
+  const dateEl=document.getElementById('fl-ob-date-'+gi);
+  const date=dateEl?dateEl.value.replace(/\D/g,'').slice(0,6):'';
   if(!date||date.length!==6){alert('출고일을 입력해주세요 (예: 260601)');return;}
-  const boxes=parseInt(document.getElementById('fl-ob-boxes').value)||0;
+  const boxes=parseInt(document.getElementById('fl-ob-boxes-'+gi)?.value)||0;
   if(!boxes){alert('출고 박스수를 입력해주세요');return;}
-  const g=flGetGroups().find(x=>x.key===gk);
-  if(!g){alert('그룹을 찾을 수 없습니다');return;}
   if(boxes>g.remain_box){alert(`잔량(${g.remain_box}box)보다 많습니다`);return;}
-  // 완제품코드 확인
-  const prodSel=document.getElementById('fl-ob-product');
-  const selOpt=prodSel?.options[prodSel.selectedIndex];
-  const outProductCode=prodSel?.value||'';
-  const outProductName=selOpt?.dataset?.name||g.name;
-  const outProductClient=selOpt?.dataset?.client||g.client;
+  const prodInput=document.getElementById('fl-ob-product-'+gi);
+  const outProductName=prodInput?.value?.trim()||g.name;
+  const prod=FL_STATE.products.find(p=>p.name===outProductName);
+  const outProductCode=prod?.lot_code||'';
+  const outProductClient=prod?.client||g.client;
   let toDeduct=boxes;
   const lots=FL_STATE.lots.filter(l=>flGroupKey(l.lot_number)===gk&&l.remain_box>0);
   for(const l of lots){if(toDeduct<=0)break;const deduct=Math.min(toDeduct,l.remain_box);l.outbound.push({box:deduct,client,date,productCode:outProductCode,productName:outProductName,productClient:outProductClient});l.remain_box-=deduct;toDeduct-=deduct;}
-  // 통합관리 매핑 자동 누적 (P코드 → 완제품명)
+  // 매핑 자동 누적
   if(outProductName && outProductName!==g.name){
-    const pCode=g.key.split('-')[0]||'';
+    const pCode=gk.split('-')[0]||'';
     if(pCode) flAccumulateMapping(pCode, outProductName);
   }
   flSave();flRefreshOutboundCombos();flRenderOutbound();flRenderStock();
-  alert(`출고 등록 완료! ${outProductName} ${boxes}box → ${client}`);
-  document.getElementById('fl-ob-boxes').value='';
+  alert(`출고 완료! ${outProductName} ${boxes}box → ${client}`);
+}
+function flRegisterOutbound(){}
+// 출고등록에서 LOT 그룹 삭제
+function flDeleteGroupLot(gi){
+  const g=window._obGroups[gi];
+  if(!g) return;
+  if(!confirm(`"${g.name} (${g.key})" LOT를 삭제하시겠습니까?\n이 LOT의 모든 재고와 출고 내역이 삭제됩니다.`)) return;
+  FL_STATE.lots=FL_STATE.lots.filter(l=>flGroupKey(l.lot_number)!==g.key);
+  flSave();flRefreshOutboundCombos();flRenderOutbound();flRenderStock();
+  alert('삭제 완료');
 }
 // 통합관리 매핑에 자동 누적
 async function flAccumulateMapping(pCode, productName){
