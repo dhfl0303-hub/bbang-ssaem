@@ -188,7 +188,7 @@ tr:hover td{background:var(--bg);}
       </div>
       <div>
         <div class="card"><div class="card-hd"><div class="card-hd-title">🏢 출고처 관리</div></div><div class="card-bd"><div style="display:flex;gap:8px;margin-bottom:10px;"><input class="form-input" id="fl-cl-new" placeholder="출고처명 입력"><button class="btn btn-primary btn-sm" onclick="flAddClient()">추가</button></div><div class="table-wrap"><table style="min-width:200px"><thead><tr><th>출고처명</th><th></th></tr></thead><tbody id="fl-client-tbody"></tbody></table></div></div></div>
-        <div class="card"><div class="card-hd"><div class="card-hd-title">⚙ 데이터 관리</div></div><div class="card-bd" style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-primary btn-sm" style="width:100%" onclick="flSyncFromPack()">🔄 포장 데이터 동기화</button><button class="btn btn-outline btn-sm" style="width:100%" onclick="flClearDeletedLots()">♻️ 삭제이력 초기화 후 재동기화</button><button class="btn btn-danger btn-sm" style="width:100%" onclick="flResetData()">🗑 전체 데이터 초기화</button></div></div>
+        <div class="card"><div class="card-hd"><div class="card-hd-title">⚙ 데이터 관리</div></div><div class="card-bd" style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-primary btn-sm" style="width:100%" onclick="flSyncFromPack()">🔄 포장 데이터 동기화</button><button class="btn btn-outline btn-sm" style="width:100%" onclick="flClearDeletedLots()">♻️ 삭제이력 초기화 후 재동기화</button><button class="btn btn-sm" style="width:100%;background:var(--warning-light);color:var(--warning);border:1px solid #f0c080;" onclick="flResetLotsOnly()">🔄 LOT만 초기화 후 재동기화</button><button class="btn btn-danger btn-sm" style="width:100%" onclick="flResetData()">🗑 전체 데이터 초기화</button></div></div>
       </div>
     </div>
   </div>
@@ -1008,6 +1008,19 @@ function flRenderClientTable(){
   const el=document.getElementById('fl-client-tbody');
   if(!el) return;
   el.innerHTML=FL_STATE.clients.map(c=>`<tr><td style="font-weight:600">${c}</td><td><button class="btn btn-sm btn-danger" onclick="flDeleteClient('${c}')">삭제</button></td></tr>`).join('');
+}
+function flResetLotsOnly(){
+  if(!confirm('LOT 재고 데이터만 초기화하고 재동기화합니다.\n제품 목록과 거래처는 유지됩니다.\n기존 출고 내역도 삭제됩니다. 계속하시겠습니까?')) return;
+  FL_STATE.lots=[];
+  window._flPending=[];
+  window._deletedLots=[];
+  if(window._db){
+    window._db.collection('appData').doc('완제품_lots').set({data:JSON.stringify([]),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+    window._db.collection('appData').doc('완제품_pending').set({data:JSON.stringify([]),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+    window._db.collection('appData').doc('완제품_deleted_lots').set({data:JSON.stringify([]),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  }
+  flUpdatePendingBadge();
+  flSyncFromPack();
 }
 function flResetData(){if(!confirm('완제품수불부 전체 데이터를 초기화하시겠습니까?'))return;FL_STATE.lots=[];FL_STATE.products=[];FL_STATE.clients=FL_DEFAULT_CLIENTS;flSave();flRenderStock();flRenderProductTable();flRenderClientTable();alert('초기화 완료');}
 function printFinishedLedger(){
