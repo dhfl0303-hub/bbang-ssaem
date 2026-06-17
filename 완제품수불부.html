@@ -72,14 +72,14 @@ tr:hover td{background:var(--bg);}
 </div>
 <div class="content">
   <div style="display:flex;gap:4px;margin-bottom:16px;background:#fff;border-radius:10px;padding:6px;box-shadow:var(--shadow);">
-    <button class="fl-tab active" id="fl-tab-outbound" onclick="switchFlTab('outbound')" style="flex:1;">🚚 출고등록</button>
-    <button class="fl-tab" id="fl-tab-pending" onclick="switchFlTab('pending')" style="flex:1;">⏳ 입고대기 <span id="fl-pending-badge" style="background:var(--danger);color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;margin-left:4px;display:none;">0</span></button>
+    <button class="fl-tab active" id="fl-tab-pending" onclick="switchFlTab('pending')" style="flex:1;">⏳ 입고대기 <span id="fl-pending-badge" style="background:var(--danger);color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;margin-left:4px;display:none;">0</span></button>
     <button class="fl-tab" id="fl-tab-stock" onclick="switchFlTab('stock')" style="flex:1;">📊 완제품수불부</button>
+    <button class="fl-tab" id="fl-tab-outbound" onclick="switchFlTab('outbound')" style="flex:1;">🚚 출고등록</button>
     <button class="fl-tab" id="fl-tab-manage" onclick="switchFlTab('manage')" style="flex:1;">⚙️ 관리</button>
   </div>
 
   <!-- 입고대기 패널 -->
-  <div class="fl-panel" id="fl-panel-pending">
+  <div class="fl-panel active" id="fl-panel-pending">
     <div class="card">
       <div class="card-hd">
         <div class="card-hd-title">⏳ 입고 대기 목록</div>
@@ -101,6 +101,10 @@ tr:hover td{background:var(--bg);}
           <div style="flex:1"><label class="form-label">포장LOT</label><input class="form-input" id="flSplitPkgLot" readonly style="background:#f4f6fa;font-weight:700;font-size:13px;"></div>
           <div style="width:100px"><label class="form-label">총 수량</label><input class="form-input" id="flSplitTotal" readonly style="background:#f4f6fa;font-weight:700;font-size:18px;text-align:center;color:var(--primary)"></div>
         </div>
+        <div class="form-row" style="margin-bottom:12px;">
+          <label class="form-label">입고일 (YYMMDD)</label>
+          <input class="form-input" id="flSplitDate" type="text" placeholder="예: 260617" maxlength="6" style="font-weight:700;">
+        </div>
         <div style="font-weight:700;font-size:13px;margin-bottom:8px;">완제품 배정</div>
         <div id="flSplitRows" style="display:flex;flex-direction:column;gap:8px;"></div>
         <button class="btn btn-outline btn-sm" style="margin-top:8px;width:100%;" onclick="flAddSplitRow()">+ 완제품 추가</button>
@@ -116,7 +120,7 @@ tr:hover td{background:var(--bg);}
     </div>
   </div>
 
-  <div class="fl-panel active" id="fl-panel-outbound">
+  <div class="fl-panel" id="fl-panel-outbound">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div class="card">
         <div class="card-hd"><div class="card-hd-title">🚚 출고 등록</div></div>
@@ -527,24 +531,32 @@ function flDirectInbound(idx){
   const sel=document.createElement('div');
   sel.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;';
   sel.innerHTML=`<div style="background:#fff;border-radius:16px;padding:24px;width:420px;">
-    <div style="font-weight:700;font-size:16px;margin-bottom:16px;">완제품 선택 (직접 입고)</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:700;font-size:16px;">완제품 선택 (직접 입고)</div>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text3);">×</button>
+    </div>
     <div style="font-size:13px;color:var(--text3);margin-bottom:12px;">${p.pkg_lot} / ${p.total_box}box</div>
-    <select id="directInboundSel" class="form-input" style="margin-bottom:16px;font-weight:700;">
+    <select id="directInboundSel" class="form-input" style="margin-bottom:12px;font-weight:700;">
       <option value="">-- 완제품 선택 --</option>${prodOpts}
     </select>
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">입고일 (YYMMDD)</label>
+      <input id="directInboundDate" class="form-input" type="text" placeholder="예: 260617" maxlength="6" value="${p.date||''}" style="font-weight:700;">
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button class="btn btn-outline" onclick="this.closest('div[style]').remove()">취소</button>
-      <button class="btn btn-success" onclick="flDoDirectInbound(${idx},document.getElementById('directInboundSel').value);this.closest('div[style]').remove()">입고 확정</button>
+      <button class="btn btn-outline" onclick="this.closest('div[style*=fixed]').remove()">취소</button>
+      <button class="btn btn-success" onclick="flDoDirectInbound(${idx},document.getElementById('directInboundSel').value,document.getElementById('directInboundDate').value);this.closest('div[style*=fixed]').remove()">입고 확정</button>
     </div>
   </div>`;
+  sel.onclick=e=>{ if(e.target===sel) sel.remove(); };
   document.body.appendChild(sel);
 }
-function flDoDirectInbound(idx, lotCode){
+function flDoDirectInbound(idx, lotCode, inboundDate){
   if(!lotCode){alert('완제품을 선택해주세요');return;}
   const p=window._flPending[idx];
   if(!p) return;
   const prod=FL_STATE.products.find(pr=>pr.lot_code===lotCode);
-  const mfg=p.date||'';
+  const mfg=(inboundDate||p.date||'').replace(/\D/g,'').slice(0,6)||p.date||'';
   const existCount=FL_STATE.lots.filter(l=>l.lot_code_base===lotCode&&l.mfg_date===mfg).length;
   const lotNum=`${lotCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
   FL_STATE.lots.push({
@@ -572,6 +584,7 @@ function flOpenSplit(idx){
   if(!p) return;
   document.getElementById('flSplitPkgLot').value=p.pkg_lot;
   document.getElementById('flSplitTotal').value=p.total_box;
+  document.getElementById('flSplitDate').value=p.date||'';
   const rowsEl=document.getElementById('flSplitRows');
   rowsEl.innerHTML='';
   flAddSplitRow();
@@ -624,9 +637,9 @@ function flConfirmSplit(){
     if(!confirm(`${total-sumQty}box가 배정되지 않았습니다. 계속하시겠습니까?`)) return;
   }
   // 각 완제품으로 입고
+  const mfg=(document.getElementById('flSplitDate')?.value||p.date||'').replace(/\D/g,'').slice(0,6)||p.date||'';
   splits.forEach(sp=>{
     const prod=FL_STATE.products.find(pr=>pr.lot_code===sp.lotCode);
-    const mfg=p.date||'';
     const existCount=FL_STATE.lots.filter(l=>l.lot_code_base===sp.lotCode&&l.mfg_date===mfg).length;
     const lotNum=`${sp.lotCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
     FL_STATE.lots.push({
