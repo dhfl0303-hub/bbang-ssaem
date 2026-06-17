@@ -188,7 +188,7 @@ tr:hover td{background:var(--bg);}
       </div>
       <div>
         <div class="card"><div class="card-hd"><div class="card-hd-title">🏢 출고처 관리</div></div><div class="card-bd"><div style="display:flex;gap:8px;margin-bottom:10px;"><input class="form-input" id="fl-cl-new" placeholder="출고처명 입력"><button class="btn btn-primary btn-sm" onclick="flAddClient()">추가</button></div><div class="table-wrap"><table style="min-width:200px"><thead><tr><th>출고처명</th><th></th></tr></thead><tbody id="fl-client-tbody"></tbody></table></div></div></div>
-        <div class="card"><div class="card-hd"><div class="card-hd-title">⚙ 데이터 관리</div></div><div class="card-bd" style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-primary btn-sm" style="width:100%" onclick="flSyncFromPack()">🔄 포장 데이터 동기화</button><button class="btn btn-outline btn-sm" style="width:100%" onclick="flClearDeletedLots()">♻️ 삭제이력 초기화 후 재동기화</button><button class="btn btn-sm" style="width:100%;background:var(--warning-light);color:var(--warning);border:1px solid #f0c080;" onclick="flResetLotsOnly()">🔄 LOT만 초기화 후 재동기화</button><button class="btn btn-danger btn-sm" style="width:100%" onclick="flResetData()">🗑 전체 데이터 초기화</button></div></div>
+        <div class="card"><div class="card-hd"><div class="card-hd-title">⚙ 데이터 관리</div></div><div class="card-bd" style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-primary btn-sm" style="width:100%" onclick="flSyncFromPack()">🔄 포장 데이터 동기화</button><button class="btn btn-outline btn-sm" style="width:100%" onclick="flClearDeletedLots()">♻️ 삭제이력 초기화 후 재동기화</button><button class="btn btn-sm" style="width:100%;background:var(--warning-light);color:var(--warning);border:1px solid #f0c080;" onclick="flResetLotsOnly()">🔄 LOT만 초기화 후 재동기화</button><button class="btn btn-sm" style="width:100%;background:var(--success-light);color:var(--success);border:1px solid #8dc;" onclick="flRestoreDefaultProducts()">📋 제품목록 기본값 복구</button><button class="btn btn-danger btn-sm" style="width:100%" onclick="flResetData()">🗑 전체 데이터 초기화</button></div></div>
       </div>
     </div>
   </div>
@@ -1008,6 +1008,13 @@ function flRenderClientTable(){
   const el=document.getElementById('fl-client-tbody');
   if(!el) return;
   el.innerHTML=FL_STATE.clients.map(c=>`<tr><td style="font-weight:600">${c}</td><td><button class="btn btn-sm btn-danger" onclick="flDeleteClient('${c}')">삭제</button></td></tr>`).join('');
+}
+function flRestoreDefaultProducts(){
+  if(!confirm('제품 목록을 기본값(A1~Q7)으로 복구하시겠습니까?\n기존에 추가/수정한 제품이 있으면 덮어씌워집니다.')) return;
+  FL_STATE.products=JSON.parse(JSON.stringify(FL_DEFAULT_PRODUCTS));
+  if(window._db) window._db.collection('appData').doc('완제품_products').set({data:JSON.stringify(FL_STATE.products),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  flRenderProductTable();
+  alert('제품 목록 복구 완료 (A1~Q7)');
 }
 function flResetLotsOnly(){
   if(!confirm('LOT 재고 데이터만 초기화하고 재동기화합니다.\n제품 목록과 거래처는 유지됩니다.\n기존 출고 내역도 삭제됩니다. 계속하시겠습니까?')) return;
