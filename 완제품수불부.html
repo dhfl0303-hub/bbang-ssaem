@@ -73,21 +73,71 @@ tr:hover td{background:var(--bg);}
 <div class="content">
   <div style="display:flex;gap:4px;margin-bottom:16px;background:#fff;border-radius:10px;padding:6px;box-shadow:var(--shadow);">
     <button class="fl-tab active" id="fl-tab-outbound" onclick="switchFlTab('outbound')" style="flex:1;">🚚 출고등록</button>
+    <button class="fl-tab" id="fl-tab-pending" onclick="switchFlTab('pending')" style="flex:1;">⏳ 입고대기 <span id="fl-pending-badge" style="background:var(--danger);color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;margin-left:4px;display:none;">0</span></button>
     <button class="fl-tab" id="fl-tab-stock" onclick="switchFlTab('stock')" style="flex:1;">📊 완제품수불부</button>
     <button class="fl-tab" id="fl-tab-manage" onclick="switchFlTab('manage')" style="flex:1;">⚙️ 관리</button>
+  </div>
+
+  <!-- 입고대기 패널 -->
+  <div class="fl-panel" id="fl-panel-pending">
+    <div class="card">
+      <div class="card-hd">
+        <div class="card-hd-title">⏳ 입고 대기 목록</div>
+        <span style="font-size:12px;color:var(--text3)">포장LOT를 완제품코드로 분할 후 입고 확정하세요</span>
+      </div>
+      <div class="card-bd" style="padding:12px">
+        <div id="fl-pending-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 분할 모달 -->
+  <div class="modal-overlay" id="flSplitModal">
+    <div class="modal" style="width:500px">
+      <div class="modal-hd"><div class="modal-title">✂️ 완제품 분할 입고</div><button class="modal-close" onclick="closeModal('flSplitModal')">×</button></div>
+      <div class="modal-bd">
+        <div style="background:var(--primary-light);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--primary)">포장LOT 수량을 완제품별로 나눠서 입고합니다.</div>
+        <div style="display:flex;gap:12px;margin-bottom:16px;">
+          <div style="flex:1"><label class="form-label">포장LOT</label><input class="form-input" id="flSplitPkgLot" readonly style="background:#f4f6fa;font-weight:700;font-size:13px;"></div>
+          <div style="width:100px"><label class="form-label">총 수량</label><input class="form-input" id="flSplitTotal" readonly style="background:#f4f6fa;font-weight:700;font-size:18px;text-align:center;color:var(--primary)"></div>
+        </div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;">완제품 배정</div>
+        <div id="flSplitRows" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px;width:100%;" onclick="flAddSplitRow()">+ 완제품 추가</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <span style="font-size:14px;">남은 수량:</span>
+          <span id="flSplitRemain" style="font-size:20px;font-weight:700;color:var(--danger);">0 box</span>
+        </div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-outline" onclick="closeModal('flSplitModal')">취소</button>
+        <button class="btn btn-success" onclick="flConfirmSplit()">✅ 입고 확정</button>
+      </div>
+    </div>
   </div>
 
   <div class="fl-panel active" id="fl-panel-outbound">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div class="card">
         <div class="card-hd"><div class="card-hd-title">🚚 출고 등록</div></div>
-        <div class="card-bd" style="padding:8px">
-          <div id="fl-ob-lot-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <div class="card-bd">
+          <div class="form-row"><label class="form-label">그룹LOT 선택</label><select class="form-input" id="fl-ob-group" onchange="flOnGroupSelected()"><option value="">-- 선택 --</option></select></div>
+          <div id="fl-ob-info" style="display:none;background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text2)">품명</span><span id="fl-ob-info-name" style="font-weight:700">-</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text2)">거래처</span><span id="fl-ob-info-client">-</span></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:var(--text2)">잔량</span><span id="fl-ob-info-remain" style="font-weight:700;color:var(--success)">-</span></div>
+          </div>
+          <div class="form-row"><label class="form-label">출고처</label><select class="form-input" id="fl-ob-client"><option value="">-- 선택 --</option></select></div>
+          <div class="form-grid">
+            <div class="form-row"><label class="form-label">출고일</label><input class="form-input" id="fl-ob-date" type="text" placeholder="예: 260601" maxlength="8" oninput="fmtObDate(this)"></div>
+            <div class="form-row"><label class="form-label">출고 박스수</label><input class="form-input" id="fl-ob-boxes" type="number" placeholder="0"></div>
+          </div>
+          <button class="btn btn-success" style="width:100%;margin-top:8px;" onclick="flRegisterOutbound()">🚚 출고 등록</button>
         </div>
       </div>
       <div class="card">
         <div class="card-hd"><div class="card-hd-title">📋 최근 출고 내역</div></div>
-        <div class="card-bd" style="padding:8px"><div id="fl-outbound-list"></div></div>
+        <div class="card-bd" style="padding:0"><div class="table-wrap"><table style="min-width:400px"><thead><tr><th>그룹LOT</th><th>품명</th><th>출고처</th><th>출고일</th><th>박스</th><th></th></tr></thead><tbody id="fl-outbound-tbody"></tbody></table></div></div>
       </div>
     </div>
   </div>
@@ -294,20 +344,20 @@ function flSave(){
 async function loadFromFirebase(){
   if(!window._db) return;
   try{
-    const [lotsSnap, prodSnap, clientSnap, delSnap, lotMapSnap, pnMapSnap] = await Promise.all([
+    const [lotsSnap, prodSnap, clientSnap, delSnap, lotMapSnap, pendingSnap] = await Promise.all([
       window._db.collection('appData').doc('완제품_lots').get(),
       window._db.collection('appData').doc('완제품_products').get(),
       window._db.collection('appData').doc('완제품_clients').get(),
       window._db.collection('appData').doc('완제품_deleted_lots').get(),
       window._db.collection('appData').doc('lotMapping').get(),
-      window._db.collection('appData').doc('productNameMapping').get()
+      window._db.collection('appData').doc('완제품_pending').get()
     ]);
     if(lotsSnap.exists && lotsSnap.data().data) window._flLots = JSON.parse(lotsSnap.data().data);
     if(prodSnap.exists && prodSnap.data().data) window._flProducts = JSON.parse(prodSnap.data().data);
     if(clientSnap.exists && clientSnap.data().data) window._flClients = JSON.parse(clientSnap.data().data);
     if(delSnap.exists && delSnap.data().data) window._deletedLots = JSON.parse(delSnap.data().data);
     if(lotMapSnap.exists && lotMapSnap.data().data) window._lotMapping = JSON.parse(lotMapSnap.data().data);
-    if(pnMapSnap.exists && pnMapSnap.data().data) window._productNameMapping = JSON.parse(pnMapSnap.data().data);
+    if(pendingSnap.exists && pendingSnap.data().data) window._flPending = JSON.parse(pendingSnap.data().data);
     // packRecords 전체 로드
     window._fbPackCache = {};
     const allSnap = await window._db.collection('appData').get();
@@ -344,74 +394,71 @@ function flGetGroups(hideZero=false,clientFilter='전체',groupFilter='전체'){
   return res;
 }
 function flFmtDate6(d6){if(!d6||d6.length!==6)return d6||'-';return `20${d6.slice(0,2)}.${d6.slice(2,4)}.${d6.slice(4,6)}`;}
-// remain_box를 출고 기록에서 동적 재계산
-function flRecalcRemainBox(){
-  FL_STATE.lots.forEach(l=>{
-    const totalOut=l.outbound.reduce((s,o)=>s+o.box,0);
-    l.remain_box=Math.max(0, (l.total_box||0) - totalOut);
-  });
-}
 function flSyncFromPack(silent=false){
   const keys=Object.keys(window._fbPackCache||{});
+  const lotMapping=window._lotMapping||[];
   const deletedLots=flGetDeletedLots();
-  let count=0;
+  let count=0, pending=0;
   keys.forEach(k=>{
     const recs=(window._fbPackCache&&window._fbPackCache[k])||[];
     recs.forEach(r=>{
       if(!r.lot||!r.productCode) return;
       if(deletedLots.includes(r.lot)) return;
-      // 포장코드·제품명을 그대로 사용 (lotMapping 변환 없음)
-      const pCode=r.productCode;
-      const pName=r.product||'';
-
+      // 이미 처리된 LOT면 스킵
       const existing=FL_STATE.lots.find(l=>l.pkg_lot===r.lot);
-      if(existing){
-        // 기존 LOT가 매핑으로 다른 코드였으면 P코드로 복원
-        if(existing.lot_code_base!==pCode){
-          const mfg=existing.mfg_date||r.date||'';
-          const existCount=FL_STATE.lots.filter(l=>l.pkg_lot!==r.lot&&l.lot_code_base===pCode&&l.mfg_date===mfg).length;
-          existing.lot_number=`${pCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
-          existing.lot_code_base=pCode;
-          existing.name=pName;
-          existing.client='';
-        }
-        return;
-      }
+      if(existing) return;
+      // 대기 목록에도 있으면 스킵
+      const existingPending=(window._flPending||[]).find(p=>p.pkg_lot===r.lot);
+      if(existingPending) return;
 
-      const mfg=r.date||'';
-      const existCount=FL_STATE.lots.filter(l=>l.lot_code_base===pCode&&l.mfg_date===mfg).length;
-      const lotNum=`${pCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
-      FL_STATE.lots.push({
-        lot_number:lotNum, lot_code_base:pCode,
-        client:'', name:pName,
-        spec:'', mfg_date:mfg,
-        exp_date:r.expiryDate||'',
-        total_box:parseInt(r.qtyBoxes)||0,
-        remain_box:parseInt(r.qtyBoxes)||0,
-        is_partial:false, pkg_lot:r.lot,
-        outbound:[], reg_date:r.date||getTodayISO2()
-      });
-      count++;
+      const mappingEntry=lotMapping.find(m=>m.pLot===r.productCode);
+      const isOneToOne=mappingEntry&&mappingEntry.wLots&&mappingEntry.wLots.length===1;
+
+      if(isOneToOne){
+        // 1:1 매핑 → 자동 입고
+        const wLotCode=mappingEntry.wLots[0].lot;
+        const wLotName=mappingEntry.wLots[0].name;
+        const wLotClient=mappingEntry.wLots[0].client;
+        const prod=FL_STATE.products.find(p=>p.lot_code===wLotCode);
+        const mfg=r.date||'';
+        const existCount=FL_STATE.lots.filter(l=>l.lot_code_base===wLotCode&&l.mfg_date===mfg).length;
+        const lotNum=`${wLotCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
+        FL_STATE.lots.push({
+          lot_number:lotNum, lot_code_base:wLotCode,
+          client:wLotClient, name:wLotName,
+          spec:prod?.spec||'', mfg_date:mfg,
+          exp_date:r.expiryDate||'',
+          total_box:parseInt(r.qtyBoxes)||0,
+          remain_box:parseInt(r.qtyBoxes)||0,
+          is_partial:false, pkg_lot:r.lot,
+          outbound:[], reg_date:r.date||getTodayISO2()
+        });
+        count++;
+      } else {
+        // 매핑 없거나 1:N → 대기 상태
+        if(!window._flPending) window._flPending=[];
+        window._flPending.push({
+          pkg_lot:r.lot,
+          productCode:r.productCode,
+          product:r.product||'',
+          date:r.date||'',
+          total_box:parseInt(r.qtyBoxes)||0,
+          exp_date:r.expiryDate||''
+        });
+        pending++;
+      }
     });
   });
-  // 기존 LOT 중 pkg_lot에서 P코드 추출하여 일괄 변환
-  FL_STATE.lots.forEach(l=>{
-    if(!l.pkg_lot) return;
-    const parts=l.pkg_lot.split('-');
-    if(parts[0]==='포장'&&parts[1]){
-      const pCode=parts[1];
-      if(l.lot_code_base!==pCode){
-        const mfg=l.mfg_date||'';
-        const existCount=FL_STATE.lots.filter(x=>x!==l&&x.lot_code_base===pCode&&x.mfg_date===mfg).length;
-        l.lot_code_base=pCode;
-        l.lot_number=`${pCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
-      }
-    }
-  });
-  flRecalcRemainBox();
+  // 대기 목록 Firebase 저장
+  if(window._db && window._flPending){
+    window._db.collection('appData').doc('완제품_pending').set({data:JSON.stringify(window._flPending),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  }
+  flUpdatePendingBadge();
   flSave();
   if(!silent){
-    alert(`동기화 완료: ${count}건 추가`);
+    let msg=`동기화 완료: ${count}건 자동입고`;
+    if(pending) msg+=`, ${pending}건 입고대기`;
+    alert(msg);
   }
   flRenderStock();flRefreshOutboundCombos();
 }
@@ -425,7 +472,12 @@ async function flClearDeletedLots(){
   }
   flSyncFromPack();
 }
-function initFinishedLedger(){flLoad();flRecalcRemainBox();flSyncFromPack(true);}
+function initFinishedLedger(){
+  flLoad();
+  if(!window._flPending) window._flPending=[];
+  flUpdatePendingBadge();
+  flSyncFromPack(true);
+}
 function switchFlTab(tab){
   document.querySelectorAll('.fl-tab').forEach(b=>{b.style.background='transparent';b.style.color='var(--text2)';});
   document.querySelectorAll('.fl-panel').forEach(p=>p.style.display='none');
@@ -433,143 +485,233 @@ function switchFlTab(tab){
   document.getElementById('fl-tab-'+tab).style.color='#fff';
   document.getElementById('fl-panel-'+tab).style.display='block';
   if(tab==='outbound'){flRefreshOutboundCombos();flRenderOutbound();}
+  if(tab==='pending') flRenderPending();
   if(tab==='stock') flRenderStock();
   if(tab==='manage'){flRenderProductTable();flRenderClientTable();}
 }
-function flRefreshOutboundCombos(){
-  const grps=flGetGroups(true);
-  const el=document.getElementById('fl-ob-lot-list');
-  if(!el) return;
-  const clientOpts=FL_STATE.clients.map(c=>`<option value="${c}">${c}</option>`).join('');
-  const td=getTodayISO2();
-  if(!grps.length){ el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">잔량이 있는 포장LOT가 없습니다</div>'; return; }
-  el.innerHTML=grps.map((g,gi)=>{
-    const firstLot=g.lots[0];
-    const pkgLot=firstLot?.pkg_lot||'';
-    const pCode=pkgLot.startsWith('포장-')?pkgLot.split('-')[1]:'';
-    const displayCode=pCode?pCode+'-'+g.key.split('-').slice(1).join('-'):g.key;
-    // 매핑 누적 데이터
-    const mapping=window._productNameMapping||{};
-    const recentNames=mapping[pCode]||mapping[g.key.split('-')[0]]||[];
-    let dlOpts='';
-    if(recentNames.length){
-      recentNames.forEach(rn=>{const prod=FL_STATE.products.find(p=>p.name===rn);dlOpts+=`<option value="${rn}">[${prod?.lot_code||'★'}] ${rn}${prod?.client?' - '+prod.client:''}</option>`;});
-    }
-    FL_STATE.products.filter(p=>!recentNames.includes(p.name)).forEach(p=>{dlOpts+=`<option value="${p.name}">[${p.lot_code}] ${p.name} - ${p.client||''}</option>`;});
-    return `<div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;">
-      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.ob-arrow').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:var(--bg);">
-        <div>
-          <div style="font-weight:700;font-size:15px;">${g.name}</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px;">${displayCode}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-weight:700;font-size:16px;color:var(--success);">${g.remain_box.toLocaleString()} box</span>
-          <button onclick="event.stopPropagation();flDeleteGroupLot(${gi})" style="background:var(--danger);color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">삭제</button>
-          <span class="ob-arrow" style="color:var(--text3);">▶</span>
-        </div>
-      </div>
-      <div style="display:none;padding:14px 16px;border-top:1px solid var(--border);">
-        <div class="form-row"><label class="form-label">출고처</label><select class="form-input" id="fl-ob-client-${gi}"><option value="">-- 선택 --</option>${clientOpts}</select></div>
-        <div class="form-row"><label class="form-label">완제품명 <span style="font-size:11px;color:var(--text3);font-weight:400;">타이핑하면 자동완성</span></label><input class="form-input" id="fl-ob-product-${gi}" list="fl-ob-dl-${gi}" value="${g.name}" style="font-weight:700;font-size:15px;" autocomplete="off"><datalist id="fl-ob-dl-${gi}">${dlOpts}</datalist></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <div class="form-row"><label class="form-label">출고일</label><input class="form-input" id="fl-ob-date-${gi}" type="text" placeholder="예: 260601" maxlength="8" value="${td}" oninput="fmtObDate(this)"></div>
-          <div class="form-row"><label class="form-label">출고 박스수</label><input class="form-input" id="fl-ob-boxes-${gi}" type="number" placeholder="0"></div>
-        </div>
-        <button class="btn btn-success" style="width:100%;margin-top:8px;" onclick="flRegisterOutboundByIdx(${gi})">🚚 출고 등록</button>
-      </div>
-    </div>`;
-  }).join('');
-  window._obGroups=grps;
+// ===== 입고 대기 =====
+function flUpdatePendingBadge(){
+  const cnt=(window._flPending||[]).length;
+  const badge=document.getElementById('fl-pending-badge');
+  if(!badge) return;
+  badge.textContent=cnt;
+  badge.style.display=cnt>0?'inline':'none';
 }
-function flOnGroupSelected(){}
-function flRegisterOutboundByIdx(gi){
-  const g=window._obGroups[gi];
-  if(!g){alert('LOT 정보를 찾을 수 없습니다');return;}
-  const gk=g.key;
-  const client=document.getElementById('fl-ob-client-'+gi)?.value;
+function flRenderPending(){
+  const el=document.getElementById('fl-pending-list');
+  if(!el) return;
+  const pending=window._flPending||[];
+  if(!pending.length){
+    el.innerHTML='<div style="padding:24px;text-align:center;color:var(--text3);">대기 중인 포장LOT가 없습니다</div>';
+    return;
+  }
+  el.innerHTML=pending.map((p,i)=>`
+    <div style="border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;background:#fff;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:700;font-size:15px;">${p.product||p.productCode}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;">${p.pkg_lot} · ${p.date} · <span style="font-weight:700;color:var(--primary)">${p.total_box.toLocaleString()} box</span></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm" onclick="flOpenSplit(${i})">✂️ 분할 입고</button>
+          <button class="btn btn-success btn-sm" onclick="flDirectInbound(${i})">✅ 직접 입고</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+// 직접 입고 (분할 없이 완제품코드 선택)
+function flDirectInbound(idx){
+  const p=window._flPending[idx];
+  if(!p) return;
+  const prodOpts=FL_STATE.products.map(pr=>`<option value="${pr.lot_code}">[${pr.lot_code}] ${pr.name} - ${pr.client||''}</option>`).join('');
+  const sel=document.createElement('div');
+  sel.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;';
+  sel.innerHTML=`<div style="background:#fff;border-radius:16px;padding:24px;width:420px;">
+    <div style="font-weight:700;font-size:16px;margin-bottom:16px;">완제품 선택 (직접 입고)</div>
+    <div style="font-size:13px;color:var(--text3);margin-bottom:12px;">${p.pkg_lot} / ${p.total_box}box</div>
+    <select id="directInboundSel" class="form-input" style="margin-bottom:16px;font-weight:700;">
+      <option value="">-- 완제품 선택 --</option>${prodOpts}
+    </select>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="this.closest('div[style]').remove()">취소</button>
+      <button class="btn btn-success" onclick="flDoDirectInbound(${idx},document.getElementById('directInboundSel').value);this.closest('div[style]').remove()">입고 확정</button>
+    </div>
+  </div>`;
+  document.body.appendChild(sel);
+}
+function flDoDirectInbound(idx, lotCode){
+  if(!lotCode){alert('완제품을 선택해주세요');return;}
+  const p=window._flPending[idx];
+  if(!p) return;
+  const prod=FL_STATE.products.find(pr=>pr.lot_code===lotCode);
+  const mfg=p.date||'';
+  const existCount=FL_STATE.lots.filter(l=>l.lot_code_base===lotCode&&l.mfg_date===mfg).length;
+  const lotNum=`${lotCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
+  FL_STATE.lots.push({
+    lot_number:lotNum, lot_code_base:lotCode,
+    client:prod?.client||'', name:prod?.name||'',
+    spec:prod?.spec||'', mfg_date:mfg,
+    exp_date:p.exp_date||'',
+    total_box:p.total_box, remain_box:p.total_box,
+    is_partial:false, pkg_lot:p.pkg_lot,
+    outbound:[], reg_date:getTodayISO2()
+  });
+  window._flPending.splice(idx,1);
+  flSavePending();
+  flSave();
+  flUpdatePendingBadge();
+  flRenderPending();
+  flRenderStock();
+  alert(`입고 완료: ${prod?.name||lotCode} ${p.total_box}box`);
+}
+// 분할 입고
+let _splitPendingIdx=null;
+function flOpenSplit(idx){
+  _splitPendingIdx=idx;
+  const p=window._flPending[idx];
+  if(!p) return;
+  document.getElementById('flSplitPkgLot').value=p.pkg_lot;
+  document.getElementById('flSplitTotal').value=p.total_box;
+  const rowsEl=document.getElementById('flSplitRows');
+  rowsEl.innerHTML='';
+  flAddSplitRow();
+  flCalcSplitRemain();
+  document.getElementById('flSplitModal').classList.add('open');
+}
+function flAddSplitRow(){
+  const rowsEl=document.getElementById('flSplitRows');
+  const prodOpts=FL_STATE.products.map(p=>`<option value="${p.lot_code}">[${p.lot_code}] ${p.name} - ${p.client||''}</option>`).join('');
+  const div=document.createElement('div');
+  div.style.cssText='display:flex;gap:8px;align-items:center;';
+  div.innerHTML=`
+    <select class="form-input" style="flex:2;font-size:13px;" onchange="flCalcSplitRemain()">
+      <option value="">-- 완제품 선택 --</option>${prodOpts}
+    </select>
+    <input class="form-input" type="number" placeholder="box" style="flex:1;text-align:center;font-weight:700;" oninput="flCalcSplitRemain()">
+    <button onclick="this.parentElement.remove();flCalcSplitRemain()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--danger);">✕</button>`;
+  rowsEl.appendChild(div);
+}
+function flCalcSplitRemain(){
+  const total=parseInt(document.getElementById('flSplitTotal').value)||0;
+  let assigned=0;
+  document.querySelectorAll('#flSplitRows input[type="number"]').forEach(inp=>{ assigned+=parseInt(inp.value)||0; });
+  const remain=total-assigned;
+  const el=document.getElementById('flSplitRemain');
+  el.textContent=remain.toLocaleString()+' box';
+  el.style.color=remain<0?'var(--danger)':remain===0?'var(--success)':'var(--warning)';
+}
+function flConfirmSplit(){
+  const idx=_splitPendingIdx;
+  const p=window._flPending[idx];
+  if(!p) return;
+  const total=parseInt(document.getElementById('flSplitTotal').value)||0;
+  const rows=document.querySelectorAll('#flSplitRows > div');
+  const splits=[];
+  let sumQty=0;
+  for(const row of rows){
+    const sel=row.querySelector('select');
+    const inp=row.querySelector('input[type="number"]');
+    if(!sel.value){alert('완제품을 선택해주세요');return;}
+    const qty=parseInt(inp.value)||0;
+    if(qty<=0){alert('수량을 입력해주세요');return;}
+    splits.push({lotCode:sel.value,qty});
+    sumQty+=qty;
+  }
+  if(!splits.length){alert('완제품을 추가해주세요');return;}
+  if(sumQty>total){alert(`총 수량(${total}box)을 초과했습니다`);return;}
+  // 남은 수량 처리
+  if(sumQty<total){
+    if(!confirm(`${total-sumQty}box가 배정되지 않았습니다. 계속하시겠습니까?`)) return;
+  }
+  // 각 완제품으로 입고
+  splits.forEach(sp=>{
+    const prod=FL_STATE.products.find(pr=>pr.lot_code===sp.lotCode);
+    const mfg=p.date||'';
+    const existCount=FL_STATE.lots.filter(l=>l.lot_code_base===sp.lotCode&&l.mfg_date===mfg).length;
+    const lotNum=`${sp.lotCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
+    FL_STATE.lots.push({
+      lot_number:lotNum, lot_code_base:sp.lotCode,
+      client:prod?.client||'', name:prod?.name||'',
+      spec:prod?.spec||'', mfg_date:mfg,
+      exp_date:p.exp_date||'',
+      total_box:sp.qty, remain_box:sp.qty,
+      is_partial:splits.length>1, pkg_lot:p.pkg_lot,
+      outbound:[], reg_date:getTodayISO2()
+    });
+  });
+  window._flPending.splice(idx,1);
+  flSavePending();
+  flSave();
+  flUpdatePendingBadge();
+  document.getElementById('flSplitModal').classList.remove('open');
+  flRenderPending();
+  flRenderStock();
+  alert(`분할 입고 완료: ${splits.length}개 완제품`);
+}
+function flSavePending(){
+  if(window._db) window._db.collection('appData').doc('완제품_pending').set({data:JSON.stringify(window._flPending||[]),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+}
+
+// ===== 출고등록 =====
+  const grps=flGetGroups(true);
+  const sel=document.getElementById('fl-ob-group');
+  if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">-- 선택 --</option>'+grps.map(g=>`<option value="${g.key}">${g.key} / ${g.name} / 잔량:${g.remain_box}box</option>`).join('');
+  if(cur) sel.value=cur;
+  const csel=document.getElementById('fl-ob-client');
+  if(csel) csel.innerHTML='<option value="">-- 선택 --</option>'+FL_STATE.clients.map(c=>`<option value="${c}">${c}</option>`).join('');
+  flOnGroupSelected();
+}
+function flOnGroupSelected(){
+  const gk=document.getElementById('fl-ob-group')?.value;
+  const info=document.getElementById('fl-ob-info');
+  if(!gk||!info){if(info)info.style.display='none';return;}
+  const g=flGetGroups().find(x=>x.key===gk);
+  if(!g) return;
+  info.style.display='block';
+  document.getElementById('fl-ob-info-name').textContent=g.name;
+  document.getElementById('fl-ob-info-client').textContent=g.client;
+  document.getElementById('fl-ob-info-remain').textContent=g.remain_box+' box';
+}
+function flRegisterOutbound(){
+  const gk=document.getElementById('fl-ob-group').value;
+  if(!gk){alert('그룹LOT를 선택해주세요');return;}
+  const client=document.getElementById('fl-ob-client').value;
   if(!client){alert('출고처를 선택해주세요');return;}
-  const dateEl=document.getElementById('fl-ob-date-'+gi);
-  const date=dateEl?dateEl.value.replace(/\D/g,'').slice(0,6):'';
+  const date=getObDateVal();
   if(!date||date.length!==6){alert('출고일을 입력해주세요 (예: 260601)');return;}
-  const boxes=parseInt(document.getElementById('fl-ob-boxes-'+gi)?.value)||0;
+  const boxes=parseInt(document.getElementById('fl-ob-boxes').value)||0;
   if(!boxes){alert('출고 박스수를 입력해주세요');return;}
+  const g=flGetGroups().find(x=>x.key===gk);
+  if(!g){alert('그룹을 찾을 수 없습니다');return;}
   if(boxes>g.remain_box){alert(`잔량(${g.remain_box}box)보다 많습니다`);return;}
-  const prodInput=document.getElementById('fl-ob-product-'+gi);
-  const outProductName=prodInput?.value?.trim()||g.name;
-  const prod=FL_STATE.products.find(p=>p.name===outProductName);
-  const outProductCode=prod?.lot_code||'';
-  const outProductClient=prod?.client||g.client;
   let toDeduct=boxes;
   const lots=FL_STATE.lots.filter(l=>flGroupKey(l.lot_number)===gk&&l.remain_box>0);
-  for(const l of lots){if(toDeduct<=0)break;const deduct=Math.min(toDeduct,l.remain_box);l.outbound.push({box:deduct,client,date,productCode:outProductCode,productName:outProductName,productClient:outProductClient});l.remain_box-=deduct;toDeduct-=deduct;}
-  // 매핑 자동 누적
-  if(outProductName && outProductName!==g.name){
-    const pCode=gk.split('-')[0]||'';
-    if(pCode) flAccumulateMapping(pCode, outProductName);
-  }
+  for(const l of lots){if(toDeduct<=0)break;const deduct=Math.min(toDeduct,l.remain_box);l.outbound.push({box:deduct,client,date});l.remain_box-=deduct;toDeduct-=deduct;}
   flSave();flRefreshOutboundCombos();flRenderOutbound();flRenderStock();
-  alert(`출고 완료! ${outProductName} ${boxes}box → ${client}`);
-}
-function flRegisterOutbound(){}
-// 출고등록에서 LOT 그룹 삭제
-function flDeleteGroupLot(gi){
-  const g=window._obGroups[gi];
-  if(!g) return;
-  if(!confirm(`"${g.name} (${g.key})" LOT를 삭제하시겠습니까?\n이 LOT의 모든 재고와 출고 내역이 삭제됩니다.`)) return;
-  FL_STATE.lots=FL_STATE.lots.filter(l=>flGroupKey(l.lot_number)!==g.key);
-  flSave();flRefreshOutboundCombos();flRenderOutbound();flRenderStock();
-  alert('삭제 완료');
-}
-// 통합관리 매핑에 자동 누적
-async function flAccumulateMapping(pCode, productName){
-  try{
-    if(!window._db) return;
-    let mapping=window._productNameMapping||{};
-    if(!mapping[pCode]) mapping[pCode]=[];
-    if(!mapping[pCode].includes(productName)){
-      mapping[pCode].push(productName);
-      window._productNameMapping=mapping;
-      await window._db.collection('appData').doc('productNameMapping').set({data:JSON.stringify(mapping),updatedAt:new Date().toISOString()});
-    }
-  }catch(e){console.warn('매핑 누적 실패',e);}
+  alert(`출고 등록 완료! ${boxes}box`);
+  document.getElementById('fl-ob-boxes').value='';
 }
 function flRenderOutbound(){
-  const groups=flGetGroups().filter(g=>g.total_out>0);
-  groups.sort((a,b)=>a.key.localeCompare(b.key));
-  const el=document.getElementById('fl-outbound-list');
-  if(!el) return;
-  if(!groups.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">출고 내역이 없습니다</div>';return;}
-  el.innerHTML=groups.map(g=>{
+  const groups=flGetGroups().filter(g=>g.total_out>0).reverse();
+  const tbody=document.getElementById('fl-outbound-tbody');
+  if(!tbody) return;
+  if(!groups.length){tbody.innerHTML='<tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">출고 내역이 없습니다</td></tr>';return;}
+  let html='';
+  for(const g of groups){
     const outbounds=[];
     for(const l of g.lots) for(let oi=0;oi<l.outbound.length;oi++) outbounds.push({...l.outbound[oi],lotNumber:l.lot_number,oi});
-    const totalBox=outbounds.reduce((s,o)=>s+o.box,0);
-    return `<div style="border:1px solid ${g.remain_box<=0?'var(--success)':'var(--border)'};border-radius:8px;margin-bottom:6px;overflow:hidden;">
-      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;background:${g.remain_box<=0?'#e8f8f0':'var(--bg)'};">
-        <div>
-          <span style="font-weight:700;color:var(--primary);font-size:13px;">${g.key}</span>
-          <span style="font-weight:600;margin-left:8px;">${g.name}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-weight:700;color:var(--danger);font-size:14px;">${totalBox.toLocaleString()} box</span>
-          ${g.remain_box<=0
-            ?'<span style="background:var(--success);color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">출고완료</span>'
-            :'<span style="background:var(--warning-light);color:var(--warning);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">잔여 '+g.remain_box.toLocaleString()+'box</span>'}
-        </div>
-      </div>
-      <div style="display:none;">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead><tr style="background:#f8f9fa;"><th style="padding:6px 10px;text-align:left;">품명</th><th style="padding:6px 10px;text-align:left;">출고처</th><th style="padding:6px 10px;">출고일</th><th style="padding:6px 10px;">박스</th><th style="padding:6px 10px;"></th></tr></thead>
-          <tbody>${outbounds.map(o=>`<tr style="border-top:1px solid var(--border);">
-            <td style="padding:6px 10px;font-weight:600;">${o.productName||g.name}</td>
-            <td style="padding:6px 10px;">${o.client}</td>
-            <td style="padding:6px 10px;text-align:center;">${o.date}</td>
-            <td style="padding:6px 10px;text-align:center;font-weight:700;color:var(--danger);">${o.box.toLocaleString()}</td>
-            <td style="padding:6px 10px;text-align:center;"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 8px;" onclick="flDeleteOutbound('${o.lotNumber}',${o.oi})">삭제</button></td>
-          </tr>`).join('')}</tbody>
-        </table>
-      </div>
-    </div>`;
-  }).join('');
+    outbounds.forEach(o=>{html+=`<tr>
+      <td style="font-size:11px;color:var(--primary);font-weight:700">${g.key}</td>
+      <td style="font-weight:600">${g.name}</td>
+      <td style="font-size:12px">${o.client}</td>
+      <td style="font-size:12px">${o.date}</td>
+      <td class="tc" style="font-weight:700;color:var(--danger)">${o.box.toLocaleString()}</td>
+      <td class="tc"><button class="btn btn-sm btn-danger" onclick="flDeleteOutbound('${o.lotNumber}',${o.oi})">삭제</button></td>
+    </tr>`;});
+  }
+  tbody.innerHTML=html;
 }
 function flDeleteOutbound(lotNumber, oi){
   if(!confirm('이 출고 내역을 삭제하시겠습니까?\n삭제 시 재고가 복원됩니다.')) return;
@@ -602,62 +744,71 @@ function flRenderStock(){
   const hideZero=document.getElementById('fl-st-hide-zero')?.checked||false;
   document.getElementById('fl-st-date-display').textContent=selDate;
 
-  // 1. 등록된 전 품목(FL_STATE.products) + 실제 LOT(P코드) 통합
-  const rows=[];
-  const usedLots=new Set();
-
-  // 등록 품목 기준
-  FL_STATE.products.forEach(prod=>{
-    // 이름으로 LOT 매칭 (코드가 달라도 이름이 같으면 매칭)
-    const lots=FL_STATE.lots.filter(l=>l.name===prod.name||l.lot_code_base===prod.lot_code);
-    lots.forEach(l=>usedLots.add(l));
-    rows.push({code:prod.lot_code, name:prod.name, spec:prod.spec||'', lots, palletQty:prod.pallet_qty||0});
-  });
-
-  // 등록 품목에 매칭 안 된 LOT (P코드 그룹)
-  const unmatchedMap={};
-  FL_STATE.lots.filter(l=>!usedLots.has(l)).forEach(l=>{
-    const code=l.lot_code_base||'?';
-    if(!unmatchedMap[code]) unmatchedMap[code]={code, name:l.name||code, spec:'', lots:[], palletQty:0};
-    unmatchedMap[code].lots.push(l);
-  });
-  Object.values(unmatchedMap).forEach(g=>rows.push(g));
-
-  // 검색 필터
-  let filtered=rows;
-  if(q) filtered=rows.filter(r=>r.name.toLowerCase().includes(q)||r.code.toLowerCase().includes(q));
-  filtered.sort((a,b)=>a.code.localeCompare(b.code));
+  // 제품 마스터 기준 (FL_STATE.products)
+  let products=FL_STATE.products.slice();
+  if(q) products=products.filter(p=>p.name.toLowerCase().includes(q)||p.lot_code.toLowerCase().includes(q));
 
   const tbody=document.getElementById('fl-stock-tbody');
   if(!tbody) return;
-  if(!filtered.length){tbody.innerHTML='<tr><td colspan="8" class="tc" style="padding:24px;color:var(--text3)">검색 결과가 없습니다</td></tr>';return;}
+  if(!products.length){tbody.innerHTML='<tr><td colspan="8" class="tc" style="padding:24px;color:var(--text3)">검색 결과가 없습니다</td></tr>';return;}
 
   let html='';
-  filtered.forEach((prod,idx)=>{
-    const lots=prod.lots;
+  products.forEach((prod,idx)=>{
+    // 이 제품코드에 해당하는 lot들 찾기
+    const lots=FL_STATE.lots.filter(l=>l.lot_code_base===prod.lot_code);
     const isOH=(l)=>l.lot_number&&l.lot_number.includes('-OH-');
+
+    // OH(초기재고)는 날짜 무관 항상 포함
     const initStock=lots.filter(isOH).reduce((s,l)=>s+l.total_box,0);
+    const initOut=lots.filter(isOH).reduce((s,l)=>s+l.outbound.reduce((ss,o)=>ss+o.box,0),0);
+
+    // 전일재고: init(날짜무관) + selDate 이전 입고 - selDate 이전 출고
     let prevIn=0, prevOut=0;
     lots.filter(l=>!isOH(l)).forEach(l=>{
       const mfgISO=yymmddToISO2(l.mfg_date);
       if(mfgISO<selDate) prevIn+=l.total_box;
-      l.outbound.forEach(o=>{ const oISO=yymmddToISO2(o.date); if(oISO<selDate) prevOut+=o.box; });
+      l.outbound.forEach(o=>{
+        const oISO=yymmddToISO2(o.date);
+        if(oISO<selDate) prevOut+=o.box;
+      });
     });
+    // OH 출고도 날짜별로 분리
     let initPrevOut=0, initTodayOut=0;
     lots.filter(isOH).forEach(l=>{
-      l.outbound.forEach(o=>{ const oISO=yymmddToISO2(o.date); if(oISO<selDate) initPrevOut+=o.box; else if(oISO===selDate) initTodayOut+=o.box; });
+      l.outbound.forEach(o=>{
+        const oISO=yymmddToISO2(o.date);
+        if(oISO<selDate) initPrevOut+=o.box;
+        else if(oISO===selDate) initTodayOut+=o.box;
+      });
     });
     const prevStock=Math.max(0, initStock - initPrevOut + prevIn - prevOut);
+
+    // 당일 입고(완제품) - OH 제외
     let todayIn=0;
-    lots.filter(l=>!isOH(l)).forEach(l=>{ const mfgISO=yymmddToISO2(l.mfg_date); if(mfgISO===selDate) todayIn+=l.total_box; });
+    lots.filter(l=>!isOH(l)).forEach(l=>{
+      const mfgISO=yymmddToISO2(l.mfg_date);
+      if(mfgISO===selDate) todayIn+=l.total_box;
+    });
+
+    // 당일 출고 - OH 출고 포함
     let todayOut=initTodayOut;
-    lots.filter(l=>!isOH(l)).forEach(l=>{ l.outbound.forEach(o=>{ const oISO=yymmddToISO2(o.date); if(oISO===selDate) todayOut+=o.box; }); });
+    lots.filter(l=>!isOH(l)).forEach(l=>{
+      l.outbound.forEach(o=>{
+        const oISO=yymmddToISO2(o.date);
+        if(oISO===selDate) todayOut+=o.box;
+      });
+    });
+
     const closing=Math.max(0,prevStock+todayIn-todayOut);
-    if(hideZero && closing===0 && prevStock===0 && todayIn===0 && todayOut===0) return;
-    const exp=FL_STATE.expandedStock.has(prod.code);
-    html+=`<tr style="cursor:pointer;" onclick="flToggleStock('${prod.code}')">
+
+    // 재고있는것만 필터
+    if(hideZero && closing===0) return;
+
+    const exp=FL_STATE.expandedStock.has(prod.lot_code);
+
+    html+=`<tr style="cursor:pointer;" onclick="flToggleStock('${prod.lot_code}')">
       <td>${lots.length>0?(exp?'▼':'▶'):''}</td>
-      <td><span class="badge badge-blue" style="font-size:10px">${prod.code}</span></td>
+      <td><span class="badge badge-blue" style="font-size:10px">${prod.lot_code}</span></td>
       <td style="font-weight:600">${prod.name}</td>
       <td style="font-size:12px;color:var(--text2)">${prod.spec||'-'}</td>
       <td class="tc" style="color:var(--text2)">${prevStock>0?prevStock.toLocaleString():'-'}</td>
@@ -665,22 +816,64 @@ function flRenderStock(){
       <td class="tc" style="color:var(--danger);font-weight:${todayOut>0?700:400}">${todayOut>0?'-'+todayOut.toLocaleString():'-'}</td>
       <td class="tc" style="font-weight:700;color:${closing>0?'var(--primary)':'var(--text3)'}">${closing>0?closing.toLocaleString():'0'}</td>
     </tr>`;
+
+    // 아코디언 - 하위 LOT 상세 (파렛트 분할)
     if(exp && lots.length>0){
-      const palletQty=prod.palletQty||0;
+      const palletQty=prod.pallet_qty||0;
       lots.forEach(l=>{
         const lTotalOut=l.outbound.reduce((s,o)=>s+o.box,0);
         const li=FL_STATE.lots.indexOf(l);
         const ohTag=l.lot_number&&l.lot_number.includes('-OH-')?'<span class="badge badge-gray" style="font-size:9px;margin-left:4px">초기재고</span>':'';
         const expTag=l.exp_date?'<span style="font-size:10px;color:var(--text3)">(~'+flFmtDate6(l.exp_date)+')</span>':'';
-        html+=`<tr style="background:var(--bg);font-size:12px;" onclick="event.stopPropagation()">
-          <td></td>
-          <td colspan="2" style="padding-left:24px;color:var(--text2)">${l.lot_number}${ohTag} ${expTag}</td>
-          <td style="font-size:11px;color:var(--text3)">${flFmtDate6(l.mfg_date)}</td>
-          <td class="tc">${l.total_box}</td>
-          <td class="tc" style="color:var(--danger)">${lTotalOut>0?lTotalOut:'-'}</td>
-          <td class="tc" style="color:${l.remain_box>0?'var(--success)':'var(--text3)'}; font-weight:700">${l.remain_box}</td>
-          <td class="tc"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 8px" onclick="event.stopPropagation();flDeleteStockLot(${li})">삭제</button></td>
-        </tr>`;
+
+        if(palletQty>0){
+          // LOT 헤더 행
+          html+=`<tr style="background:#eef2f8;font-size:12px;cursor:default;" onclick="event.stopPropagation()">
+            <td></td>
+            <td colspan="2" style="padding-left:20px;font-weight:700;color:var(--primary)">${l.lot_number}${ohTag} ${expTag}</td>
+            <td style="font-size:11px;color:var(--text3)">${flFmtDate6(l.mfg_date)}</td>
+            <td class="tc" style="font-weight:600">${l.total_box}</td>
+            <td class="tc" style="color:var(--danger);font-weight:600">${lTotalOut>0?lTotalOut:'-'}</td>
+            <td class="tc" style="font-weight:700;color:${l.remain_box>0?'var(--success)':'var(--text3)'}">${l.remain_box}</td>
+            <td class="tc"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 8px" onclick="event.stopPropagation();flDeleteStockLot(${li})">삭제</button></td>
+          </tr>`;
+          // 파렛트별 서브행
+          const totalPallets=Math.ceil(l.total_box/palletQty);
+          let outRemain=lTotalOut;
+          for(let pi=1;pi<=totalPallets;pi++){
+            const isLast=pi===totalPallets;
+            const palletBox=isLast?(l.total_box-(totalPallets-1)*palletQty):palletQty;
+            const consumed=Math.min(outRemain,palletBox);
+            outRemain-=consumed;
+            const remainBox=palletBox-consumed;
+            const isEmpty=remainBox<=0;
+            const isFullPallet=palletBox===palletQty;
+            const subLot=`${l.lot_number.split('-').slice(0,2).join('-')}-${String(pi).padStart(2,'0')}`;
+            const pLabel=isFullPallet?'1P':'';
+            const boxLabel=isEmpty?'출고완료':`${remainBox}box`;
+            const boxColor=isEmpty?'var(--text3)':remainBox===palletBox?'var(--success)':'var(--warning)';
+            html+=`<tr style="background:var(--bg);font-size:11px;${isEmpty?'color:var(--text3);text-decoration:line-through;':''}" onclick="event.stopPropagation()">
+              <td></td>
+              <td colspan="2" style="padding-left:40px;${isEmpty?'':'color:var(--text2)'}">${subLot}${!isFullPallet?' <span style="font-size:10px;color:var(--warning)">(잔여)</span>':''}</td>
+              <td class="tc" style="font-size:10px">${pLabel}</td>
+              <td class="tc">${palletBox}</td>
+              <td class="tc" style="color:var(--danger)">${consumed||'-'}</td>
+              <td class="tc" style="color:${boxColor};font-weight:700">${boxLabel}</td>
+              <td></td>
+            </tr>`;
+          }
+        } else {
+          // pallet_qty=0: LOT만 표시
+          html+=`<tr style="background:var(--bg);font-size:12px;" onclick="event.stopPropagation()">
+            <td></td>
+            <td colspan="2" style="padding-left:24px;color:var(--text2)">${l.lot_number}${ohTag} ${expTag}</td>
+            <td style="font-size:11px;color:var(--text3)">${flFmtDate6(l.mfg_date)}</td>
+            <td class="tc">${l.total_box}</td>
+            <td class="tc" style="color:var(--danger)">${lTotalOut>0?lTotalOut:'-'}</td>
+            <td class="tc" style="color:${l.remain_box>0?'var(--success)':'var(--text3)'}; font-weight:700">${l.remain_box}</td>
+            <td class="tc"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 8px" onclick="event.stopPropagation();flDeleteStockLot(${li})">삭제</button></td>
+          </tr>`;
+        }
       });
     }
   });
@@ -818,27 +1011,12 @@ function flRenderClientTable(){
 function flResetData(){if(!confirm('완제품수불부 전체 데이터를 초기화하시겠습니까?'))return;FL_STATE.lots=[];FL_STATE.products=[];FL_STATE.clients=FL_DEFAULT_CLIENTS;flSave();flRenderStock();flRenderProductTable();flRenderClientTable();alert('초기화 완료');}
 function printFinishedLedger(){
   const selDate=getStockDateISO();
-  // 등록 품목 + 실제 LOT 통합
-  const rows=[];
-  const usedLots=new Set();
-  FL_STATE.products.forEach(prod=>{
-    const lots=FL_STATE.lots.filter(l=>l.name===prod.name||l.lot_code_base===prod.lot_code);
-    lots.forEach(l=>usedLots.add(l));
-    rows.push({code:prod.lot_code, name:prod.name, spec:prod.spec||'', lots});
-  });
-  const unmatchedMap={};
-  FL_STATE.lots.filter(l=>!usedLots.has(l)).forEach(l=>{
-    const code=l.lot_code_base||'?';
-    if(!unmatchedMap[code]) unmatchedMap[code]={code, name:l.name||code, spec:'', lots:[]};
-    unmatchedMap[code].lots.push(l);
-  });
-  Object.values(unmatchedMap).forEach(g=>rows.push(g));
-  rows.sort((a,b)=>a.code.localeCompare(b.code));
-  if(!rows.length){alert('출력할 데이터가 없습니다');return;}
+  const products=FL_STATE.products.slice();
+  if(!products.length){alert('출력할 데이터가 없습니다');return;}
 
   let bodyHtml='';
-  rows.forEach((prod,idx)=>{
-    const lots=prod.lots;
+  products.forEach((prod,idx)=>{
+    const lots=FL_STATE.lots.filter(l=>l.lot_code_base===prod.lot_code);
     const isOH=(l)=>l.lot_number&&l.lot_number.includes('-OH-');
     const initStock=lots.filter(isOH).reduce((s,l)=>s+l.total_box,0);
     let prevIn=0, prevOut=0;
@@ -864,7 +1042,7 @@ function printFinishedLedger(){
 
     bodyHtml+=`<tr>
       <td class="tc">${idx+1}</td>
-      <td class="blue bold">${prod.code}</td>
+      <td class="blue bold">${prod.lot_code}</td>
       <td class="left bold">${prod.name}</td>
       <td class="tc">${prod.spec||'-'}</td>
       <td class="num">${prevStock>0?prevStock.toLocaleString():'-'}</td>
@@ -1071,7 +1249,7 @@ async function saveFlInitStock(){
     <div class="modal-hd"><div class="modal-title">🗑️ 완제품 폐기</div><button class="modal-close" onclick="closeModal('flDisposeModal')">×</button></div>
     <div class="modal-bd">
       <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">폐기 처리하면 잔량에서 차감됩니다.</div>
-      <div class="form-row"><label class="form-label">포장LOT / 품명</label><input class="form-input" id="flDispName" readonly style="background:#f4f6fa;font-weight:700"></div>
+      <div class="form-row"><label class="form-label">그룹LOT / 품명</label><input class="form-input" id="flDispName" readonly style="background:#f4f6fa;font-weight:700"></div>
       <div class="form-grid">
         <div class="form-row"><label class="form-label">현재 잔량</label><input class="form-input" id="flDispRemain" readonly style="background:#f4f6fa"></div>
         <div class="form-row"><label class="form-label">폐기 박스수</label><input class="form-input" id="flDispQty" type="number" placeholder="0"></div>
