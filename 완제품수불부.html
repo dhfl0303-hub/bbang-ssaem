@@ -1032,15 +1032,22 @@ function flRestoreDefaultProducts(){
 function flResetLotsOnly(){
   if(!confirm('LOT 재고 데이터만 초기화하고 재동기화합니다.\n제품 목록과 거래처는 유지됩니다.\n기존 출고 내역도 삭제됩니다. 계속하시겠습니까?')) return;
   FL_STATE.lots=[];
+  window._flLots=[];
   window._flPending=[];
   window._deletedLots=[];
+  const saves=[];
   if(window._db){
-    window._db.collection('appData').doc('완제품_lots').set({data:JSON.stringify([]),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-    window._db.collection('appData').doc('완제품_pending').set({data:JSON.stringify([]),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-    window._db.collection('appData').doc('완제품_deleted_lots').set({data:JSON.stringify([]),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+    saves.push(window._db.collection('appData').doc('완제품_lots').set({data:JSON.stringify([]),updatedAt:new Date().toISOString()}));
+    saves.push(window._db.collection('appData').doc('완제품_pending').set({data:JSON.stringify([]),updatedAt:new Date().toISOString()}));
+    saves.push(window._db.collection('appData').doc('완제품_deleted_lots').set({data:JSON.stringify([]),updatedAt:new Date().toISOString()}));
   }
-  flUpdatePendingBadge();
-  flSyncFromPack();
+  Promise.all(saves).then(()=>{
+    alert('초기화 완료. 페이지를 새로고침합니다.');
+    location.reload();
+  }).catch(()=>{
+    alert('초기화 완료. 페이지를 새로고침합니다.');
+    location.reload();
+  });
 }
 function flResetData(){if(!confirm('완제품수불부 전체 데이터를 초기화하시겠습니까?'))return;FL_STATE.lots=[];FL_STATE.products=[];FL_STATE.clients=FL_DEFAULT_CLIENTS;flSave();flRenderStock();flRenderProductTable();flRenderClientTable();alert('초기화 완료');}
 function printFinishedLedger(){
