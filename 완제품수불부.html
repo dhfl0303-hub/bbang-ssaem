@@ -653,6 +653,7 @@ function flSavePending(){
 }
 
 // ===== 출고등록 =====
+function flRefreshOutboundCombos(){
   const grps=flGetGroups(true);
   const sel=document.getElementById('fl-ob-group');
   if(!sel) return;
