@@ -453,9 +453,9 @@ function flRefreshOutboundCombos(){
     const recentNames=mapping[pCode]||mapping[g.key.split('-')[0]]||[];
     let dlOpts='';
     if(recentNames.length){
-      recentNames.forEach(rn=>{const prod=FL_STATE.products.find(p=>p.name===rn);dlOpts+=`<option value="${rn}">[${prod?.lot_code||'★'}] ${rn}</option>`;});
+      recentNames.forEach(rn=>{const prod=FL_STATE.products.find(p=>p.name===rn);dlOpts+=`<option value="${rn}">[${prod?.lot_code||'★'}] ${rn}${prod?.client?' - '+prod.client:''}</option>`;});
     }
-    FL_STATE.products.filter(p=>!recentNames.includes(p.name)).forEach(p=>{dlOpts+=`<option value="${p.name}">[${p.lot_code}] ${p.name}</option>`;});
+    FL_STATE.products.filter(p=>!recentNames.includes(p.name)).forEach(p=>{dlOpts+=`<option value="${p.name}">[${p.lot_code}] ${p.name} - ${p.client||''}</option>`;});
     return `<div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;">
       <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.ob-arrow').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:var(--bg);">
         <div>
