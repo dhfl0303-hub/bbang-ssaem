@@ -708,23 +708,27 @@ function flRegisterOutbound(){
   document.getElementById('fl-ob-boxes').value='';
 }
 function flRenderOutbound(){
-  const groups=flGetGroups().filter(g=>g.total_out>0).reverse();
+  const groups=flGetGroups().filter(g=>g.total_out>0);
   const tbody=document.getElementById('fl-outbound-tbody');
   if(!tbody) return;
   if(!groups.length){tbody.innerHTML='<tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">출고 내역이 없습니다</td></tr>';return;}
-  let html='';
+  // 전체 출고 내역 수집 후 날짜 최신순 정렬
+  const allOutbounds=[];
   for(const g of groups){
-    const outbounds=[];
-    for(const l of g.lots) for(let oi=0;oi<l.outbound.length;oi++) outbounds.push({...l.outbound[oi],lotNumber:l.lot_number,oi});
-    outbounds.forEach(o=>{html+=`<tr>
-      <td style="font-size:11px;color:var(--primary);font-weight:700">${g.key}</td>
-      <td style="font-weight:600">${g.name}</td>
-      <td style="font-size:12px">${o.client}</td>
-      <td style="font-size:12px">${o.date}</td>
-      <td class="tc" style="font-weight:700;color:var(--danger)">${o.box.toLocaleString()}</td>
-      <td class="tc"><button class="btn btn-sm btn-danger" onclick="flDeleteOutbound('${o.lotNumber}',${o.oi})">삭제</button></td>
-    </tr>`;});
+    for(const l of g.lots) for(let oi=0;oi<l.outbound.length;oi++){
+      allOutbounds.push({...l.outbound[oi], lotNumber:l.lot_number, oi, groupKey:g.key, groupName:g.name});
+    }
   }
+  allOutbounds.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  let html='';
+  allOutbounds.forEach(o=>{html+=`<tr>
+    <td style="font-size:11px;color:var(--primary);font-weight:700">${o.groupKey}</td>
+    <td style="font-weight:600">${o.groupName}</td>
+    <td style="font-size:12px">${o.client}</td>
+    <td style="font-size:12px">${o.date}</td>
+    <td class="tc" style="font-weight:700;color:var(--danger)">${o.box.toLocaleString()}</td>
+    <td class="tc"><button class="btn btn-sm btn-danger" onclick="flDeleteOutbound('${o.lotNumber}',${o.oi})">삭제</button></td>
+  </tr>`;});
   tbody.innerHTML=html;
 }
 function flDeleteOutbound(lotNumber, oi){
