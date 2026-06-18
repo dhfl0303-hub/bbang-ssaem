@@ -750,7 +750,22 @@ async function syncToServer(){
       if(dkSnap.exists && dkSnap.data().data) deletedKeys = JSON.parse(dkSnap.data().data);
     }catch(e){}
     const inputDeleted = deletedKeys.filter(k=>k.startsWith('inputRecords_'));
-    inputDeleted.forEach(k=>{ localStorage.removeItem(k); });
+
+    // 삭제된 키에 해당하는 inputLot 목록 수집 (ledgerRecords 정리용)
+    let deletedInputLots = [];
+    for(const k of inputDeleted){
+      try{
+        // Firebase에서 삭제 전 데이터 조회
+        const snap = await db.collection('appData').doc(k).get();
+        if(snap.exists && snap.data().data){
+          const dayRecs = JSON.parse(snap.data().data);
+          dayRecs.forEach(r=>{ if(r.lot) deletedInputLots.push(r.lot); });
+        }
+        // Firebase에서도 해당 문서 삭제
+        await db.collection('appData').doc(k).delete();
+      }catch(e){}
+      localStorage.removeItem(k);
+    }
 
     const keys = Object.keys(localStorage).filter(k=>k.startsWith('inputRecords_'));
     let recs = []; keys.forEach(k=>{ recs = recs.concat(JSON.parse(localStorage.getItem(k)||'[]')); });
@@ -771,6 +786,11 @@ async function syncToServer(){
     // 2. ledgerRecords 출고 반영
     let ledgerSnap = await db.collection('appData').doc('ledgerRecords').get();
     let ledgerRecords = (ledgerSnap.exists && ledgerSnap.data().data) ? JSON.parse(ledgerSnap.data().data) : [];
+
+    // 삭제된 투입LOT에 해당하는 출고 기록 제거
+    if(deletedInputLots.length){
+      ledgerRecords = ledgerRecords.filter(r=>!(r.type==='out' && r.inputLot && deletedInputLots.includes(r.inputLot)));
+    }
     recs.forEach(rec=>{
       rec.ingredients.forEach(ing=>{
         const exists = ledgerRecords.find(r=>r.type==='out'&&r.lot===ing.lot&&r.inputLot===rec.lot);
