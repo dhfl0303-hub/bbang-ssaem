@@ -670,7 +670,7 @@ function searchByInputLot(){
     document.getElementById("confirmDeleteInputLotBtn").style.display="none";
     return;
   }
-  let html='<div style="font-size:13px;margin-bottom:8px;color:var(--text2)">아래 <strong>'"+found.length+'건</strong>의 출고 기록이 삭제됩니다:</div>';
+  let html='<div style="font-size:13px;margin-bottom:8px;color:var(--text2)">아래 <strong>'+found.length+'건</strong>의 출고 기록이 삭제됩니다:</div>';
   html+='<table style="width:100%;border-collapse:collapse;font-size:12px;">';
   html+='<tr style="background:var(--bg2);"><th style="padding:6px;border:1px solid var(--border);text-align:left;">원료명</th><th style="padding:6px;border:1px solid var(--border);">날짜</th><th style="padding:6px;border:1px solid var(--border);">LOT</th><th style="padding:6px;border:1px solid var(--border);text-align:right;">수량(kg)</th></tr>';
   found.forEach(r=>{
