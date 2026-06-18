@@ -89,6 +89,7 @@ tr:hover td{background:var(--bg);}
     <button class="btn btn-sm btn-primary" onclick="openNewIngModal()">+ 신규 원료 등록</button>
     <button class="btn btn-sm" style="background:var(--warning-light);color:var(--warning);border:1px solid #f0c080" onclick="openInitStock()">📋 전일재고 등록</button>
     <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="openDeleteCode()">🗑️ 코드 삭제</button>
+    <button class="btn btn-sm" style="background:#1a1a3d;color:#8888ff;border:1px solid #44f;" onclick="openDeleteByInputLot()">🗑️ 투입LOT 출고삭제</button>
     <button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;" onclick="openDeleteAllLedger()">⚠️ 수불내역 전체삭제</button>
     <button class="btn btn-sm" style="background:var(--success-light);color:var(--success);border:1px solid #8dc;" onclick="backupLedger()">💾 백업</button>
     <button class="btn btn-sm" style="background:var(--primary-light);color:var(--primary);border:1px solid #acd;" onclick="restoreLedger()">🔄 복원</button>
@@ -212,6 +213,27 @@ tr:hover td{background:var(--bg);}
       <div class="table-wrap"><table><thead><tr><th>원료명</th><th>코드</th><th>LOT</th><th>재고량(kg)</th><th>소비기한</th><th>제조일자</th><th>기준일</th><th></th></tr></thead><tbody id="initStockTbody"></tbody></table></div>
     </div>
     <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('initStockModal')">취소</button><button class="btn btn-primary" onclick="saveInitStock()">전체 저장</button></div>
+  </div>
+</div>
+
+<!-- 투입LOT 출고삭제 모달 -->
+<div class="modal-overlay" id="deleteByInputLotModal" onclick="closeModalOutside(event,'deleteByInputLotModal')">
+  <div class="modal" style="width:480px">
+    <div class="modal-hd"><div class="modal-title">🗑️ 투입LOT 출고삭제</div><button class="modal-close" onclick="closeModal('deleteByInputLotModal')">×</button></div>
+    <div class="modal-bd">
+      <div class="form-row" style="margin-bottom:12px;">
+        <label class="form-label">투입LOT 번호</label>
+        <div style="display:flex;gap:8px;">
+          <input class="form-input" id="inputLotSearchVal" placeholder="예: 투입-P500-260618-001" style="flex:1;">
+          <button class="btn btn-primary" onclick="searchByInputLot()">조회</button>
+        </div>
+      </div>
+      <div id="inputLotSearchResult" style="margin-top:8px;"></div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-outline" onclick="closeModal('deleteByInputLotModal')">닫기</button>
+      <button class="btn btn-danger" id="confirmDeleteInputLotBtn" style="display:none;" onclick="confirmDeleteByInputLot()">삭제</button>
+    </div>
   </div>
 </div>
 
@@ -630,6 +652,43 @@ function deleteSavedInitRow(key){
   if(!confirm('삭제하시겠습니까?'))return;
   ledgerRecords=ledgerRecords.filter(r=>!(r.type==='init'&&(r._initKey===key||r.name+r.date===key)));
   saveLedger();renderSavedInitStock();renderLedger();
+}
+
+function openDeleteByInputLot(){
+  document.getElementById("inputLotSearchVal").value="";
+  document.getElementById("inputLotSearchResult").innerHTML="";
+  document.getElementById("confirmDeleteInputLotBtn").style.display="none";
+  document.getElementById("deleteByInputLotModal").classList.add("open");
+}
+function searchByInputLot(){
+  const lot = document.getElementById("inputLotSearchVal").value.trim();
+  if(!lot){ alert("LOT 번호를 입력해주세요"); return; }
+  const found = ledgerRecords.filter(r=>r.type==="out" && r.inputLot===lot);
+  const el = document.getElementById("inputLotSearchResult");
+  if(!found.length){
+    el.innerHTML='<div style="color:var(--danger);padding:12px;background:#fff0f0;border-radius:8px;">해당 투입LOT의 출고 기록이 없습니다.</div>';
+    document.getElementById("confirmDeleteInputLotBtn").style.display="none";
+    return;
+  }
+  let html='<div style="font-size:13px;margin-bottom:8px;color:var(--text2)">아래 <strong>'"+found.length+'건</strong>의 출고 기록이 삭제됩니다:</div>';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+  html+='<tr style="background:var(--bg2);"><th style="padding:6px;border:1px solid var(--border);text-align:left;">원료명</th><th style="padding:6px;border:1px solid var(--border);">날짜</th><th style="padding:6px;border:1px solid var(--border);">LOT</th><th style="padding:6px;border:1px solid var(--border);text-align:right;">수량(kg)</th></tr>';
+  found.forEach(r=>{
+    html+=`<tr><td style="padding:6px;border:1px solid var(--border);">${r.name}</td><td style="padding:6px;border:1px solid var(--border);text-align:center;">${r.date}</td><td style="padding:6px;border:1px solid var(--border);text-align:center;">${r.lot||"-"}</td><td style="padding:6px;border:1px solid var(--border);text-align:right;">${r.qty}</td></tr>`;
+  });
+  html+='</table>';
+  el.innerHTML=html;
+  document.getElementById("confirmDeleteInputLotBtn").style.display="";
+}
+async function confirmDeleteByInputLot(){
+  const lot = document.getElementById("inputLotSearchVal").value.trim();
+  if(!lot) return;
+  if(!confirm(`투입LOT "${lot}" 출고 기록을 삭제하시겠습니까?`)) return;
+  ledgerRecords = ledgerRecords.filter(r=>!(r.type==="out" && r.inputLot===lot));
+  await saveLedger();
+  renderLedger();
+  closeModal("deleteByInputLotModal");
+  alert("삭제 완료! 재고가 원상복귀되었습니다.");
 }
 
 function openDeleteAllLedger(){
