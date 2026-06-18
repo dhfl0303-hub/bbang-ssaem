@@ -704,12 +704,13 @@ function flRegisterOutbound(){
   const lots=FL_STATE.lots.filter(l=>flGroupKey(l.lot_number)===gk&&l.remain_box>0);
   for(const l of lots){if(toDeduct<=0)break;const deduct=Math.min(toDeduct,l.remain_box);l.outbound.push({box:deduct,client,date});l.remain_box-=deduct;toDeduct-=deduct;}
   flSave();flRefreshOutboundCombos();flRenderOutbound();flRenderStock();
-  // 완제품명 매핑 누적 저장
+  // 완제품명 매핑 누적 저장 ({코드: [{name, client}]} 형태, 중복 제외)
   if(window._db && g.key && g.name){
     window._db.collection("appData").doc("productNameMapping").get().then(snap=>{
       let mapping = (snap.exists && snap.data().data) ? JSON.parse(snap.data().data) : {};
       if(!mapping[g.key]) mapping[g.key] = [];
-      if(!mapping[g.key].includes(g.name)) mapping[g.key].push(g.name);
+      const already = mapping[g.key].some(e=>e.name===g.name && e.client===client);
+      if(!already) mapping[g.key].push({name:g.name, client:client});
       window._db.collection("appData").doc("productNameMapping").set({data:JSON.stringify(mapping),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
     }).catch(e=>console.warn(e));
   }
