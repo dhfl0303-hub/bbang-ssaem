@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>관리자 화면</title>
+<title>통합관리</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
 :root{
@@ -189,7 +189,7 @@ tr:hover td{background:var(--bg);}
   </div>
   <div class="accordion-body" id="acc-production" style="max-height:500px;overflow-y:auto;">
     <div class="nav-sub-section">원료관리</div>
-    <div class="nav-item" onclick="showPanel('ingredient-stock')">
+    <div class="nav-item active" onclick="showPanel('ingredient-stock')">
       <span class="nav-icon">🧂</span>원료 재고현황
     </div>
     <div class="nav-item" onclick="showPanel('incoming')">
@@ -197,7 +197,7 @@ tr:hover td{background:var(--bg);}
     </div>
 
     <div class="nav-sub-section">수불부관리</div>
-    <div class="nav-item active" onclick="showPanel('material-ledger')">
+    <div class="nav-item" onclick="showPanel('material-ledger')">
       <span class="nav-icon">📒</span>원료수불부
     </div>
     <div class="nav-item" onclick="showPanel('subsidiary')">
@@ -271,7 +271,7 @@ tr:hover td{background:var(--bg);}
 <!-- 메인 -->
 <div class="main">
   <div class="topbar">
-    <div class="topbar-title" id="topbarTitle">배합비 관리</div>
+    <div class="topbar-title" id="topbarTitle">원료 재고 현황</div>
     <div style="display:flex;gap:8px;align-items:center;">
       <div class="topbar-badge" id="topbarDate"></div>
     </div>
@@ -291,7 +291,7 @@ tr:hover td{background:var(--bg);}
     </div>
 
     <!-- ⓪ 원료수불부 -->
-    <div class="panel active" id="panel-material-ledger">
+    <div class="panel" id="panel-material-ledger">
     <div class="card" style="text-align:center;padding:40px;">
       <div style="font-size:48px;margin-bottom:12px;">📒</div>
       <div style="font-size:16px;font-weight:700;margin-bottom:8px;">원료수불부</div>
@@ -551,7 +551,7 @@ tr:hover td{background:var(--bg);}
     </div>
 
     <!-- ② 원료 재고 현황 -->
-    <div class="panel" id="panel-ingredient-stock">
+    <div class="panel active" id="panel-ingredient-stock">
       <div class="stat-grid">
         <div class="stat-box"><div class="stat-label">전체 원료</div><div class="stat-value stat-blue" id="ingTotal">-</div><div class="stat-sub">종류</div></div>
         <div class="stat-box"><div class="stat-label">소비기한 초과</div><div class="stat-value stat-red" id="ingExpired">-</div><div class="stat-sub">종류</div></div>
@@ -562,13 +562,13 @@ tr:hover td{background:var(--bg);}
         <div class="card-hd"><div class="card-hd-title">⚠️ 소비기한 알림</div></div>
         <div class="card-bd" id="alertList"></div>
       </div>
-      <!-- 폐기대장 -->
+      <!-- 폐기대장 (아코디언) -->
       <div class="card" style="margin-top:16px">
-        <div class="card-hd">
-          <div class="card-hd-title">🗑️ 폐기대장</div>
-          <span class="badge badge-gray" id="disposeCount">0건</span>
+        <div class="card-hd" onclick="toggleAccordion('disposeAccBody',this)" style="cursor:pointer;user-select:none;">
+          <div class="card-hd-title">🗑️ 폐기대장 <span class="badge badge-gray" id="disposeCount">0건</span></div>
+          <span style="font-size:18px;transition:transform .2s;" class="acc-arrow">▼</span>
         </div>
-        <div class="card-bd" style="padding:0">
+        <div class="card-bd" id="disposeAccBody" style="padding:0;display:none;">
           <div class="table-wrap">
             <table>
               <thead><tr><th>폐기일</th><th>코드</th><th>원료명</th><th>폐기량</th><th>LOT</th><th>사유</th></tr></thead>
@@ -577,13 +577,13 @@ tr:hover td{background:var(--bg);}
           </div>
         </div>
       </div>
-      <!-- 반품대장 -->
+      <!-- 반품대장 (아코디언) -->
       <div class="card" style="margin-top:16px">
-        <div class="card-hd">
-          <div class="card-hd-title">↩️ 반품대장</div>
-          <span class="badge badge-gray" id="returnCount">0건</span>
+        <div class="card-hd" onclick="toggleAccordion('returnAccBody',this)" style="cursor:pointer;user-select:none;">
+          <div class="card-hd-title">↩️ 반품대장 <span class="badge badge-gray" id="returnCount">0건</span></div>
+          <span style="font-size:18px;transition:transform .2s;" class="acc-arrow">▼</span>
         </div>
-        <div class="card-bd" style="padding:0">
+        <div class="card-bd" id="returnAccBody" style="padding:0;display:none;">
           <div class="table-wrap">
             <table>
               <thead><tr><th>반품일</th><th>코드</th><th>원료명</th><th>반품량</th><th>LOT</th><th>사유</th></tr></thead>
@@ -830,7 +830,7 @@ tr:hover td{background:var(--bg);}
       <div id="batch-b1">
         <div class="form-row" style="margin-bottom:8px"><label class="form-label">반죽중량(g)</label><input class="form-input" id="rW1" type="number" placeholder="0" style="max-width:160px"></div>
         <div id="ingRows1"></div>
-        <button class="btn btn-sm btn-outline" onclick="addIngRowN(1)">+ 원료 추가</button>
+        <button class="btn btn-sm btn-outline" onclick="addIngRowAll()">+ 원료 추가</button>
       </div>
       <!-- 배합2 -->
       <div id="batch-b2" style="display:none">
@@ -2743,6 +2743,17 @@ function fillYieldDateDropdown(){
 }
 
 // ===== showPanel 확장 (날짜 기본값 설정) =====
+function toggleAccordion(bodyId, hdEl){
+  const body=document.getElementById(bodyId);
+  const arrow=hdEl.querySelector('.acc-arrow');
+  if(body.style.display==='none'){
+    body.style.display='';
+    if(arrow) arrow.style.transform='rotate(180deg)';
+  } else {
+    body.style.display='none';
+    if(arrow) arrow.style.transform='';
+  }
+}
 function showPanel(id){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+id).classList.add('active');
@@ -2953,24 +2964,56 @@ function getIngNames(){
 }
 
 function addIngRow(name='',a1='',a2='',a3='',a4=''){
-  addIngRowN(1,name,a1);
-  if(a2) addIngRowN(2,name,a2);
-  if(a3) addIngRowN(3,name,a3);
-  if(a4) addIngRowN(4,name,a4);
+  const grp = 'grp'+Date.now()+Math.random().toString(36).slice(2,6);
+  addIngRowN(1,name,a1,grp);
+  addIngRowN(2,name,a2||'',grp);
+  addIngRowN(3,name,a3||'',grp);
+  addIngRowN(4,name,a4||'',grp);
 }
 
-function addIngRowN(n, name='', amount=''){
+function addIngRowAll(name=''){
+  const grp = 'grp'+Date.now()+Math.random().toString(36).slice(2,6);
+  addIngRowN(1,name,'',grp);
+  addIngRowN(2,name,'',grp);
+  addIngRowN(3,name,'',grp);
+  addIngRowN(4,name,'',grp);
+}
+
+function addIngRowN(n, name='', amount='', grp=''){
   const row=document.createElement('div'); row.className='ing-row';
+  if(grp) row.dataset.grp=grp;
   const uid='ing'+n+'-'+Date.now()+Math.random().toString(36).slice(2);
+  const syncAttr = n===1&&grp ? `onchange="syncBatch1Name('${grp}',this.value)"` : '';
   row.innerHTML=`
     <div class="autocomplete-wrap">
       <input class="ing-input" id="${uid}" placeholder="원료명 입력/검색" value="${name}" autocomplete="off"
-        oninput="showAC('${uid}')" onfocus="showAC('${uid}')" onblur="setTimeout(()=>hideAC('${uid}'),150)">
+        oninput="showAC('${uid}')" onfocus="showAC('${uid}')" onblur="setTimeout(()=>hideAC('${uid}'),150)" ${syncAttr}>
       <div class="autocomplete-list" id="ac-${uid}"></div>
     </div>
     <input class="ing-input" type="number" placeholder="용량(g)" value="${amount}" style="text-align:center">
-    <div class="ing-del" onclick="this.closest('.ing-row').remove()">×</div>`;
+    <div class="ing-del" onclick="delIngRow(this,${n},'${grp}')">×</div>`;
   document.getElementById('ingRows'+n).appendChild(row);
+}
+
+function syncBatch1Name(grp, name){
+  if(!grp) return;
+  [2,3,4].forEach(n=>{
+    const row = document.querySelector('#ingRows'+n+' .ing-row[data-grp="'+grp+'"]');
+    if(row){
+      const inp = row.querySelector('.ing-input');
+      if(inp) inp.value = name;
+    }
+  });
+}
+
+function delIngRow(el, n, grp){
+  el.closest('.ing-row').remove();
+  if(n===1 && grp){
+    [2,3,4].forEach(bn=>{
+      const row = document.querySelector('#ingRows'+bn+' .ing-row[data-grp="'+grp+'"]');
+      if(row) row.remove();
+    });
+  }
 }
 
 function showAC(uid){
@@ -2988,8 +3031,14 @@ function showAC(uid){
 }
 function hideAC(uid){ document.getElementById('ac-'+uid).classList.remove('open'); }
 function selectAC(uid,name){
-  document.getElementById(uid).value=name;
+  const inp=document.getElementById(uid);
+  inp.value=name;
   hideAC(uid);
+  // 배합1 원료 선택 시 배합2~4 동기화
+  const row=inp.closest('.ing-row');
+  if(row && row.dataset.grp && uid.startsWith('ing1')){
+    syncBatch1Name(row.dataset.grp, name);
+  }
 }
 function saveRecipe(){
   const code=document.getElementById('rCode').value.trim().toUpperCase();
@@ -3481,6 +3530,7 @@ function syncIncomingToLedger(){
         code: ing ? ing.code : '',
         qty: qty,
         exp: row.exp||'',
+        lot: row.lot||'',
         type: 'in'
       });
     });
