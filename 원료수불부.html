@@ -279,24 +279,40 @@ let initRows = [];
 let ingStock = [];
 
 async function initLedger(){
-  // incomingRecords → ledgerRecords 확정 저장
+  // incomingRecords → ledgerRecords 자동 동기화 (중복 제거)
   try{
     const recs = window._incomingRecords||[];
+    if(!recs.length) return;
+
+    // 1) 기존 type='in' 레코드 제거
+    ledgerRecords = ledgerRecords.filter(r=>r.type!=='in');
+
+    // 2) incomingRecords 기반으로 type='in' 재생성 (날짜+원료명+소비기한 기준 중복 제거)
+    const seen = new Set();
     let added = false;
     recs.forEach(rec=>{
+      const date = rec.date||'';
       (rec.rows||[]).forEach(row=>{
-        if(!row.product||!row.qty) return;
-        const uniqueKey='in_'+(row.lot||'')+row.product+(rec.date||'');
-        const exists=ledgerRecords.find(r=>r._key===uniqueKey);
-        if(!exists){
-          const ing=getIngByName(row.product);
-          ledgerRecords.push({date:rec.date||getTodayISO2(),name:row.product,code:ing?ing.code:row.lot?.split('-')[0]||'',qty:parseFloat(row.qty)||0,exp:row.exp||'',lot:row.lot||'',type:'in',_key:uniqueKey});
-          added = true;
-        }
+        const qty = parseFloat(row.qty)||0;
+        if(!row.product || qty<=0) return;
+        const dedupKey = date+'|'+(row.product||'').trim()+'|'+(row.exp||'').trim();
+        if(seen.has(dedupKey)) return;
+        seen.add(dedupKey);
+        const ing = getIngByName(row.product);
+        ledgerRecords.push({
+          date: date,
+          name: row.product,
+          code: ing ? ing.code : '',
+          qty: qty,
+          exp: row.exp||'',
+          type: 'in'
+        });
+        added = true;
       });
     });
+
     if(added) await saveLedger();
-  }catch(e){}
+  }catch(e){ console.warn('initLedger 오류', e); }
 }
 
 function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
