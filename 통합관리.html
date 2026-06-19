@@ -3510,13 +3510,18 @@ function syncIncomingToLedger(){
   const oldInCount = ledgerRecords.filter(r=>r.type==='in').length;
   ledgerRecords = ledgerRecords.filter(r=>r.type!=='in');
 
-  // 2) incomingRecords 기반으로 type='in' 레코드 재생성
+  // 2) incomingRecords 기반으로 type='in' 레코드 재생성 (중복 제거)
   let newInCount = 0;
+  let dupCount = 0;
+  const seen = new Set();
   incomingRecords.forEach(rec=>{
     const date = rec.date||'';
     (rec.rows||[]).forEach(row=>{
       const qty = parseFloat(row.qty)||0;
       if(!row.product || qty<=0) return;
+      const dedupKey = date+'|'+row.product+'|'+qty+'|'+(row.exp||'');
+      if(seen.has(dedupKey)){ dupCount++; return; }
+      seen.add(dedupKey);
       const ing = getIngByName(row.product);
       ledgerRecords.push({
         date: date,
@@ -3534,7 +3539,7 @@ function syncIncomingToLedger(){
   saveLedger();
   syncIngStockFromLedger();
   renderLedger();
-  alert(`일괄 동기화 완료!\n\n기존 입고 레코드: ${oldInCount}건 제거\n새로 생성: ${newInCount}건`);
+  alert(`일괄 동기화 완료!\n\n기존 입고 레코드: ${oldInCount}건 제거\n새로 생성: ${newInCount}건\n중복 제거: ${dupCount}건`);
 }
 
 // ===== ③ 설비 세팅값 =====
