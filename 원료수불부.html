@@ -622,7 +622,9 @@ function saveEditIngredient(){
   if(qty>0){
     ledgerRecords = ledgerRecords.filter(r=>!(r.name===ing.name&&r.type==='init'));
     const today = getLedgerDateISO();
-    ledgerRecords.push({date:today, name:ing.name, code:ing.code, qty, exp, mfg, type:'init'});
+    const datepart = (exp||mfg||'').replace(/\./g,'');
+    const lot = ing.code + '-OI-' + datepart;
+    ledgerRecords.push({date:today, name:ing.name, code:ing.code, qty, exp, mfg, lot, type:'init'});
     saveLedger();
   }
   saveIngredientDB();
@@ -904,12 +906,11 @@ async function loadFromFirebase(){
   let lotFixed = false;
   ledgerRecords.forEach(r=>{
     if(r.type==='init' && !r.lot){
-      const code = r.code || '';
-      const datepart = (r.exp||r.mfg||'').replace(/\./g,'');
-      if(code && datepart){
-        r.lot = code + '-OI-' + datepart;
-        lotFixed = true;
-      }
+      let code = r.code || '';
+      if(!code){ const ing=getIngByName(r.name); if(ing) { code=ing.code; r.code=code; } }
+      const datepart = (r.exp||r.mfg||'').replace(/\./g,'').replace(/-/g,'');
+      r.lot = code ? code + '-OI-' + datepart : 'OI-' + (r.name||'').slice(0,4) + '-' + datepart;
+      lotFixed = true;
     }
   });
   if(lotFixed) await saveLedger();

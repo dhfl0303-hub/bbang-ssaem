@@ -3893,6 +3893,18 @@ async function cleanOrphanedBatchOut(){
   await loadFromFirebase();
   initData();
   await cleanOrphanedBatchOut();
+  // LOT 없는 init 레코드 자동 보정
+  let _lotFixed = false;
+  ledgerRecords.forEach(r=>{
+    if(r.type==='init' && !r.lot){
+      let code = r.code || '';
+      if(!code){ const ing=getIngByName(r.name); if(ing) { code=ing.code; r.code=code; } }
+      const datepart = (r.exp||r.mfg||'').replace(/\./g,'').replace(/-/g,'');
+      r.lot = code ? code + '-OI-' + datepart : 'OI-' + (r.name||'').slice(0,4) + '-' + datepart;
+      _lotFixed = true;
+    }
+  });
+  if(_lotFixed) saveLedger();
   syncIncomingToLedger();
   syncIngStockFromLedger();
   document.getElementById('topbarDate').textContent=getToday();
