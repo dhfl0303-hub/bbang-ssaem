@@ -3066,19 +3066,21 @@ function syncIngStockFromLedger(){
     // 1. init, in → 재고 추가
     ledgerRecords.forEach(r=>{
       if(r.type!=='init' && r.type!=='in') return;
-      const lot = r.lot || (r.code||'')+'_'+(r.exp||r.mfg||'');
-      if(!stockMap[lot]){
-        stockMap[lot] = {
-          name:(r.name||'').replace(/\n/g,' '),
+      const name = (r.name||'').replace(/\n/g,' ');
+      const key = name+'_'+(r.exp||r.mfg||'');
+      if(!stockMap[key]){
+        stockMap[key] = {
+          name:name,
           code:r.code||'',
           qty:0,
           expiry:r.exp||'',
           mfg:r.mfg||'',
           lot:r.lot||'',
-          _syncKey:lot
+          _syncKey:key
         };
       }
-      stockMap[lot].qty += r.qty||0;
+      stockMap[key].qty += r.qty||0;
+      if(!stockMap[key].code && r.code) stockMap[key].code = r.code;
     });
     // 2. out, dispose, return → 재고 차감 (같은 원료명 기준)
     ledgerRecords.forEach(r=>{
