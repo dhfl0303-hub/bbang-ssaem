@@ -3471,7 +3471,7 @@ function syncIncomingToLedger(){
     (rec.rows||[]).forEach(row=>{
       const qty = parseFloat(row.qty)||0;
       if(!row.product || qty<=0) return;
-      const dedupKey = date+'|'+row.product+'|'+qty+'|'+(row.exp||'');
+      const dedupKey = date+'|'+(row.product||'').trim()+'|'+(row.exp||'').trim();
       if(seen.has(dedupKey)) return;
       seen.add(dedupKey);
       const ing = getIngByName(row.product);
