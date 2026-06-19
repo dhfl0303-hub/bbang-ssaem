@@ -564,7 +564,7 @@ tr:hover td{background:var(--bg);}
       </div>
       <!-- 폐기대장 (아코디언) -->
       <div class="card" style="margin-top:16px">
-        <div class="card-hd" onclick="toggleAccordion('disposeAccBody',this)" style="cursor:pointer;user-select:none;">
+        <div class="card-hd" onclick="toggleCardAccordion('disposeAccBody')" style="cursor:pointer;user-select:none;">
           <div class="card-hd-title">🗑️ 폐기대장 <span class="badge badge-gray" id="disposeCount">0건</span></div>
           <span style="font-size:18px;transition:transform .2s;" class="acc-arrow">▼</span>
         </div>
@@ -579,7 +579,7 @@ tr:hover td{background:var(--bg);}
       </div>
       <!-- 반품대장 (아코디언) -->
       <div class="card" style="margin-top:16px">
-        <div class="card-hd" onclick="toggleAccordion('returnAccBody',this)" style="cursor:pointer;user-select:none;">
+        <div class="card-hd" onclick="toggleCardAccordion('returnAccBody')" style="cursor:pointer;user-select:none;">
           <div class="card-hd-title">↩️ 반품대장 <span class="badge badge-gray" id="returnCount">0건</span></div>
           <span style="font-size:18px;transition:transform .2s;" class="acc-arrow">▼</span>
         </div>
@@ -2743,9 +2743,11 @@ function fillYieldDateDropdown(){
 }
 
 // ===== showPanel 확장 (날짜 기본값 설정) =====
-function toggleAccordion(bodyId, hdEl){
+function toggleCardAccordion(bodyId){
   const body=document.getElementById(bodyId);
-  const arrow=hdEl.querySelector('.acc-arrow');
+  if(!body) return;
+  const card=body.closest('.card');
+  const arrow=card?card.querySelector('.acc-arrow'):null;
   if(body.style.display==='none'){
     body.style.display='';
     if(arrow) arrow.style.transform='rotate(180deg)';
