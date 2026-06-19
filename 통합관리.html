@@ -3427,7 +3427,14 @@ function openEditIncoming(i){
 function saveEditIncoming(){
   const origIdx = parseInt(document.getElementById('editIncomingIdx').value);
   if(isNaN(origIdx)||!incomingRecords[origIdx]) return;
-  incomingRecords[origIdx].date = document.getElementById('editIncomingDate').value;
+
+  // 1) 수정 전 기존 값 캡처
+  const oldDate = incomingRecords[origIdx].date;
+  const oldRows = (incomingRecords[origIdx].rows||[]).map(r=>({product:r.product, qty:parseFloat(r.qty)||0, exp:r.exp||''}));
+
+  // 2) 새 값 반영
+  const newDate = document.getElementById('editIncomingDate').value;
+  incomingRecords[origIdx].date = newDate;
   const rows = incomingRecords[origIdx].rows||[];
   rows.forEach((row,ri)=>{
     row.supplier = document.getElementById('eir_supplier_'+ri)?.value||row.supplier;
@@ -3437,9 +3444,50 @@ function saveEditIncoming(){
     row.mfg      = document.getElementById('eir_mfg_'+ri)?.value||row.mfg;
     row.exp      = document.getElementById('eir_exp_'+ri)?.value||row.exp;
   });
+
+  // 3) 원료수불부(ledgerRecords) 연동
+  rows.forEach((row,ri)=>{
+    const oldRow = oldRows[ri];
+    if(!oldRow) return;
+    const newQty = parseFloat(row.qty)||0;
+    const oldQty = oldRow.qty;
+    const nameChanged = oldRow.product !== row.product;
+    const qtyChanged = oldQty !== newQty;
+    const dateChanged = oldDate !== newDate;
+    const expChanged = oldRow.exp !== (row.exp||'');
+
+    if(!nameChanged && !qtyChanged && !dateChanged && !expChanged) return;
+
+    // 매칭: 기존 날짜 + 기존 원료명 + type='in' + 기존 소비기한
+    const ledgerIdx = ledgerRecords.findIndex(lr=>
+      lr.date === oldDate &&
+      lr.name === oldRow.product &&
+      lr.type === 'in' &&
+      (lr.exp||'') === oldRow.exp
+    );
+
+    if(ledgerIdx >= 0){
+      // 매칭된 수불부 레코드 업데이트
+      if(dateChanged) ledgerRecords[ledgerIdx].date = newDate;
+      if(nameChanged){
+        ledgerRecords[ledgerIdx].name = row.product;
+        const ing = getIngByName(row.product);
+        ledgerRecords[ledgerIdx].code = ing ? ing.code : '';
+      }
+      if(qtyChanged) ledgerRecords[ledgerIdx].qty = newQty;
+      if(expChanged) ledgerRecords[ledgerIdx].exp = row.exp||'';
+    } else if(newQty > 0){
+      // 매칭 못 찾으면 새 입고 레코드 생성
+      const ing = getIngByName(row.product);
+      ledgerRecords.push({date:newDate, name:row.product, code:ing?ing.code:'', qty:newQty, exp:row.exp||'', type:'in'});
+    }
+  });
+  saveLedger();
+
+  // 4) incomingRecords 저장
   if(window._db) window._db.collection('appData').doc('incomingRecords').set({data:JSON.stringify(incomingRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
   syncIngStockFromLedger();
-  closeModal('editIncomingModal'); renderIncoming(); alert('수정 완료');
+  closeModal('editIncomingModal'); renderIncoming(); renderLedger(); alert('수정 완료 (수불부 반영됨)');
 }
 function deleteIncoming(i){
   if(!confirm('이 입고 기록을 삭제하시겠습니까?')) return;
