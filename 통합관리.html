@@ -282,7 +282,6 @@ tr:hover td{background:var(--bg);}
     <div class="panel" id="panel-incoming">
       <div class="filter-row">
         <input class="search-input" placeholder="원료명 / 업체명 검색..." id="incomingSearch" oninput="filterIncoming()">
-        <button class="btn btn-primary btn-sm" onclick="syncIncomingToLedger()" style="white-space:nowrap;">🔄 수불부 일괄 동기화</button>
       </div>
       <div id="incomingList"></div>
       <div class="empty-state" id="incomingEmpty" style="display:none;text-align:center;padding:40px;color:var(--text3);">
@@ -3431,13 +3430,8 @@ function saveEditIncoming(){
   const origIdx = parseInt(document.getElementById('editIncomingIdx').value);
   if(isNaN(origIdx)||!incomingRecords[origIdx]) return;
 
-  // 1) 수정 전 기존 값 캡처
-  const oldDate = incomingRecords[origIdx].date;
-  const oldRows = (incomingRecords[origIdx].rows||[]).map(r=>({product:r.product, qty:parseFloat(r.qty)||0, exp:r.exp||''}));
-
-  // 2) 새 값 반영
-  const newDate = document.getElementById('editIncomingDate').value;
-  incomingRecords[origIdx].date = newDate;
+  // 새 값 반영
+  incomingRecords[origIdx].date = document.getElementById('editIncomingDate').value;
   const rows = incomingRecords[origIdx].rows||[];
   rows.forEach((row,ri)=>{
     row.supplier = document.getElementById('eir_supplier_'+ri)?.value||row.supplier;
@@ -3448,47 +3442,9 @@ function saveEditIncoming(){
     row.exp      = document.getElementById('eir_exp_'+ri)?.value||row.exp;
   });
 
-  // 3) 원료수불부(ledgerRecords) 연동
-  rows.forEach((row,ri)=>{
-    const oldRow = oldRows[ri];
-    if(!oldRow) return;
-    const newQty = parseFloat(row.qty)||0;
-    const oldQty = oldRow.qty;
-    const nameChanged = oldRow.product !== row.product;
-    const qtyChanged = oldQty !== newQty;
-    const dateChanged = oldDate !== newDate;
-    const expChanged = oldRow.exp !== (row.exp||'');
-
-    if(!nameChanged && !qtyChanged && !dateChanged && !expChanged) return;
-
-    // 매칭: 기존 날짜 + 기존 원료명 + type='in' + 기존 소비기한
-    const ledgerIdx = ledgerRecords.findIndex(lr=>
-      lr.date === oldDate &&
-      lr.name === oldRow.product &&
-      lr.type === 'in' &&
-      (lr.exp||'') === oldRow.exp
-    );
-
-    if(ledgerIdx >= 0){
-      // 매칭된 수불부 레코드 업데이트
-      if(dateChanged) ledgerRecords[ledgerIdx].date = newDate;
-      if(nameChanged){
-        ledgerRecords[ledgerIdx].name = row.product;
-        const ing = getIngByName(row.product);
-        ledgerRecords[ledgerIdx].code = ing ? ing.code : '';
-      }
-      if(qtyChanged) ledgerRecords[ledgerIdx].qty = newQty;
-      if(expChanged) ledgerRecords[ledgerIdx].exp = row.exp||'';
-    } else if(newQty > 0){
-      // 매칭 못 찾으면 새 입고 레코드 생성
-      const ing = getIngByName(row.product);
-      ledgerRecords.push({date:newDate, name:row.product, code:ing?ing.code:'', qty:newQty, exp:row.exp||'', type:'in'});
-    }
-  });
-  saveLedger();
-
-  // 4) incomingRecords 저장
+  // incomingRecords 저장 → 수불부 자동 동기화
   if(window._db) window._db.collection('appData').doc('incomingRecords').set({data:JSON.stringify(incomingRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  syncIncomingToLedger();
   syncIngStockFromLedger();
   closeModal('editIncomingModal'); renderIncoming(); renderLedger(); alert('수정 완료 (수불부 반영됨)');
 }
@@ -3499,20 +3455,16 @@ function deleteIncoming(i){
   const origIdx = incomingRecords.indexOf(r);
   incomingRecords.splice(origIdx,1);
   if(window._db) window._db.collection('appData').doc('incomingRecords').set({data:JSON.stringify(incomingRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  syncIncomingToLedger();
   syncIngStockFromLedger();
   renderIncoming();
 }
 
 function syncIncomingToLedger(){
-  if(!confirm('입고현황 데이터를 기준으로 수불부의 입고(in) 레코드를 재구축합니다.\n기존 출고/초기재고 등은 유지됩니다.\n\n진행하시겠습니까?')) return;
-
   // 1) 기존 type='in' 레코드 제거
-  const oldInCount = ledgerRecords.filter(r=>r.type==='in').length;
   ledgerRecords = ledgerRecords.filter(r=>r.type!=='in');
 
   // 2) incomingRecords 기반으로 type='in' 레코드 재생성 (중복 제거)
-  let newInCount = 0;
-  let dupCount = 0;
   const seen = new Set();
   incomingRecords.forEach(rec=>{
     const date = rec.date||'';
@@ -3520,7 +3472,7 @@ function syncIncomingToLedger(){
       const qty = parseFloat(row.qty)||0;
       if(!row.product || qty<=0) return;
       const dedupKey = date+'|'+row.product+'|'+qty+'|'+(row.exp||'');
-      if(seen.has(dedupKey)){ dupCount++; return; }
+      if(seen.has(dedupKey)) return;
       seen.add(dedupKey);
       const ing = getIngByName(row.product);
       ledgerRecords.push({
@@ -3531,15 +3483,11 @@ function syncIncomingToLedger(){
         exp: row.exp||'',
         type: 'in'
       });
-      newInCount++;
     });
   });
 
   // 3) 저장
   saveLedger();
-  syncIngStockFromLedger();
-  renderLedger();
-  alert(`일괄 동기화 완료!\n\n기존 입고 레코드: ${oldInCount}건 제거\n새로 생성: ${newInCount}건\n중복 제거: ${dupCount}건`);
 }
 
 // ===== ③ 설비 세팅값 =====
@@ -3890,6 +3838,7 @@ async function cleanOrphanedBatchOut(){
   await loadFromFirebase();
   initData();
   await cleanOrphanedBatchOut();
+  syncIncomingToLedger();
   syncIngStockFromLedger();
   document.getElementById('topbarDate').textContent=getToday();
   const _ld=document.getElementById('ledgerDate'); if(_ld) _ld.value=getTodayISO2();
