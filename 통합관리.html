@@ -2895,7 +2895,9 @@ function openAddRecipe(){
   closeAllModals();
   editingCode=null;
   document.getElementById('recipeModalTitle').textContent='배합비 신규 등록';
-  document.getElementById('rCode').value='';
+  const recipeNums = Object.keys(DB).map(c=>parseInt(c.replace('P',''))||0).filter(n=>n>=1&&n<500);
+  const nextRecipe = recipeNums.length ? Math.max(...recipeNums)+1 : 1;
+  document.getElementById('rCode').value = 'P'+String(nextRecipe).padStart(3,'0');
   document.getElementById('rName').value='';
   document.getElementById('rW1').value='';
   [1,2,3,4].forEach(n=>{ const el=document.getElementById('ingRows'+n); if(el) el.innerHTML=''; });
