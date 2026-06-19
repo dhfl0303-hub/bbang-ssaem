@@ -282,6 +282,7 @@ tr:hover td{background:var(--bg);}
     <div class="panel" id="panel-incoming">
       <div class="filter-row">
         <input class="search-input" placeholder="원료명 / 업체명 검색..." id="incomingSearch" oninput="filterIncoming()">
+        <button class="btn btn-primary btn-sm" onclick="syncIncomingToLedger()" style="white-space:nowrap;">🔄 수불부 일괄 동기화</button>
       </div>
       <div id="incomingList"></div>
       <div class="empty-state" id="incomingEmpty" style="display:none;text-align:center;padding:40px;color:var(--text3);">
@@ -3498,6 +3499,40 @@ function deleteIncoming(i){
   if(window._db) window._db.collection('appData').doc('incomingRecords').set({data:JSON.stringify(incomingRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
   syncIngStockFromLedger();
   renderIncoming();
+}
+
+function syncIncomingToLedger(){
+  if(!confirm('입고현황 데이터를 기준으로 수불부의 입고(in) 레코드를 재구축합니다.\n기존 출고/초기재고 등은 유지됩니다.\n\n진행하시겠습니까?')) return;
+
+  // 1) 기존 type='in' 레코드 제거
+  const oldInCount = ledgerRecords.filter(r=>r.type==='in').length;
+  ledgerRecords = ledgerRecords.filter(r=>r.type!=='in');
+
+  // 2) incomingRecords 기반으로 type='in' 레코드 재생성
+  let newInCount = 0;
+  incomingRecords.forEach(rec=>{
+    const date = rec.date||'';
+    (rec.rows||[]).forEach(row=>{
+      const qty = parseFloat(row.qty)||0;
+      if(!row.product || qty<=0) return;
+      const ing = getIngByName(row.product);
+      ledgerRecords.push({
+        date: date,
+        name: row.product,
+        code: ing ? ing.code : '',
+        qty: qty,
+        exp: row.exp||'',
+        type: 'in'
+      });
+      newInCount++;
+    });
+  });
+
+  // 3) 저장
+  saveLedger();
+  syncIngStockFromLedger();
+  renderLedger();
+  alert(`일괄 동기화 완료!\n\n기존 입고 레코드: ${oldInCount}건 제거\n새로 생성: ${newInCount}건`);
 }
 
 // ===== ③ 설비 세팅값 =====
