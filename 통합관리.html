@@ -3510,7 +3510,11 @@ function deleteIncoming(i){
 }
 
 function syncIncomingToLedger(){
+  // 안전장치: incomingRecords가 비어있으면 기존 'in' 레코드 유지
+  if(!incomingRecords || !incomingRecords.length) return;
+
   // 1) 기존 type='in' 레코드 제거
+  const oldInCount = ledgerRecords.filter(r=>r.type==='in').length;
   ledgerRecords = ledgerRecords.filter(r=>r.type!=='in');
 
   // 2) incomingRecords 기반으로 type='in' 레코드 재생성 (중복 제거)
@@ -3536,8 +3540,9 @@ function syncIncomingToLedger(){
     });
   });
 
-  // 3) 저장
-  saveLedger();
+  // 3) 변경이 있을 때만 저장
+  const newInCount = ledgerRecords.filter(r=>r.type==='in').length;
+  if(oldInCount !== newInCount) saveLedger();
 }
 
 // ===== ③ 설비 세팅값 =====
