@@ -1338,9 +1338,27 @@ function initData(){
   initLedger();
   // DB, lotMapping, ingStock, deviceSettings는 loadFromFirebase에서 전역변수에 이미 반영됨
   // Firebase에서 못 받은 경우 기본값 사용
-  if(!DB || !Object.keys(DB).length) DB = JSON.parse(JSON.stringify(RECIPE_DB_INIT));
+  if(!DB || !Object.keys(DB).length){
+    DB = JSON.parse(JSON.stringify(RECIPE_DB_INIT));
+  } else {
+    // Firebase 데이터 유지 + INIT에만 있는 신규 항목 추가 (기존 데이터 절대 덮어쓰지 않음)
+    const init = RECIPE_DB_INIT;
+    Object.keys(init).forEach(k=>{
+      if(!DB[k]) DB[k] = JSON.parse(JSON.stringify(init[k]));
+    });
+  }
   if(!inputDB) inputDB = {};
-  if(!lotMapping || !lotMapping.length) lotMapping = JSON.parse(JSON.stringify(LOT_MAPPING_INIT));
+  if(!lotMapping || !lotMapping.length){
+    lotMapping = JSON.parse(JSON.stringify(LOT_MAPPING_INIT));
+  } else {
+    // Firebase 데이터 유지 + INIT에만 있는 신규 항목 추가
+    const initMap = LOT_MAPPING_INIT;
+    initMap.forEach(item=>{
+      if(!lotMapping.find(m=>m.pLot===item.pLot)){
+        lotMapping.push(JSON.parse(JSON.stringify(item)));
+      }
+    });
+  }
   if(!ingStock) ingStock = [];
   if(!deviceSettings) deviceSettings = [];
   if(!subsidiaryStock) subsidiaryStock = [];
