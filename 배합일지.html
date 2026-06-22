@@ -981,24 +981,29 @@ function renderIngredients(ings){
 function calcFifoDistribution(lots, totalG){
   const totalKg = totalG / 1000;
   const rows = [];
-  let remaining = totalKg;
   // 재고 있는 LOT만 소비기한 순으로 (이미 정렬됨)
   const available = lots.filter(l=>l.remaining>0);
   if(!available.length) return [];
 
+  // 총 가용 재고 계산
+  const totalAvailable = available.reduce((s,l)=>s+l.remaining, 0);
+  let remaining = Math.min(totalKg, totalAvailable); // 재고 범위 내에서만 분배
+
   for(const lot of available){
-    if(remaining<=0) break;
+    if(remaining<=0.0005) break;
     const use = Math.min(lot.remaining, remaining);
     rows.push({ lot:lot.lot, exp:lot.exp, dateType:lot.dateType||'exp', amount:Math.round(use*1000) });
     remaining -= use;
     if(rows.length>=5) break; // 최대 5개 LOT
   }
 
-  // 마지막 LOT에 남은 양 몰아주기 (소수점 보정)
+  // 소수점 보정 (1g 이내 오차만)
   if(rows.length>0){
+    const cappedTotal = Math.min(totalG, Math.round(totalAvailable*1000));
     const usedSoFar = rows.reduce((s,r)=>s+r.amount, 0);
-    if(usedSoFar < totalG){
-      rows[rows.length-1].amount += (totalG - usedSoFar);
+    const diff = cappedTotal - usedSoFar;
+    if(diff > 0 && diff <= 1000){
+      rows[rows.length-1].amount += diff;
     }
   }
   return rows;
@@ -1490,12 +1495,16 @@ function onInputIngQtyChange(ii, val){
   const totalKg = parseFloat(val)||0;
   if(totalKg>0 && S.inputIngredients[ii].name){
     const lots = getIngLots(S.inputIngredients[ii].name);
+    const totalAvailable = lots.filter(l=>l.remaining>0).reduce((s,l)=>s+l.remaining, 0);
+    S.inputIngredients[ii]._totalAvailable = totalAvailable;
+    S.inputIngredients[ii]._overStock = totalKg > totalAvailable;
     const fifoRows = calcFifoDistribution(lots, totalKg*1000);
     S.inputIngredients[ii].distributions = fifoRows.map(fr=>({
       lot:fr.lot, qty:fr.amount/1000, exp:fr.exp||''
     }));
   } else {
     S.inputIngredients[ii].distributions = [];
+    S.inputIngredients[ii]._overStock = false;
   }
   renderInputIngPage();
 }
@@ -1546,7 +1555,8 @@ function renderInputIngPage(){
       <div style="padding:10px 14px;">
         <div style="font-size:12px;color:var(--text3);font-weight:500;margin-bottom:4px;">총 사용량 (kg) 입력 → FIFO 자동 분배</div>
         <input class="exp-input" type="number" step="0.001" placeholder="총 사용량 (kg)" value="${ing.totalQty}"
-          oninput="onInputIngQtyChange(${ii},this.value)" style="font-size:15px;font-weight:700;">
+          onchange="onInputIngQtyChange(${ii},this.value)" style="font-size:15px;font-weight:700;">
+        ${ing._overStock?`<div style="margin-top:6px;padding:8px 12px;background:#fff0f0;border:1px solid #f5a0a0;border-radius:6px;font-size:12px;color:#c0392b;font-weight:600;">⚠️ 재고 부족! 가용재고: ${(ing._totalAvailable||0).toFixed(3)}kg — 재고 범위 내에서만 분배됩니다.</div>`:''}
         ${distHtml}
       </div>
     </div>`;
@@ -1574,23 +1584,67 @@ function skipInputIng(){
 
 // ===== 공정중 잔량 폐기 =====
 function goDispose(){
+  // 배합에서 사용된 원료+LOT 수집
+  const usedMap = {}; // {원료명: [{lot, exp}]}
+  // 배합비 원료
+  (S.batchRecords||[]).forEach(br=>{
+    (br.ingredients||[]).forEach(ing=>{
+      if(!usedMap[ing.name]) usedMap[ing.name]=[];
+      (ing.exps||[]).forEach(e=>{
+        if(e.lot && !usedMap[ing.name].find(x=>x.lot===e.lot)){
+          usedMap[ing.name].push({lot:e.lot, exp:e.exp||''});
+        }
+      });
+    });
+  });
+  // 기타사용원재료
+  (S.inputIngredients||[]).forEach(ing=>{
+    if(!ing.name) return;
+    if(!usedMap[ing.name]) usedMap[ing.name]=[];
+    (ing.distributions||[]).forEach(d=>{
+      if(d.lot && !usedMap[ing.name].find(x=>x.lot===d.lot)){
+        usedMap[ing.name].push({lot:d.lot, exp:d.exp||''});
+      }
+    });
+  });
+  S._usedIngMap = usedMap;
   S.disposeIngredients = [{name:'', lot:'', qty:'', exp:''}];
   renderDisposePage();
   showPage('dispose');
 }
 
+function getDisposeIngOptions(selectedName){
+  const usedMap = S._usedIngMap||{};
+  const names = Object.keys(usedMap).filter(n=>usedMap[n].length>0);
+  if(!names.length) return '<option value="">사용된 원료 없음</option>';
+  return '<option value="">원료 선택...</option>' +
+    names.map(n=>{
+      const code = INGREDIENT_DB_STATIC[n]||'';
+      return `<option value="${n}" ${n===selectedName?'selected':''}>${code?code+' - ':''}${n}</option>`;
+    }).join('');
+}
+
 function getDisposeLotOptions(ingName, selectedLot){
   if(!ingName) return '<option value="">원료를 먼저 선택하세요</option>';
-  const lots = getIngLots(ingName);
-  if(!lots.length) return '<option value="">등록된 LOT 없음</option>';
-  return '<option value="">LOT 선택...</option>' +
-    lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===selectedLot?'selected':''}>${l.label}</option>`).join('');
+  const usedMap = S._usedIngMap||{};
+  const lots = usedMap[ingName]||[];
+  if(!lots.length) return '<option value="">사용된 LOT 없음</option>';
+  return lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===selectedLot?'selected':''}>${l.lot} (소비:${l.exp||'-'})</option>`).join('');
 }
 
 function onDisposeNameChange(ii, val){
   S.disposeIngredients[ii].name = val;
-  S.disposeIngredients[ii].lot = '';
-  S.disposeIngredients[ii].exp = '';
+  // 마지막 LOT 자동 선택 (FIFO 마지막 = 잔량 발생 LOT)
+  const usedMap = S._usedIngMap||{};
+  const lots = usedMap[val]||[];
+  if(lots.length){
+    const lastLot = lots[lots.length-1];
+    S.disposeIngredients[ii].lot = lastLot.lot;
+    S.disposeIngredients[ii].exp = lastLot.exp||'';
+  } else {
+    S.disposeIngredients[ii].lot = '';
+    S.disposeIngredients[ii].exp = '';
+  }
   renderDisposePage();
 }
 
@@ -1609,7 +1663,7 @@ function renderDisposePage(){
       <div style="padding:8px 14px;background:#fff0f0;border-bottom:1px solid #f5a0a0;display:flex;align-items:center;gap:8px;">
         <select class="exp-input" style="flex:1;font-size:15px;"
           onchange="onDisposeNameChange(${ii},this.value)">
-          ${getIngDropdownOptions(ing.name)}
+          ${getDisposeIngOptions(ing.name)}
         </select>
         ${S.disposeIngredients.length>1?`<div class="del-btn" onclick="delDisposeRow(${ii})">×</div>`:'<div style="width:34px;"></div>'}
       </div>
