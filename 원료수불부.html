@@ -562,6 +562,33 @@ function buildAccordionContent(ing,selDate){
 
   const totalRemain=lots.reduce((s,l)=>s+l.remain,0);
 
+  // 출고 기록 목록 (삭제 가능)
+  const outRecs=recs.filter(r=>(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date<=selDate);
+  let outHtml='';
+  if(outRecs.length){
+    outHtml=`<div style="margin-top:10px;">
+      <div onclick="toggleOutRecs('out-${ing.code}')" style="cursor:pointer;font-size:11px;font-weight:700;color:var(--warning);padding:4px 0;">
+        ▶ 출고내역 보기/정리 (${outRecs.length}건)
+      </div>
+      <div id="out-${ing.code}" style="display:none;">
+        <table class="acc-table" style="font-size:11px;">
+          <thead><tr><th style="text-align:left">날짜</th><th style="text-align:left">LOT</th><th>배합LOT</th><th>유형</th><th style="text-align:right">수량</th><th></th></tr></thead>
+          <tbody>${outRecs.map((r,i)=>{
+            const idx=ledgerRecords.indexOf(r);
+            return `<tr>
+              <td style="font-size:10px;">${r.date||'-'}</td>
+              <td style="font-size:10px;font-family:monospace;">${r.lot||'-'}</td>
+              <td style="font-size:10px;">${r.batchLot||'-'}</td>
+              <td style="font-size:10px;color:${r.type==='dispose'?'var(--danger)':'var(--text2)'}">${r.type==='out'?'출고':r.type==='dispose'?'폐기':'반품'}</td>
+              <td style="text-align:right;font-size:10px;">${(r.qty||0).toFixed(3)}</td>
+              <td><button onclick="event.stopPropagation();deleteOutRecord(${idx})" style="background:#fff0f0;color:#d63031;border:1px solid #f5a0a0;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;">삭제</button></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
   return `<div class="acc-inner">
     <table class="acc-table">
       <thead><tr><th style="text-align:left">LOT번호</th><th>유형</th><th>소비기한</th><th style="text-align:right">잔여량(${ing.unit||'kg'})</th><th>상태</th></tr></thead>
@@ -573,6 +600,7 @@ function buildAccordionContent(ing,selDate){
         </tr>
       </tbody>
     </table>
+    ${outHtml}
   </div>`;
 }
 
@@ -581,6 +609,22 @@ async function saveLedger(){
   try{
     await window._db.collection('appData').doc('ledgerRecords').set({ data: JSON.stringify(ledgerRecords), updatedAt: new Date().toISOString() });
   }catch(e){ console.warn('Firebase 저장 실패', e); alert('저장 실패: 네트워크를 확인해주세요'); }
+}
+
+function toggleOutRecs(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+
+async function deleteOutRecord(idx){
+  if(idx<0||idx>=ledgerRecords.length) return;
+  const r=ledgerRecords[idx];
+  if(!confirm(`출고 기록을 삭제하시겠습니까?\n\n원료: ${r.name}\nLOT: ${r.lot||'-'}\n수량: ${(r.qty||0).toFixed(3)}kg\n날짜: ${r.date||'-'}`)) return;
+  ledgerRecords.splice(idx,1);
+  await saveLedger();
+  renderLedger();
+  alert('삭제 완료');
 }
 
 function fmtInitDate(input){
