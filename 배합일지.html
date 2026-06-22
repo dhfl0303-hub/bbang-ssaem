@@ -834,18 +834,19 @@ function getIngLots(ingName){
       window._ledgerRecords.forEach(r=>ledger.push(r));
     }
     const ingN=ingName.trim().replace(/\n/g,' ');
+    // 원료코드로 매칭 (정확한 매칭)
+    const ingCode = INGREDIENT_DB_STATIC[ingN]||'';
 
-    // 원료명 매칭 함수
-    function nameMatch(recName){
-      const rn=(recName||'').trim().replace(/\n/g,' ');
-      return rn===ingN || rn.includes(ingN) || ingN.includes(rn);
+    function recMatch(r){
+      if(!ingCode || !r.code) return false;
+      return r.code === ingCode;
     }
 
     // 1) LOT별 입고량 합산 (init + in)
     const inQty={};
     ledger.forEach(r=>{
       if(r.type!=='init' && r.type!=='in') return;
-      if(!nameMatch(r.name)) return;
+      if(!recMatch(r)) return;
       if(!r.lot) return;
       inQty[r.lot]=(inQty[r.lot]||0)+(parseFloat(r.qty)||0);
     });
@@ -854,7 +855,7 @@ function getIngLots(ingName){
     const outQty={};
     ledger.forEach(r=>{
       if(r.type!=='out' && r.type!=='dispose' && r.type!=='return') return;
-      if(!nameMatch(r.name)) return;
+      if(!recMatch(r)) return;
       if(!r.lot) return;
       outQty[r.lot]=(outQty[r.lot]||0)+(parseFloat(r.qty)||0);
     });
@@ -862,7 +863,7 @@ function getIngLots(ingName){
     // 2-1) 현재 세션(S.batchRecords)에서 이미 사용한 양 추가 차감
     (S.batchRecords||[]).forEach(br=>{
       (br.ingredients||[]).forEach(ing2=>{
-        if(!nameMatch(ing2.name)) return;
+        if((ing2.name||'').trim().replace(/\n/g,' ') !== ingN) return;
         (ing2.exps||[]).forEach(e=>{
           if(!e.lot || !e.amount) return;
           outQty[e.lot]=(outQty[e.lot]||0)+((e.amount||0)/1000);
@@ -873,7 +874,7 @@ function getIngLots(ingName){
     // 3) LOT 목록 생성 + 잔여재고 표시
     ledger.forEach(r=>{
       if(r.type!=='init' && r.type!=='in') return;
-      if(!nameMatch(r.name)) return;
+      if(!recMatch(r)) return;
       if(!r.lot || seen.has(r.lot)) return;
       seen.add(r.lot);
 
