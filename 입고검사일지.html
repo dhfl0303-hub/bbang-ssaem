@@ -135,6 +135,9 @@ select.td-input{cursor:pointer;}
 /* 빈 상태 */
 .empty-state{text-align:center;padding:40px 20px;color:var(--text3);}
 .empty-state-icon{font-size:40px;margin-bottom:10px;}
+.calc-btn{padding:14px;font-size:18px;font-weight:700;border:1.5px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-family:"Noto Sans KR",sans-serif;transition:all 0.1s;}
+.calc-btn:active{background:var(--primary-light);transform:scale(0.95);}
+.calc-op{background:#f0f4ff;color:var(--primary);}
 
     input[type=number]::-webkit-inner-spin-button,
     input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
@@ -160,6 +163,47 @@ select.td-input{cursor:pointer;}
 </script>
 </head>
 <body>
+
+<!-- 자동완성 datalist -->
+<datalist id="dl-suppliers"></datalist>
+<datalist id="dl-products"></datalist>
+
+<!-- 계산기 모달 -->
+<div class="modal-overlay" id="calcModal" onclick="closeModalOutside(event,'calcModal')">
+  <div class="modal" style="width:340px;">
+    <div class="modal-hd">
+      <div class="modal-title">🧮 입고량 계산기</div>
+      <button class="modal-close" onclick="closeModal('calcModal')">×</button>
+    </div>
+    <div class="modal-bd" style="padding:16px;">
+      <input id="calcExpr" class="form-input-modal" placeholder="예: 10.8 * 3" style="font-size:18px;font-weight:700;text-align:center;margin-bottom:10px;" inputmode="decimal"
+        onkeyup="if(event.key==='Enter')calcResult()">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;">
+        <button class="calc-btn" onclick="calcAppend('7')">7</button>
+        <button class="calc-btn" onclick="calcAppend('8')">8</button>
+        <button class="calc-btn" onclick="calcAppend('9')">9</button>
+        <button class="calc-btn calc-op" onclick="calcAppend('/')">÷</button>
+        <button class="calc-btn" onclick="calcAppend('4')">4</button>
+        <button class="calc-btn" onclick="calcAppend('5')">5</button>
+        <button class="calc-btn" onclick="calcAppend('6')">6</button>
+        <button class="calc-btn calc-op" onclick="calcAppend('*')">×</button>
+        <button class="calc-btn" onclick="calcAppend('1')">1</button>
+        <button class="calc-btn" onclick="calcAppend('2')">2</button>
+        <button class="calc-btn" onclick="calcAppend('3')">3</button>
+        <button class="calc-btn calc-op" onclick="calcAppend('-')">−</button>
+        <button class="calc-btn" onclick="calcAppend('0')">0</button>
+        <button class="calc-btn" onclick="calcAppend('.')">.</button>
+        <button class="calc-btn" onclick="calcClear()" style="color:var(--danger);">C</button>
+        <button class="calc-btn calc-op" onclick="calcAppend('+')">+</button>
+      </div>
+      <div id="calcResultDisplay" style="text-align:right;font-size:24px;font-weight:700;color:var(--primary);padding:8px 12px;background:var(--bg);border-radius:8px;margin-bottom:12px;min-height:40px;">-</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" onclick="closeModal('calcModal')" style="flex:1;">취소</button>
+        <button class="btn btn-primary" onclick="calcApply()" style="flex:1;">적용</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- 탭 바 -->
 <div class="tab-bar" style="justify-content:space-between;padding-right:12px;">
@@ -478,12 +522,60 @@ function onInDateInput(){
   }
 }
 
+// ===== Datalist 빌드 =====
+function buildDatalists(){
+  const dlSup = document.getElementById('dl-suppliers');
+  dlSup.innerHTML = suppliers.map(s=>`<option value="${s}">`).join('');
+  const dlProd = document.getElementById('dl-products');
+  dlProd.innerHTML = INGREDIENT_DB.map(i=>`<option value="${i.name}">${i.code}</option>`).join('');
+}
+
+// ===== 계산기 =====
+let _calcTargetId = null;
+function openCalc(rowId){
+  _calcTargetId = rowId;
+  document.getElementById('calcExpr').value = '';
+  document.getElementById('calcResultDisplay').textContent = '-';
+  document.getElementById('calcModal').classList.add('open');
+  setTimeout(()=>document.getElementById('calcExpr').focus(), 100);
+}
+function calcAppend(ch){
+  const el = document.getElementById('calcExpr');
+  el.value += ch;
+  calcResult();
+}
+function calcClear(){
+  document.getElementById('calcExpr').value = '';
+  document.getElementById('calcResultDisplay').textContent = '-';
+}
+function calcResult(){
+  const expr = document.getElementById('calcExpr').value.trim();
+  if(!expr){ document.getElementById('calcResultDisplay').textContent = '-'; return; }
+  try{
+    // 안전한 수식 평가 (숫자, +, -, *, /, ., 공백, 괄호만 허용)
+    if(!/^[0-9+\-*/.()\s]+$/.test(expr)){ document.getElementById('calcResultDisplay').textContent = '?'; return; }
+    const result = Function('"use strict";return ('+expr+')')();
+    if(isNaN(result)||!isFinite(result)){ document.getElementById('calcResultDisplay').textContent = '?'; return; }
+    document.getElementById('calcResultDisplay').textContent = parseFloat(result.toFixed(3));
+  }catch(e){ document.getElementById('calcResultDisplay').textContent = '?'; }
+}
+function calcApply(){
+  const display = document.getElementById('calcResultDisplay').textContent;
+  if(!display || display==='-' || display==='?') return;
+  if(_calcTargetId!==null){
+    const qtyEl = document.getElementById('qty-'+_calcTargetId);
+    if(qtyEl){ qtyEl.value = display; formatQty(qtyEl); }
+  }
+  closeModal('calcModal');
+}
+
 // ===== 초기화 =====
 let signModalTarget = null;
 let signModalDrawing = false;
 let signModalCtx = null;
 
 function init(){
+  buildDatalists();
   // 오늘 날짜 자동입력
   const today = new Date();
   const yy = String(today.getFullYear()).slice(2);
@@ -658,25 +750,13 @@ function addRow(){
   const tr = document.createElement('tr');
   tr.id = 'row-'+id;
 
-  const ingOptions = INGREDIENT_DB.map(i=>`<option value="${i.name}" data-code="${i.code}">${i.name}</option>`).join('');
-  const supplierOptions = suppliers.map(s=>`<option value="${s}">${s}</option>`).join('');
-
   tr.innerHTML = `
     <td>
-      <select class="td-input" id="supplier-${id}">
-        <option value="">선택</option>
-        ${supplierOptions}
-        <option value="__direct__">직접입력</option>
-      </select>
-      <input class="td-input" id="supplier-direct-${id}" placeholder="거래처명" style="display:none;margin-top:3px">
+      <input class="td-input" id="supplier-${id}" list="dl-suppliers" placeholder="업체명 입력" autocomplete="off">
     </td>
     <td>
-      <select class="td-input" id="product-${id}" onchange="onProductChange(${id})">
-        <option value="">선택</option>
-        ${ingOptions}
-        <option value="__direct__">직접입력</option>
-      </select>
-      <input class="td-input" id="product-direct-${id}" placeholder="제품명" style="display:none;margin-top:3px">
+      <input class="td-input" id="product-${id}" list="dl-products" placeholder="제품명 입력" autocomplete="off"
+        oninput="onProductInput(${id})">
     </td>
     <td>
       <div style="display:flex;align-items:center;gap:2px;margin-bottom:4px;">
@@ -684,22 +764,27 @@ function addRow(){
           oninput="buildLot(${id})"
           style="width:46px;text-align:center;font-size:11px;padding:4px 3px;">
         <span style="font-size:12px;color:var(--text3);flex-shrink:0;">-</span>
-        <input class="td-input" id="lot-date-${id}" placeholder="YYMMDD" maxlength="6"
+        <input class="td-input" id="lot-date-${id}" placeholder="YYMMDD" maxlength="6" inputmode="numeric"
           oninput="this.value=this.value.replace(/\D/g,'').slice(0,6);buildLot(${id})"
           style="width:58px;text-align:center;font-size:11px;padding:4px 3px;">
         <span style="font-size:12px;color:var(--text3);flex-shrink:0;">-</span>
-        <input class="td-input" id="lot-exp-${id}" placeholder="YYMMDD" maxlength="7"
+        <input class="td-input" id="lot-exp-${id}" placeholder="YYMMDD" maxlength="7" inputmode="numeric"
           oninput="this.value=this.value.replace(/[^0-9*]/g,'').slice(0,7);buildLot(${id})"
           style="width:58px;text-align:center;font-size:11px;padding:4px 3px;">
       </div>
       <div id="lot-${id}" style="font-size:10px;color:var(--primary);font-weight:700;padding:2px 3px;min-height:14px;letter-spacing:0.3px;"></div>
     </td>
-    <td><input class="td-input" type="text" inputmode="decimal" id="qty-${id}" placeholder="0" oninput="formatQty(this)" style="text-align:center;"></td>
     <td>
-      <input class="td-input" id="mfg-${id}" placeholder="제조일자(YYMMDD)" maxlength="6"
+      <div style="display:flex;align-items:center;gap:2px;">
+        <input class="td-input" type="text" inputmode="decimal" id="qty-${id}" placeholder="0" oninput="formatQty(this)" style="text-align:center;flex:1;">
+        <button onclick="openCalc(${id})" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 5px;cursor:pointer;font-size:14px;flex-shrink:0;" title="계산기">🧮</button>
+      </div>
+    </td>
+    <td>
+      <input class="td-input" id="mfg-${id}" placeholder="제조일자(YYMMDD)" maxlength="6" inputmode="numeric"
         oninput="this.value=this.value.replace(/\D/g,'').slice(0,6);onMfgInput(${id})" style="margin-bottom:3px;">
       <div id="mfg-display-${id}" style="font-size:10px;color:var(--text2);padding:1px 4px;"></div>
-      <input class="td-input" id="exp-raw-${id}" placeholder="소비기한(YYMMDD)" maxlength="6"
+      <input class="td-input" id="exp-raw-${id}" placeholder="소비기한(YYMMDD)" maxlength="6" inputmode="numeric"
         oninput="this.value=this.value.replace(/\D/g,'').slice(0,6);onExpInput(${id})" style="margin-top:3px;">
       <div id="exp-display-${id}" style="font-size:10px;color:var(--primary);font-weight:700;padding:1px 4px;"></div>
       <input type="hidden" id="exp-${id}">
@@ -713,25 +798,16 @@ function addRow(){
     <td><button class="row-del" onclick="delRow(${id})">×</button></td>
   `;
   tbody.appendChild(tr);
-
-  document.getElementById('supplier-'+id).addEventListener('change', function(){
-    document.getElementById('supplier-direct-'+id).style.display = this.value==='__direct__' ? '' : 'none';
-  });
 }
 
-function onProductChange(id){
-  const sel = document.getElementById('product-'+id);
-  const direct = document.getElementById('product-direct-'+id);
+function onProductInput(id){
+  const val = document.getElementById('product-'+id).value.trim();
+  if(!val) return;
 
-  direct.style.display = sel.value==='__direct__' ? '' : 'none';
-
-  if(sel.value && sel.value !== '__direct__'){
-    // 원료코드 자동입력
-    const ing = INGREDIENT_DB.find(i=>i.name===sel.value);
-    if(ing){
-      document.getElementById('lot-code-'+id).value = ing.code;
-    }
-    // 입고일자 자동입력
+  // INGREDIENT_DB에서 매칭 확인
+  const ing = INGREDIENT_DB.find(i=>i.name===val);
+  if(ing){
+    document.getElementById('lot-code-'+id).value = ing.code;
     document.getElementById('lot-date-'+id).value = getInDateYYMMDD();
     buildLot(id);
   }
@@ -885,14 +961,8 @@ async function saveRecord(){
   const rows = [];
   document.querySelectorAll('#mainTbody tr').forEach(tr=>{
     const id = tr.id.replace('row-','');
-    const supplierSel = document.getElementById('supplier-'+id);
-    const supplier = supplierSel.value==='__direct__'
-      ? document.getElementById('supplier-direct-'+id).value
-      : supplierSel.value;
-    const productSel = document.getElementById('product-'+id);
-    const product = productSel.value==='__direct__'
-      ? document.getElementById('product-direct-'+id).value
-      : productSel.value;
+    const supplier = document.getElementById('supplier-'+id)?.value?.trim()||'';
+    const product = document.getElementById('product-'+id)?.value?.trim()||'';
     const lotCode = document.getElementById('lot-code-'+id)?.value.trim()||'';
     const lotDate = document.getElementById('lot-date-'+id)?.value.trim()||'';
     const lotExp  = document.getElementById('lot-exp-'+id)?.value.trim()||'';
@@ -1051,9 +1121,6 @@ function addEditRow(data=null){
   const tr = document.createElement('tr');
   tr.id = 'edit-row-'+id;
 
-  const supplierOptions = suppliers.map(s=>`<option value="${s}" ${data&&data.supplier===s?'selected':''}>${s}</option>`).join('');
-  const ingOptions = INGREDIENT_DB.map(i=>`<option value="${i.name}" ${data&&data.product===i.name?'selected':''}>${i.name}</option>`).join('');
-
   const d = data || {};
   // 로트 파싱 (M001-260522-270504)
   const lotParts = (d.lot||'').split('-');
@@ -1075,16 +1142,10 @@ function addEditRow(data=null){
 
   tr.innerHTML = `
     <td style="border:1px solid var(--border);padding:3px;">
-      <select class="td-input" id="edit-supplier-${id}">
-        <option value="">선택</option>
-        ${supplierOptions}
-      </select>
+      <input class="td-input" id="edit-supplier-${id}" list="dl-suppliers" value="${d.supplier||''}" placeholder="업체명" autocomplete="off">
     </td>
     <td style="border:1px solid var(--border);padding:3px;">
-      <select class="td-input" id="edit-product-${id}">
-        <option value="">선택</option>
-        ${ingOptions}
-      </select>
+      <input class="td-input" id="edit-product-${id}" list="dl-products" value="${d.product||''}" placeholder="제품명" autocomplete="off">
     </td>
     <td style="border:1px solid var(--border);padding:3px;">
       <div style="display:flex;align-items:center;gap:1px;">
@@ -1424,14 +1485,7 @@ function saveEditSupplier(){
 }
 
 function updateSupplierSelects(){
-  const opts = suppliers.map(s=>`<option value="${s}">${s}</option>`).join('');
-  document.querySelectorAll('[id^="supplier-"]').forEach(sel=>{
-    if(sel.tagName==='SELECT'){
-      const cur = sel.value;
-      sel.innerHTML = `<option value="">선택</option>${opts}<option value="__direct__">직접입력</option>`;
-      if(suppliers.includes(cur)) sel.value = cur;
-    }
-  });
+  buildDatalists();
 }
 
 // ===== 모달 =====
