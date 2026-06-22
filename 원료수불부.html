@@ -510,9 +510,10 @@ function buildAccordionContent(ing,selDate){
   recs.forEach(r=>{
     if(r.type==='init'||(r.type==='in'&&r.date<=selDate)){
       const key=r.lot||'_미지정';
-      if(!lotMap[key])lotMap[key]={lot:r.lot||'LOT 미지정',type:r.type==='init'?'초기':'입고',exp:r.exp||'',inQty:0,outQty:0};
+      if(!lotMap[key])lotMap[key]={lot:r.lot||'LOT 미지정',type:r.type==='init'?'초기':'입고',exp:r.exp||'',inQty:0,outQty:0,inDate:r.date||''};
       lotMap[key].inQty+=r.qty;
       if(r.exp&&!lotMap[key].exp)lotMap[key].exp=r.exp;
+      if(r.date&&(!lotMap[key].inDate||r.date<lotMap[key].inDate)) lotMap[key].inDate=r.date;
     }
   });
 
@@ -535,8 +536,14 @@ function buildAccordionContent(ing,selDate){
 
   if(!lots.length)return '<div class="acc-inner"><div class="acc-empty">현재 잔여 재고가 없습니다</div></div>';
 
-  // 소비기한 임박순 정렬 (빠른 것 위로)
+  // 입고일 빠른순(1순위) + 소비기한 빠른순(2순위) 정렬
   lots.sort((a,b)=>{
+    // 1순위: 입고일 빠른 순 (오래된 것 먼저)
+    const ia=a.inDate||'', ib=b.inDate||'';
+    if(ia&&ib&&ia!==ib) return ia<ib?-1:1;
+    if(ia&&!ib) return -1;
+    if(!ia&&ib) return 1;
+    // 2순위: 소비기한 빠른 순
     const da=parseExpDate(a.exp),db=parseExpDate(b.exp);
     if(!da&&!db)return 0;if(!da)return 1;if(!db)return -1;
     return da-db;

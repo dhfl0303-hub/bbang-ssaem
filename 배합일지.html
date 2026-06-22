@@ -287,8 +287,26 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <div id="inputIngList"></div>
       </div>
     </div>
-    <button class="btn btn-success mt-12" onclick="completeInputIng()">✅ 확인 후 서명 →</button>
+    <button class="btn btn-success mt-12" onclick="completeInputIng()">✅ 확인 → 폐기량 입력</button>
     <button class="btn btn-outline mt-12" onclick="skipInputIng()" style="margin-top:8px;font-size:14px;">건너뛰기 (투입없음)</button>
+  </div>
+
+  <!-- 폐기량 입력 -->
+  <div class="page" id="page-dispose">
+    <div class="card">
+      <div class="card-hd" style="background:#fff0f0;border-bottom:1px solid #f5a0a0;">
+        <span style="color:#c0392b;font-weight:700;">🗑️ 공정중 잔량 폐기</span>
+        <span style="font-size:12px;color:#a05050;margin-left:8px;">개봉 후 남은 원료 폐기량</span>
+      </div>
+      <div class="card-bd" style="padding-bottom:10px;">
+        <div id="disposeIngList"></div>
+        <div style="display:flex;align-items:center;gap:6px;padding:10px 4px;font-size:15px;color:#c0392b;cursor:pointer;font-weight:500;" onclick="addDisposeRow()">
+          ＋ 폐기 항목 추가
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-success mt-12" onclick="completeDispose()">✅ 확인 후 서명 →</button>
+    <button class="btn btn-outline mt-12" onclick="skipDispose()" style="margin-top:8px;font-size:14px;">건너뛰기 (폐기없음)</button>
   </div>
 
   <!-- 서명 -->
@@ -374,7 +392,8 @@ let S = {
   totalBatches:1, currentBatch:1, lotOffset:0,
   batchRecords:[], prevData:{},
   todayRecords:[], editCode:null,
-  inputIngredients:[] // 기타사용원재료 입력값
+  inputIngredients:[], // 기타사용원재료 입력값
+  disposeIngredients:[] // 공정중 잔량 폐기
 };
 
 // 날짜
@@ -972,7 +991,7 @@ function calcFifoDistribution(lots, totalG){
     const use = Math.min(lot.remaining, remaining);
     rows.push({ lot:lot.lot, exp:lot.exp, dateType:lot.dateType||'exp', amount:Math.round(use*1000) });
     remaining -= use;
-    if(rows.length>=3) break; // 최대 3개 LOT
+    if(rows.length>=5) break; // 최대 5개 LOT
   }
 
   // 마지막 LOT에 남은 양 몰아주기 (소수점 보정)
@@ -1067,7 +1086,7 @@ function onLotSelect(sel){
 function addExpRow(btn){
   const block=btn.closest('.ing-block'); const total=parseInt(block.dataset.total);
   const expRows=block.querySelector('.exp-rows'); const rows=expRows.querySelectorAll('.exp-row');
-  if(rows.length>=3){ alert('LOT는 최대 3개까지 입력 가능합니다'); return; }
+  if(rows.length>=5){ alert('LOT는 최대 5개까지 입력 가능합니다'); return; }
   if(rows.length>0){
     const last=rows[rows.length-1]; last.classList.remove('auto-row');
     const numInput=Array.from(last.querySelectorAll('input')).find(i=>!i.classList.contains('lot-manual-date')&&!i.classList.contains('lot-manual-exp')&&!i.classList.contains('lot-manual-full')&&!i.classList.contains('readonly'));
@@ -1211,19 +1230,37 @@ function syncBatchToLedger(){
       });
     });
 
-    // 기타사용원재료(투입량) 출고
-    (S.inputIngredients||[]).filter(ing=>ing.name && parseFloat(ing.qty)>0).forEach(ing=>{
+    // 기타사용원재료(투입량) 출고 - FIFO 분배 형식
+    (S.inputIngredients||[]).filter(ing=>ing.name).forEach(ing=>{
       const ingCode = INGREDIENT_DB_STATIC[ing.name]||'';
       if(ingCode==='M000') return;
-      const exists=ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===lastLot&&r.lot===ing.lot);
-      if(!exists){
-        const dbIng=INGREDIENT_DB_LOCAL.find(i=>i.name===ing.name)||{code:''};
-        ledgerRecords.push({
-          date:isoDate, name:ing.name, code:dbIng.code||ingCode||'',
-          qty:parseFloat(ing.qty)||0,
-          exp:ing.exp||'', lot:ing.lot||'', batchLot:lastLot, type:'out'
+      const dists = ing.distributions||[];
+      if(dists.length){
+        dists.filter(d=>parseFloat(d.qty)>0).forEach(d=>{
+          const exists=ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===lastLot&&r.lot===d.lot);
+          if(!exists){
+            const dbIng=INGREDIENT_DB_LOCAL.find(i=>i.name===ing.name)||{code:''};
+            ledgerRecords.push({
+              date:isoDate, name:ing.name, code:dbIng.code||ingCode||'',
+              qty:parseFloat(d.qty)||0,
+              exp:d.exp||'', lot:d.lot||'', batchLot:lastLot, type:'out'
+            });
+          }
         });
       }
+    });
+
+    // 공정중 잔량 폐기
+    (S.disposeIngredients||[]).filter(d=>d.name && parseFloat(d.qty)>0).forEach(d=>{
+      const ingCode = INGREDIENT_DB_STATIC[d.name]||'';
+      if(ingCode==='M000') return;
+      const dbIng=INGREDIENT_DB_LOCAL.find(i=>i.name===d.name)||{code:''};
+      ledgerRecords.push({
+        date:isoDate, name:d.name, code:dbIng.code||ingCode||'',
+        qty:parseFloat(d.qty)||0,
+        exp:d.exp||'', lot:d.lot||'', batchLot:lastLot, type:'dispose',
+        reason:'공정중 잔량폐기'
+      });
     });
 
     localStorage.setItem('ledgerRecords',JSON.stringify(ledgerRecords));
@@ -1233,10 +1270,20 @@ function syncBatchToLedger(){
 function showComplete(){
   const p=DB[S.product];
   syncBatchToLedger(); // 원료수불부 출고 자동반영
-  // 기타사용원재료 → batchRecords의 extraIngredients에 포함
-  const extraIngs = (S.inputIngredients||[])
-    .filter(ing=>ing.name && parseFloat(ing.qty)>0)
-    .map(ing=>({name:ing.name, qty:parseFloat(ing.qty)||0, lot:ing.lot||'', exp:ing.exp||''}));
+  // 기타사용원재료 → batchRecords의 extraIngredients에 포함 (FIFO 분배 flatten)
+  const extraIngs = [];
+  (S.inputIngredients||[]).filter(ing=>ing.name).forEach(ing=>{
+    const dists = ing.distributions||[];
+    if(dists.length){
+      dists.filter(d=>parseFloat(d.qty)>0).forEach(d=>{
+        extraIngs.push({name:ing.name, qty:parseFloat(d.qty)||0, lot:d.lot||'', exp:d.exp||''});
+      });
+    }
+  });
+  // 폐기 기록도 저장
+  const disposeIngs = (S.disposeIngredients||[])
+    .filter(d=>d.name && parseFloat(d.qty)>0)
+    .map(d=>({name:d.name, qty:parseFloat(d.qty)||0, lot:d.lot||'', exp:d.exp||'', reason:'공정중 잔량폐기'}));
   const sessionKey=S.product+'-'+getWorkDateKey();
   const existIdx=S.todayRecords.findIndex(r=>r.sessionKey===sessionKey);
   const newBatchRecords=JSON.parse(JSON.stringify(S.batchRecords));
@@ -1247,13 +1294,15 @@ function showComplete(){
     existing.totalBatches=existing.batchRecords.length;
     existing.endTime=newBatchRecords[newBatchRecords.length-1].time;
     if(extraIngs.length) existing.extraIngredients=[...(existing.extraIngredients||[]),...extraIngs];
+    if(disposeIngs.length) existing.disposeIngredients=[...(existing.disposeIngredients||[]),...disposeIngs];
   } else {
     const sessionData={
       sessionKey, productCode:S.product, product:p.name,
       date:getWorkDateKey(), totalBatches:S.totalBatches,
       startTime:S.batchRecords[0].time, endTime:S.batchRecords[S.batchRecords.length-1].time,
       batchRecords:newBatchRecords,
-      extraIngredients: extraIngs
+      extraIngredients: extraIngs,
+      disposeIngredients: disposeIngs
     };
     S.todayRecords.push(sessionData);
   }
@@ -1275,17 +1324,29 @@ function showComplete(){
       totals[ing.name][key].amt+=e.amount||0;
     });
   }));
-  // 기타사용원재료(투입량) 합산
-  (S.inputIngredients||[]).filter(ing=>ing.name && parseFloat(ing.qty)>0).forEach(ing=>{
-    if(!totals[ing.name]) totals[ing.name]={};
-    const key=ing.lot||ing.exp||ing.name;
-    if(!totals[ing.name][key]) totals[ing.name][key]={lot:ing.lot||'',exp:ing.exp||'',dateType:'exp',amt:0};
-    totals[ing.name][key].amt+=(parseFloat(ing.qty)||0)*1000; // kg→g
+  // 기타사용원재료(투입량) 합산 - FIFO 분배
+  (S.inputIngredients||[]).filter(ing=>ing.name).forEach(ing=>{
+    (ing.distributions||[]).filter(d=>parseFloat(d.qty)>0).forEach(d=>{
+      if(!totals[ing.name]) totals[ing.name]={};
+      const key=d.lot||d.exp||ing.name;
+      if(!totals[ing.name][key]) totals[ing.name][key]={lot:d.lot||'',exp:d.exp||'',dateType:'exp',amt:0};
+      totals[ing.name][key].amt+=(parseFloat(d.qty)||0)*1000; // kg→g
+    });
   });
+  // 폐기량 표시
+  const disposeRows = (S.disposeIngredients||[]).filter(d=>d.name && parseFloat(d.qty)>0);
   const ingDB=JSON.parse(localStorage.getItem('customIngredients')||'[]');
   const sortedRows=Object.entries(totals)
     .flatMap(([name,keys])=>Object.entries(keys).map(([k,v])=>({name,lot:v.lot||k,exp:v.exp,dateType:v.dateType||'exp',amt:v.amt})))
     .sort((a,b)=>b.amt-a.amt);
+  let disposeHtml = '';
+  if(disposeRows.length){
+    disposeHtml = `<div class="sec" style="color:#c0392b;">🗑️ 공정중 잔량 폐기</div>
+    <table class="result-table">
+      <tr><th>원료명</th><th>LOT</th><th>폐기량(kg)</th><th>사유</th></tr>
+      ${disposeRows.map(d=>`<tr><td>${d.name}</td><td style="font-size:11px">${d.lot||'-'}</td><td>${parseFloat(d.qty).toFixed(3)}</td><td>공정중 잔량폐기</td></tr>`).join('')}
+    </table>`;
+  }
   document.getElementById('doneResult').innerHTML=`
     <div class="sec" style="margin-top:0">생성된 배합로트</div>
     ${S.batchRecords.map(r=>`<div class="done-item"><div><div class="done-lot">${r.lot}</div><div class="done-time">배합${r.machine} · ${r.time}</div></div><div class="done-badge">완료</div></div>`).join('')}
@@ -1293,7 +1354,8 @@ function showComplete(){
     <table class="result-table">
       <tr><th>원료명</th><th>LOT</th><th>소비기한/제조일자</th><th>사용량(g)</th></tr>
       ${sortedRows.map(({name:n,lot:l,exp:e,dateType:dt,amt:a})=>`<tr><td>${n}</td><td style="font-size:11px">${l||'-'}</td><td>${fmtDateLabel(e,dt)}</td><td>${Math.round(a).toLocaleString()}</td></tr>`).join('')}
-    </table>`;
+    </table>
+    ${disposeHtml}`;
   genPrint(); showPage('done');
 }
 
@@ -1309,12 +1371,14 @@ function genPrint(){
       totals[ing.name][key].amt+=e.amount||0;
     });
   }));
-  // 기타사용원재료(투입량) 합산
-  (S.inputIngredients||[]).filter(ing=>ing.name && parseFloat(ing.qty)>0).forEach(ing=>{
-    if(!totals[ing.name]) totals[ing.name]={};
-    const key=ing.lot||ing.exp||ing.name;
-    if(!totals[ing.name][key]) totals[ing.name][key]={lot:ing.lot||'',exp:ing.exp||'',dateType:'exp',amt:0};
-    totals[ing.name][key].amt+=(parseFloat(ing.qty)||0)*1000;
+  // 기타사용원재료(투입량) 합산 - FIFO 분배
+  (S.inputIngredients||[]).filter(ing=>ing.name).forEach(ing=>{
+    (ing.distributions||[]).filter(d=>parseFloat(d.qty)>0).forEach(d=>{
+      if(!totals[ing.name]) totals[ing.name]={};
+      const key=d.lot||d.exp||ing.name;
+      if(!totals[ing.name][key]) totals[ing.name][key]={lot:d.lot||'',exp:d.exp||'',dateType:'exp',amt:0};
+      totals[ing.name][key].amt+=(parseFloat(d.qty)||0)*1000;
+    });
   });
   const lots=S.batchRecords.map(r=>r.lot);
   const lotRange=lots.length===1?lots[0]:`${lots[0]}~${lots[lots.length-1].split('-').pop()}`;
@@ -1387,20 +1451,16 @@ function switchTab(tab,btn){
 }
 
 
-// ===== 기타사용원재료 =====
+// ===== 기타사용원재료 (FIFO 자동 분배) =====
 function goInputIng(){
-  // 배합 완료 후 항상 기타사용원재료 페이지 표시
-  // 빈 행 1개로 시작
-  S.inputIngredients = [{name:'', lot:'', qty:'', exp:''}];
+  S.inputIngredients = [{name:'', totalQty:'', distributions:[]}];
   renderInputIngPage();
   showPage('input-ing');
 }
 
 function getIngDropdownOptions(selectedName){
-  // INGREDIENT_DB_STATIC_LIST + ledgerRecords에 있는 원료 합치기
   const allItems = [...INGREDIENT_DB_STATIC_LIST];
   const existNames = new Set(allItems.map(i=>i.name));
-  // ledgerRecords에서 추가 원료 찾기
   const ledger = JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
   if(window._ledgerRecords && window._ledgerRecords.length > ledger.length){
     window._ledgerRecords.forEach(r=>ledger.push(r));
@@ -1411,7 +1471,6 @@ function getIngDropdownOptions(selectedName){
       allItems.push({code:r.code||'????', name:r.name});
     }
   });
-  // 코드순 정렬
   allItems.sort((a,b)=>(a.code||'').localeCompare(b.code||''));
   return '<option value="">원료 선택...</option>' +
     allItems.map(i=>
@@ -1419,33 +1478,64 @@ function getIngDropdownOptions(selectedName){
     ).join('');
 }
 
-function getInputIngLotOptions(ingName, selectedLot){
-  if(!ingName) return '<option value="">원료를 먼저 선택하세요</option>';
-  const lots = getIngLots(ingName);
-  if(!lots.length) return '<option value="">등록된 LOT 없음</option>';
-  return '<option value="">LOT 선택...</option>' +
-    lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===selectedLot?'selected':''}>${l.label}</option>`).join('');
-}
-
 function onInputIngNameChange(ii, val){
   S.inputIngredients[ii].name = val;
-  S.inputIngredients[ii].lot = '';
-  S.inputIngredients[ii].exp = '';
+  S.inputIngredients[ii].totalQty = '';
+  S.inputIngredients[ii].distributions = [];
   renderInputIngPage();
 }
 
-function onInputIngLotChange(ii, sel){
-  const opt = sel.options[sel.selectedIndex];
-  S.inputIngredients[ii].lot = sel.value;
-  S.inputIngredients[ii].exp = opt.dataset.exp||'';
+function onInputIngQtyChange(ii, val){
+  S.inputIngredients[ii].totalQty = val;
+  const totalKg = parseFloat(val)||0;
+  if(totalKg>0 && S.inputIngredients[ii].name){
+    const lots = getIngLots(S.inputIngredients[ii].name);
+    const fifoRows = calcFifoDistribution(lots, totalKg*1000);
+    S.inputIngredients[ii].distributions = fifoRows.map(fr=>({
+      lot:fr.lot, qty:fr.amount/1000, exp:fr.exp||''
+    }));
+  } else {
+    S.inputIngredients[ii].distributions = [];
+  }
   renderInputIngPage();
+}
+
+function onInputIngDistQty(ii, di, val){
+  if(S.inputIngredients[ii].distributions[di]){
+    S.inputIngredients[ii].distributions[di].qty = parseFloat(val)||0;
+  }
 }
 
 function renderInputIngPage(){
   const list = document.getElementById('inputIngList');
   if(!list) return;
-  list.innerHTML = S.inputIngredients.map((ing, ii)=>`
-    <div class="input-ing-block" style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">
+  list.innerHTML = S.inputIngredients.map((ing, ii)=>{
+    let distHtml = '';
+    if(ing.distributions && ing.distributions.length){
+      distHtml = `<div style="margin-top:8px;border:1px solid #e0e4ea;border-radius:8px;overflow:hidden;">
+        <div style="background:#f4f6fa;padding:6px 10px;font-size:11px;font-weight:700;color:var(--text2);">FIFO 자동 분배 결과</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:#f8f9fb;">
+            <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #e0e4ea;">LOT</th>
+            <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #e0e4ea;">소비기한</th>
+            <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #e0e4ea;width:100px;">사용량(kg)</th>
+          </tr></thead>
+          <tbody>${ing.distributions.map((d,di)=>`<tr>
+            <td style="padding:5px 8px;border-bottom:1px solid #f0f0f0;font-family:monospace;font-size:11px;color:var(--primary-dark);">${d.lot}</td>
+            <td style="padding:5px 8px;border-bottom:1px solid #f0f0f0;">${d.exp||'-'}</td>
+            <td style="padding:5px 8px;border-bottom:1px solid #f0f0f0;text-align:right;">
+              <input type="number" step="0.001" value="${d.qty}" oninput="onInputIngDistQty(${ii},${di},this.value)"
+                style="width:80px;text-align:right;border:1px solid #e0e4ea;border-radius:5px;padding:4px 6px;font-size:12px;font-family:'Noto Sans KR',sans-serif;">
+            </td>
+          </tr>`).join('')}
+          <tr style="background:#f4f6fa;font-weight:700;">
+            <td colspan="2" style="padding:5px 8px;text-align:right;color:var(--text2);">합계</td>
+            <td style="padding:5px 8px;text-align:right;color:var(--primary);">${ing.distributions.reduce((s,d)=>s+(parseFloat(d.qty)||0),0).toFixed(3)}</td>
+          </tr></tbody>
+        </table>
+      </div>`;
+    }
+    return `<div class="input-ing-block" style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">
       <div style="padding:8px 14px;background:#fff8e8;border-bottom:1px solid #f0d080;display:flex;align-items:center;gap:8px;">
         <select class="exp-input" style="flex:1;font-size:15px;"
           onchange="onInputIngNameChange(${ii},this.value)">
@@ -1453,33 +1543,21 @@ function renderInputIngPage(){
         </select>
         ${S.inputIngredients.length>1?`<div class="del-btn" onclick="delInputIngRow(${ii})">×</div>`:'<div style="width:34px;"></div>'}
       </div>
-      <div style="padding:6px 14px;">
-        <div style="font-size:12px;color:var(--text3);font-weight:500;margin-bottom:4px;">LOT 선택 (소비기한 자동입력)</div>
-        <select class="exp-input" style="width:100%;font-size:14px;margin-bottom:8px;"
-          onchange="onInputIngLotChange(${ii},this)">
-          ${getInputIngLotOptions(ing.name, ing.lot)}
-        </select>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-          <div>
-            <div style="font-size:12px;color:var(--text3);font-weight:500;margin-bottom:4px;">실사용량(kg)</div>
-            <input class="exp-input" type="number" step="0.001" placeholder="kg" value="${ing.qty}"
-              oninput="S.inputIngredients[${ii}].qty=this.value">
-          </div>
-          <div>
-            <div style="font-size:12px;color:var(--text3);font-weight:500;margin-bottom:4px;">소비기한</div>
-            <input class="exp-input" type="text" placeholder="예) 27.05.10" value="${ing.exp}"
-              oninput="S.inputIngredients[${ii}].exp=this.value">
-          </div>
-        </div>
+      <div style="padding:10px 14px;">
+        <div style="font-size:12px;color:var(--text3);font-weight:500;margin-bottom:4px;">총 사용량 (kg) 입력 → FIFO 자동 분배</div>
+        <input class="exp-input" type="number" step="0.001" placeholder="총 사용량 (kg)" value="${ing.totalQty}"
+          oninput="onInputIngQtyChange(${ii},this.value)" style="font-size:15px;font-weight:700;">
+        ${distHtml}
       </div>
-    </div>`).join('') +
-    `<div style="display:flex;align-items:center;gap:6px;padding:10px 4px;font-size:15px;color:#7a5800;cursor:pointer;font-weight:500;" onclick="addInputIngRow()">
-      ＋ 원료 추가
     </div>`;
+  }).join('') +
+  `<div style="display:flex;align-items:center;gap:6px;padding:10px 4px;font-size:15px;color:#7a5800;cursor:pointer;font-weight:500;" onclick="addInputIngRow()">
+    ＋ 원료 추가
+  </div>`;
 }
 
 function addInputIngRow(){
-  S.inputIngredients.push({name:'', lot:'', qty:'', exp:''});
+  S.inputIngredients.push({name:'', totalQty:'', distributions:[]});
   renderInputIngPage();
 }
 function delInputIngRow(ii){
@@ -1487,10 +1565,90 @@ function delInputIngRow(ii){
   renderInputIngPage();
 }
 function completeInputIng(){
-  goSign();
+  goDispose();
 }
 function skipInputIng(){
   S.inputIngredients = [];
+  goDispose();
+}
+
+// ===== 공정중 잔량 폐기 =====
+function goDispose(){
+  S.disposeIngredients = [{name:'', lot:'', qty:'', exp:''}];
+  renderDisposePage();
+  showPage('dispose');
+}
+
+function getDisposeLotOptions(ingName, selectedLot){
+  if(!ingName) return '<option value="">원료를 먼저 선택하세요</option>';
+  const lots = getIngLots(ingName);
+  if(!lots.length) return '<option value="">등록된 LOT 없음</option>';
+  return '<option value="">LOT 선택...</option>' +
+    lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===selectedLot?'selected':''}>${l.label}</option>`).join('');
+}
+
+function onDisposeNameChange(ii, val){
+  S.disposeIngredients[ii].name = val;
+  S.disposeIngredients[ii].lot = '';
+  S.disposeIngredients[ii].exp = '';
+  renderDisposePage();
+}
+
+function onDisposeLotChange(ii, sel){
+  const opt = sel.options[sel.selectedIndex];
+  S.disposeIngredients[ii].lot = sel.value;
+  S.disposeIngredients[ii].exp = opt.dataset.exp||'';
+  renderDisposePage();
+}
+
+function renderDisposePage(){
+  const list = document.getElementById('disposeIngList');
+  if(!list) return;
+  list.innerHTML = S.disposeIngredients.map((ing, ii)=>`
+    <div style="border:1px solid #f5a0a0;border-radius:10px;margin-bottom:10px;overflow:hidden;">
+      <div style="padding:8px 14px;background:#fff0f0;border-bottom:1px solid #f5a0a0;display:flex;align-items:center;gap:8px;">
+        <select class="exp-input" style="flex:1;font-size:15px;"
+          onchange="onDisposeNameChange(${ii},this.value)">
+          ${getIngDropdownOptions(ing.name)}
+        </select>
+        ${S.disposeIngredients.length>1?`<div class="del-btn" onclick="delDisposeRow(${ii})">×</div>`:'<div style="width:34px;"></div>'}
+      </div>
+      <div style="padding:6px 14px;">
+        <div style="font-size:12px;color:var(--text3);font-weight:500;margin-bottom:4px;">LOT 선택</div>
+        <select class="exp-input" style="width:100%;font-size:14px;margin-bottom:8px;"
+          onchange="onDisposeLotChange(${ii},this)">
+          ${getDisposeLotOptions(ing.name, ing.lot)}
+        </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <div>
+            <div style="font-size:12px;color:#c0392b;font-weight:500;margin-bottom:4px;">폐기량(kg)</div>
+            <input class="exp-input" type="number" step="0.001" placeholder="kg" value="${ing.qty}"
+              oninput="S.disposeIngredients[${ii}].qty=this.value"
+              style="border-color:#f5a0a0;">
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--text3);font-weight:500;margin-bottom:4px;">소비기한</div>
+            <input class="exp-input" type="text" placeholder="자동입력" value="${ing.exp}" readonly
+              style="background:#f8f9fb;">
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function addDisposeRow(){
+  S.disposeIngredients.push({name:'', lot:'', qty:'', exp:''});
+  renderDisposePage();
+}
+function delDisposeRow(ii){
+  S.disposeIngredients.splice(ii,1);
+  renderDisposePage();
+}
+function completeDispose(){
+  goSign();
+}
+function skipDispose(){
+  S.disposeIngredients = [];
   goSign();
 }
 
@@ -1617,8 +1775,42 @@ async function syncToServer(){
           ledgerRecords.push({ date:isoDate, name:ing.name, code:ingCode, qty, lot:ing.lot||'', exp:ing.exp||'', batchLot:lastBatchLot, type:'out' });
         }
       });
+
+      // 공정중 잔량 폐기
+      (rec.disposeIngredients||[]).forEach(d=>{
+        if(!d.name || !(parseFloat(d.qty)>0)) return;
+        const ingCode = INGREDIENT_DB_STATIC[d.name]||'';
+        if(ingCode==='M000') return;
+        const qty = parseFloat(d.qty)||0;
+        const exists = ledgerRecords.find(r=>r.type==='dispose'&&r.name===d.name&&r.batchLot===lastBatchLot&&r.lot===d.lot&&r.reason==='공정중 잔량폐기');
+        if(!exists){
+          ledgerRecords.push({ date:isoDate, name:d.name, code:ingCode, qty, lot:d.lot||'', exp:d.exp||'', batchLot:lastBatchLot, type:'dispose', reason:'공정중 잔량폐기' });
+        }
+      });
     });
     await db.collection('appData').doc('ledgerRecords').set({ data: JSON.stringify(ledgerRecords), updatedAt: new Date().toISOString() });
+
+    // 4-1. 폐기대장 Firebase 업로드 (통합관리 연동)
+    try{
+      let disposeLogSnap = await db.collection('appData').doc('disposeLog').get();
+      let disposeLog = (disposeLogSnap.exists && disposeLogSnap.data().data) ? JSON.parse(disposeLogSnap.data().data) : [];
+      recs.forEach(rec=>{
+        const rawDate=rec.date||getWorkDateKey();
+        const isoDate=rawDate.length===6?'20'+rawDate.slice(0,2)+'-'+rawDate.slice(2,4)+'-'+rawDate.slice(4,6):rawDate;
+        (rec.disposeIngredients||[]).forEach(d=>{
+          if(!d.name || !(parseFloat(d.qty)>0)) return;
+          const exists = disposeLog.find(r=>r.date===isoDate&&r.name===d.name&&r.lot===d.lot&&r.qty===parseFloat(d.qty));
+          if(!exists){
+            disposeLog.push({
+              date:isoDate, name:d.name, qty:parseFloat(d.qty)||0,
+              lot:d.lot||'', unit:'kg', reason:'공정중 잔량폐기',
+              source:'배합일지', product:rec.product||'', createdAt:new Date().toISOString()
+            });
+          }
+        });
+      });
+      await db.collection('appData').doc('disposeLog').set({ data:JSON.stringify(disposeLog), updatedAt:new Date().toISOString() });
+    }catch(e){ console.warn('폐기대장 저장 실패',e); }
 
     // 4. 배합비(recipeDB) Firebase 업로드
     await db.collection('appData').doc('recipeDB').set({ data: JSON.stringify(DB), updatedAt: new Date().toISOString() });
