@@ -57,8 +57,22 @@ tr:hover td{background:var(--bg);}
 .autocomplete-list.open{display:block;}
 .autocomplete-item{padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);}
 .autocomplete-item:hover{background:var(--primary-light);color:var(--primary);}
+.ing-row{cursor:pointer;transition:background 0.15s;}
+.ing-row:hover td{background:#eef3fb;}
+.acc-arrow{display:inline-block;font-size:10px;color:var(--text3);margin-right:4px;transition:transform 0.2s;width:12px;text-align:center;}
+.acc-arrow.open{transform:rotate(90deg);color:var(--primary);}
+.accordion-detail{display:none;}
+.accordion-detail.open{display:table-row;}
+.accordion-detail>td{padding:0 12px 12px 12px;background:#f8faff;border-bottom:2px solid var(--primary-light);}
+.acc-inner{padding:12px;background:#fff;border-radius:8px;border:1px solid var(--border);}
+.acc-table{width:100%;border-collapse:collapse;font-size:12px;}
+.acc-table thead tr{background:var(--primary-light);}
+.acc-table th{padding:7px 10px;text-align:center;font-weight:700;color:var(--primary-dark);border-bottom:1.5px solid var(--primary);font-size:11px;white-space:nowrap;}
+.acc-table td{padding:6px 10px;border-bottom:1px solid var(--border);text-align:center;font-size:12px;}
+.acc-table tr:last-child td{border-bottom:none;}
+.acc-empty{padding:16px;text-align:center;color:var(--text3);font-size:13px;}
 @media print{
-  .topbar,.filter-row,.btn{display:none!important;}
+  .topbar,.filter-row,.btn,.accordion-detail,.acc-arrow{display:none!important;}
   .card-hd .badge{display:none!important;}
   body{background:#fff;}
   .card{box-shadow:none;border:1px solid #ddd;}
@@ -412,9 +426,12 @@ function renderLedger(){
     if(!storTags.length) storTags.push('<span class="badge badge-gray" style="font-size:10px;">-</span>');
     const storDisplay=storTags.join(' ');
 
-    return `<tr>
-      <td><span class="badge badge-blue" style="font-size:10px">${ing.code}</span></td>
-      <td style="font-weight:600">${ing.name}</td>
+    const safeName=ing.name.replace(/'/g,"\\'").replace(/\n/g,' ');
+    const accHtml=buildAccordionContent(ing,selDate);
+
+    return `<tr class="ing-row" onclick="toggleAccordion('${ing.code}')">
+      <td><span class="acc-arrow" id="arrow-${ing.code}">▶</span><span class="badge badge-blue" style="font-size:10px">${ing.code}</span></td>
+      <td style="font-weight:600">${ing.name.replace(/\n/g,' ')}</td>
       <td style="font-size:12px;color:var(--text2)">${ing.origin||'-'}</td>
       <td style="white-space:nowrap;">${storDisplay}</td>
       <td class="tc" style="font-size:12px">${ing.unit||'kg'}</td>
@@ -423,12 +440,133 @@ function renderLedger(){
       <td class="tc" style="color:var(--danger);font-weight:${monthOut>0?700:400}">${monthOut>0?'-'+monthOut.toFixed(3):'-'}</td>
       <td class="tc" style="font-weight:700;color:${closing<0?'var(--danger)':closing>0?'var(--primary)':'var(--text3)'}">${closing.toFixed(3)}</td>
       <td style="white-space:nowrap;">
-        <button class="btn btn-sm btn-primary" onclick="openAddLedgerRecord('${ing.name}','${ing.code}')">+ 등록</button>
-        <button class="btn btn-sm btn-outline" onclick="openEditIngredient('${ing.code}')">수정</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteLedgerByName('${ing.name}')">삭제</button>
+        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openAddLedgerRecord('${safeName}','${ing.code}')">+ 등록</button>
+        <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();openEditIngredient('${ing.code}')">수정</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteLedgerByName('${safeName}')">삭제</button>
       </td>
+    </tr>
+    <tr class="accordion-detail" id="acc-${ing.code}"><td colspan="10">${accHtml}</td></tr>`;
+  }).join('');
+}
+
+function toggleAccordion(code){
+  const row=document.getElementById('acc-'+code);
+  const arrow=document.getElementById('arrow-'+code);
+  if(!row)return;
+  const isOpen=row.classList.contains('open');
+  if(isOpen){
+    row.classList.remove('open');
+    if(arrow){arrow.textContent='▶';arrow.classList.remove('open');}
+  }else{
+    row.classList.add('open');
+    if(arrow){arrow.textContent='▶';arrow.classList.add('open');}
+  }
+}
+
+function parseExpDate(exp){
+  if(!exp)return null;
+  let d;
+  // ISO: 2027-05-18
+  if(exp.includes('-')&&exp.length>=10){d=new Date(exp);}
+  // YY.MM.DD: 27.05.18
+  else if(exp.includes('.')&&exp.length>=8){
+    const p=exp.split('.');
+    d=new Date(2000+parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
+  }
+  // YYMMDD: 270518
+  else if(/^\d{6}$/.test(exp)){
+    d=new Date(2000+parseInt(exp.slice(0,2)),parseInt(exp.slice(2,4))-1,parseInt(exp.slice(4,6)));
+  }
+  else return null;
+  return isNaN(d.getTime())?null:d;
+}
+
+function getExpStatus(exp){
+  const d=parseExpDate(exp);
+  if(!d)return {label:'미등록',cls:'badge-gray'};
+  const today=new Date();today.setHours(0,0,0,0);d.setHours(0,0,0,0);
+  const diff=Math.ceil((d-today)/(1000*60*60*24));
+  if(diff<0)return {label:'초과 D+'+Math.abs(diff),cls:'badge-red'};
+  if(diff<=7)return {label:'D-'+diff,cls:'badge-orange'};
+  return {label:'정상',cls:'badge-green'};
+}
+
+function fmtExpDisplay(exp){
+  if(!exp)return '-';
+  const d=parseExpDate(exp);
+  if(!d)return exp;
+  const yy=String(d.getFullYear()).slice(2);
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  const dd=String(d.getDate()).padStart(2,'0');
+  return yy+'.'+mm+'.'+dd;
+}
+
+function buildAccordionContent(ing,selDate){
+  // 해당 원료의 모든 레코드 수집 (selDate 이하)
+  const recs=ledgerRecords.filter(r=>r.name===ing.name);
+  const lotMap={};
+
+  // init + in → LOT별 입고량 합산
+  recs.forEach(r=>{
+    if(r.type==='init'||(r.type==='in'&&r.date<=selDate)){
+      const key=r.lot||'_미지정';
+      if(!lotMap[key])lotMap[key]={lot:r.lot||'LOT 미지정',type:r.type==='init'?'초기':'입고',exp:r.exp||'',inQty:0,outQty:0};
+      lotMap[key].inQty+=r.qty;
+      if(r.exp&&!lotMap[key].exp)lotMap[key].exp=r.exp;
+    }
+  });
+
+  // out/dispose/return → LOT별 출고량 차감
+  recs.forEach(r=>{
+    if((r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date<=selDate){
+      const key=r.lot||'_미지정';
+      if(lotMap[key]){
+        lotMap[key].outQty+=r.qty;
+      }else{
+        // LOT 매칭 안 되는 출고 → 미지정 그룹
+        if(!lotMap['_미지정'])lotMap['_미지정']={lot:'LOT 미지정',type:'-',exp:'',inQty:0,outQty:0};
+        lotMap['_미지정'].outQty+=r.qty;
+      }
+    }
+  });
+
+  // 잔여량 계산 후 0 이상만 필터
+  const lots=Object.values(lotMap).map(l=>({...l,remain:l.inQty-l.outQty})).filter(l=>l.remain>0.0005);
+
+  if(!lots.length)return '<div class="acc-inner"><div class="acc-empty">현재 잔여 재고가 없습니다</div></div>';
+
+  // 소비기한 임박순 정렬 (빠른 것 위로)
+  lots.sort((a,b)=>{
+    const da=parseExpDate(a.exp),db=parseExpDate(b.exp);
+    if(!da&&!db)return 0;if(!da)return 1;if(!db)return -1;
+    return da-db;
+  });
+
+  let rows=lots.map(l=>{
+    const st=getExpStatus(l.exp);
+    return `<tr>
+      <td style="text-align:left;font-family:monospace;font-size:11px;color:var(--primary-dark)">${l.lot}</td>
+      <td>${l.type}</td>
+      <td>${fmtExpDisplay(l.exp)}</td>
+      <td style="text-align:right;font-weight:600">${l.remain.toFixed(3)}</td>
+      <td><span class="badge ${st.cls}">${st.label}</span></td>
     </tr>`;
   }).join('');
+
+  const totalRemain=lots.reduce((s,l)=>s+l.remain,0);
+
+  return `<div class="acc-inner">
+    <table class="acc-table">
+      <thead><tr><th style="text-align:left">LOT번호</th><th>유형</th><th>소비기한</th><th style="text-align:right">잔여량(${ing.unit||'kg'})</th><th>상태</th></tr></thead>
+      <tbody>${rows}
+        <tr style="background:var(--bg);font-weight:700;">
+          <td colspan="3" style="text-align:right;color:var(--text2)">합계</td>
+          <td style="text-align:right;color:var(--primary)">${totalRemain.toFixed(3)}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
 }
 
 async function saveLedger(){
