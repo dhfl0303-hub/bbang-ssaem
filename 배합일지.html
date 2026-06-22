@@ -1274,7 +1274,7 @@ function syncBatchToLedger(){
 
 function showComplete(){
   const p=DB[S.product];
-  syncBatchToLedger(); // 원료수불부 출고 자동반영
+  // syncBatchToLedger 제거 — 동기화 버튼 시에만 출고 반영
   // 기타사용원재료 → batchRecords의 extraIngredients에 포함 (FIFO 분배 flatten)
   const extraIngs = [];
   (S.inputIngredients||[]).filter(ing=>ing.name).forEach(ing=>{
