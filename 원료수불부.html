@@ -125,7 +125,6 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<!-- 입고 모달 -->
 <div class="modal-overlay" id="inModal" onclick="closeModalOutside(event,'inModal')">
   <div class="modal">
     <div class="modal-hd"><div class="modal-title">+ 입고 등록</div><button class="modal-close" onclick="closeModal('inModal')">×</button></div>
@@ -142,7 +141,6 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<!-- 출고 모달 -->
 <div class="modal-overlay" id="outModal" onclick="closeModalOutside(event,'outModal')">
   <div class="modal">
     <div class="modal-hd"><div class="modal-title">- 출고 등록</div><button class="modal-close" onclick="closeModal('outModal')">×</button></div>
@@ -159,7 +157,6 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<!-- 신규 원료 등록 모달 -->
 <div class="modal-overlay" id="newIngModal" onclick="closeModalOutside(event,'newIngModal')">
   <div class="modal" style="width:520px">
     <div class="modal-hd"><div class="modal-title">➕ 신규 원료 등록</div><button class="modal-close" onclick="closeModal('newIngModal')">×</button></div>
@@ -176,7 +173,6 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<!-- 코드 삭제 모달 -->
 <div class="modal-overlay" id="deleteCodeModal" onclick="closeModalOutside(event,'deleteCodeModal')">
   <div class="modal" style="width:400px">
     <div class="modal-hd"><div class="modal-title">🗑️ 코드 삭제</div><button class="modal-close" onclick="closeModal('deleteCodeModal')">×</button></div>
@@ -188,7 +184,6 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<!-- 수정 모달 -->
 <div class="modal-overlay" id="editIngModal" onclick="closeModalOutside(event,'editIngModal')">
   <div class="modal" style="width:480px">
     <div class="modal-hd"><div class="modal-title">✏️ 원료 수정</div><button class="modal-close" onclick="closeModal('editIngModal')">×</button></div>
@@ -210,7 +205,6 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<!-- 전일재고 모달 -->
 <div class="modal-overlay" id="initStockModal">
   <div class="modal" style="width:720px">
     <div class="modal-hd"><div class="modal-title">📋 전일재고 등록</div><button class="modal-close" onclick="closeModal('initStockModal')">×</button></div>
@@ -230,7 +224,6 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<!-- 투입LOT 출고삭제 모달 -->
 <div class="modal-overlay" id="deleteByInputLotModal" onclick="closeModalOutside(event,'deleteByInputLotModal')">
   <div class="modal" style="width:480px">
     <div class="modal-hd"><div class="modal-title">🗑️ 투입LOT 출고삭제</div><button class="modal-close" onclick="closeModal('deleteByInputLotModal')">×</button></div>
@@ -251,7 +244,6 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<!-- 수불내역 전체삭제 모달 -->
 <div class="modal-overlay" id="deleteAllLedgerModal" onclick="closeModalOutside(event,'deleteAllLedgerModal')">
   <div class="modal" style="width:400px">
     <div class="modal-hd"><div class="modal-title">⚠️ 수불내역 전체삭제</div><button class="modal-close" onclick="closeModal('deleteAllLedgerModal')">×</button></div>
@@ -562,20 +554,34 @@ function buildAccordionContent(ing,selDate){
 
   const totalRemain=lots.reduce((s,l)=>s+l.remain,0);
 
-  // 출고 기록 목록 (삭제 가능)
+  // 출고 기록 목록 (다중 삭제 기능 추가)
   const outRecs=recs.filter(r=>(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date<=selDate);
   let outHtml='';
   if(outRecs.length){
     outHtml=`<div style="margin-top:10px;">
-      <div onclick="toggleOutRecs('out-${ing.code}')" style="cursor:pointer;font-size:11px;font-weight:700;color:var(--warning);padding:4px 0;">
-        ▶ 출고내역 보기/정리 (${outRecs.length}건)
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
+        <div onclick="toggleOutRecs('out-${ing.code}')" style="cursor:pointer;font-size:11px;font-weight:700;color:var(--warning);">
+          ▶ 출고내역 보기/정리 (${outRecs.length}건)
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="deleteMultiOutRecords('${ing.code}')" style="padding:4px 10px; font-size:11px;">선택 삭제</button>
       </div>
-      <div id="out-${ing.code}" style="display:none;">
+      <div id="out-${ing.code}" style="display:none; margin-top:6px;">
         <table class="acc-table" style="font-size:11px;">
-          <thead><tr><th style="text-align:left">날짜</th><th style="text-align:left">LOT</th><th>배합LOT</th><th>유형</th><th style="text-align:right">수량</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th style="width:30px; text-align:center;"><input type="checkbox" onchange="toggleAllOutChk(this, '${ing.code}')"></th>
+              <th style="text-align:left">날짜</th>
+              <th style="text-align:left">LOT</th>
+              <th>배합LOT</th>
+              <th>유형</th>
+              <th style="text-align:right">수량</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>${outRecs.map((r,i)=>{
             const idx=ledgerRecords.indexOf(r);
             return `<tr>
+              <td style="text-align:center;"><input type="checkbox" class="chk-out-${ing.code}" value="${idx}"></td>
               <td style="font-size:10px;">${r.date||'-'}</td>
               <td style="font-size:10px;font-family:monospace;">${r.lot||'-'}</td>
               <td style="font-size:10px;">${r.batchLot||'-'}</td>
@@ -1063,6 +1069,45 @@ async function saveOut(){
   const ing=getIngByName(name);
   ledgerRecords.push({date,name,code:ing?ing.code:'',qty,lot,note,type:'out'});
   await saveLedger();closeModal('outModal');renderLedger();
+}
+
+// ===== 다중 삭제 처리 함수 =====
+function toggleAllOutChk(source, code) {
+  const checkboxes = document.querySelectorAll('.chk-out-' + code);
+  checkboxes.forEach(cb => cb.checked = source.checked);
+}
+
+async function deleteMultiOutRecords(code) {
+  const checkboxes = document.querySelectorAll('.chk-out-' + code + ':checked');
+  if (checkboxes.length === 0) {
+    alert('삭제할 내역을 먼저 체크해주세요.');
+    return;
+  }
+
+  if (!confirm(`선택한 ${checkboxes.length}건의 출고 기록을 정말 삭제하시겠습니까?`)) return;
+
+  // 인덱스 내림차순 정렬 (배열 삭제 시 순서 꼬임 방지)
+  const indices = Array.from(checkboxes).map(cb => parseInt(cb.value)).sort((a, b) => b - a);
+
+  indices.forEach(idx => {
+    ledgerRecords.splice(idx, 1);
+  });
+
+  await saveLedger();
+  renderLedger();
+
+  // 삭제 완료 후 펼쳐져 있던 아코디언 상태 유지
+  setTimeout(() => {
+    const row = document.getElementById('acc-' + code);
+    const arrow = document.getElementById('arrow-' + code);
+    const outDiv = document.getElementById('out-' + code);
+    
+    if (row) row.classList.add('open');
+    if (arrow) arrow.classList.add('open');
+    if (outDiv) outDiv.style.display = 'block';
+  }, 50);
+
+  alert(`${checkboxes.length}건 삭제 완료! 재고가 원상복귀 되었습니다.`);
 }
 
 // ===== Firebase 직접 읽기/쓰기 =====
