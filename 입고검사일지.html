@@ -138,6 +138,12 @@ select.td-input{cursor:pointer;}
 .calc-btn{padding:14px;font-size:18px;font-weight:700;border:1.5px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-family:"Noto Sans KR",sans-serif;transition:all 0.1s;}
 .calc-btn:active{background:var(--primary-light);transform:scale(0.95);}
 .calc-op{background:#f0f4ff;color:var(--primary);}
+.ac-wrap{position:relative;}
+.ac-list{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--primary);border-top:none;border-radius:0 0 7px 7px;max-height:180px;overflow-y:auto;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.15);}
+.ac-list.open{display:block;}
+.ac-item{padding:8px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0f0f0;}
+.ac-item:active,.ac-item:hover{background:var(--primary-light);color:var(--primary);font-weight:600;}
+.ac-item:last-child{border-bottom:none;}
 
     input[type=number]::-webkit-inner-spin-button,
     input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
@@ -164,10 +170,6 @@ select.td-input{cursor:pointer;}
 </head>
 <body>
 
-<!-- 자동완성 datalist -->
-<datalist id="dl-suppliers"></datalist>
-<datalist id="dl-products"></datalist>
-
 <!-- 계산기 모달 -->
 <div class="modal-overlay" id="calcModal" onclick="closeModalOutside(event,'calcModal')">
   <div class="modal" style="width:340px;">
@@ -176,8 +178,7 @@ select.td-input{cursor:pointer;}
       <button class="modal-close" onclick="closeModal('calcModal')">×</button>
     </div>
     <div class="modal-bd" style="padding:16px;">
-      <input id="calcExpr" class="form-input-modal" placeholder="예: 10.8 * 3" style="font-size:18px;font-weight:700;text-align:center;margin-bottom:10px;" inputmode="decimal"
-        onkeyup="if(event.key==='Enter')calcResult()">
+      <input id="calcExpr" class="form-input-modal" readonly placeholder="버튼으로 입력" style="font-size:18px;font-weight:700;text-align:center;margin-bottom:10px;background:#fff;cursor:default;">
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;">
         <button class="calc-btn" onclick="calcAppend('7')">7</button>
         <button class="calc-btn" onclick="calcAppend('8')">8</button>
@@ -196,6 +197,7 @@ select.td-input{cursor:pointer;}
         <button class="calc-btn" onclick="calcClear()" style="color:var(--danger);">C</button>
         <button class="calc-btn calc-op" onclick="calcAppend('+')">+</button>
       </div>
+      <button onclick="calcResult()" style="width:100%;padding:14px;font-size:20px;font-weight:700;background:var(--primary-light);color:var(--primary);border:1.5px solid var(--primary);border-radius:8px;cursor:pointer;margin-bottom:12px;font-family:'Noto Sans KR',sans-serif;">=</button>
       <div id="calcResultDisplay" style="text-align:right;font-size:24px;font-weight:700;color:var(--primary);padding:8px 12px;background:var(--bg);border-radius:8px;margin-bottom:12px;min-height:40px;">-</div>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-outline" onclick="closeModal('calcModal')" style="flex:1;">취소</button>
@@ -522,41 +524,139 @@ function onInDateInput(){
   }
 }
 
-// ===== Datalist 빌드 =====
-function buildDatalists(){
-  const dlSup = document.getElementById('dl-suppliers');
-  dlSup.innerHTML = suppliers.map(s=>`<option value="${s}">`).join('');
-  const dlProd = document.getElementById('dl-products');
-  dlProd.innerHTML = INGREDIENT_DB.map(i=>`<option value="${i.name}">${i.code}</option>`).join('');
+// ===== 커스텀 자동완성 =====
+function showAC(inputId, type){
+  filterAC(inputId, type);
+  const list = document.getElementById('ac-'+inputId);
+  if(list) list.classList.add('open');
+}
+function hideAC(inputId){
+  const list = document.getElementById('ac-'+inputId);
+  if(list) list.classList.remove('open');
+}
+function filterAC(inputId, type){
+  const input = document.getElementById(inputId);
+  const list = document.getElementById('ac-'+inputId);
+  if(!input||!list) return;
+  const q = input.value.trim().toLowerCase();
+  let items = [];
+  if(type==='supplier'){
+    items = suppliers.map(s=>({label:s, value:s}));
+  } else {
+    items = INGREDIENT_DB.map(i=>({label:i.code+' - '+i.name, value:i.name}));
+  }
+  const filtered = q ? items.filter(i=>i.label.toLowerCase().includes(q)||i.value.toLowerCase().includes(q)) : items;
+  list.innerHTML = filtered.slice(0,20).map(i=>
+    `<div class="ac-item" onmousedown="selectAC('${inputId}','${i.value.replace(/'/g,"\\'")}','${type}')">${i.label}</div>`
+  ).join('');
+  if(filtered.length) list.classList.add('open');
+  else list.classList.remove('open');
+
+  // 제품 입력 시 실시간 매칭 → LOT 코드 자동입력
+  if(type==='product'){
+    const ing = INGREDIENT_DB.find(i=>i.name===input.value.trim());
+    if(ing){
+      const rowId = inputId.replace('product-','').replace('edit-','');
+      const prefix = inputId.startsWith('edit-') ? 'edit-' : '';
+      const codeEl = document.getElementById(prefix+'lot-code-'+rowId);
+      const dateEl = document.getElementById(prefix+'lot-date-'+rowId);
+      if(codeEl) codeEl.value = ing.code;
+      if(dateEl && !dateEl.value) dateEl.value = getInDateYYMMDD();
+      if(!inputId.startsWith('edit-')) buildLot(parseInt(rowId));
+    }
+  }
+}
+function selectAC(inputId, value, type){
+  const input = document.getElementById(inputId);
+  if(input) input.value = value;
+  hideAC(inputId);
+  // 제품 선택 시 LOT 코드 자동입력
+  if(type==='product'){
+    const ing = INGREDIENT_DB.find(i=>i.name===value);
+    const rowId = inputId.replace('product-','').replace('edit-','');
+    const prefix = inputId.startsWith('edit-') ? 'edit-' : '';
+    if(ing){
+      const codeEl = document.getElementById(prefix+'lot-code-'+rowId);
+      const dateEl = document.getElementById(prefix+'lot-date-'+rowId);
+      if(codeEl) codeEl.value = ing.code;
+      if(dateEl) dateEl.value = getInDateYYMMDD();
+      if(!inputId.startsWith('edit-')) buildLot(parseInt(rowId));
+    }
+  }
 }
 
 // ===== 계산기 =====
 let _calcTargetId = null;
+let _calcDisplay = '';
+let _calcJustEvaluated = false;
+
 function openCalc(rowId){
   _calcTargetId = rowId;
+  _calcDisplay = '';
+  _calcJustEvaluated = false;
   document.getElementById('calcExpr').value = '';
   document.getElementById('calcResultDisplay').textContent = '-';
   document.getElementById('calcModal').classList.add('open');
-  setTimeout(()=>document.getElementById('calcExpr').focus(), 100);
 }
 function calcAppend(ch){
-  const el = document.getElementById('calcExpr');
-  el.value += ch;
-  calcResult();
+  const isOp = ['+','-','*','/'].includes(ch);
+  const isDot = ch === '.';
+
+  // = 누른 직후 숫자 입력 → 새 계산 시작
+  if(_calcJustEvaluated && !isOp){
+    _calcDisplay = '';
+    _calcJustEvaluated = false;
+  }
+  // = 누른 직후 연산자 → 결과에 이어서 계산
+  if(_calcJustEvaluated && isOp){
+    _calcJustEvaluated = false;
+  }
+
+  // 연산자 연속 입력 → 마지막 연산자 교체
+  if(isOp && _calcDisplay.length > 0){
+    const last = _calcDisplay.slice(-1);
+    if(['+','-','*','/'].includes(last)){
+      _calcDisplay = _calcDisplay.slice(0, -1);
+    }
+  }
+
+  // 빈 상태에서 연산자 → 무시 (- 제외, 음수용)
+  if(isOp && _calcDisplay === '' && ch !== '-') return;
+
+  // 소수점 중복 방지: 현재 숫자 부분에 이미 .이 있으면 무시
+  if(isDot){
+    const parts = _calcDisplay.split(/[+\-*/]/);
+    const currentNum = parts[parts.length - 1];
+    if(currentNum.includes('.')) return;
+  }
+
+  _calcDisplay += ch;
+  document.getElementById('calcExpr').value = _calcDisplay.replace(/\*/g,'×').replace(/\//g,'÷');
+  document.getElementById('calcResultDisplay').textContent = '-';
 }
 function calcClear(){
+  _calcDisplay = '';
+  _calcJustEvaluated = false;
   document.getElementById('calcExpr').value = '';
   document.getElementById('calcResultDisplay').textContent = '-';
 }
 function calcResult(){
-  const expr = document.getElementById('calcExpr').value.trim();
+  if(!_calcDisplay){ document.getElementById('calcResultDisplay').textContent = '-'; return; }
+  // 마지막이 연산자면 제거
+  let expr = _calcDisplay;
+  while(expr.length && ['+','-','*','/'].includes(expr.slice(-1))){
+    expr = expr.slice(0, -1);
+  }
   if(!expr){ document.getElementById('calcResultDisplay').textContent = '-'; return; }
   try{
-    // 안전한 수식 평가 (숫자, +, -, *, /, ., 공백, 괄호만 허용)
     if(!/^[0-9+\-*/.()\s]+$/.test(expr)){ document.getElementById('calcResultDisplay').textContent = '?'; return; }
     const result = Function('"use strict";return ('+expr+')')();
     if(isNaN(result)||!isFinite(result)){ document.getElementById('calcResultDisplay').textContent = '?'; return; }
-    document.getElementById('calcResultDisplay').textContent = parseFloat(result.toFixed(3));
+    const rounded = parseFloat(result.toFixed(3));
+    document.getElementById('calcResultDisplay').textContent = rounded;
+    _calcDisplay = String(rounded);
+    document.getElementById('calcExpr').value = String(rounded);
+    _calcJustEvaluated = true;
   }catch(e){ document.getElementById('calcResultDisplay').textContent = '?'; }
 }
 function calcApply(){
@@ -575,7 +675,6 @@ let signModalDrawing = false;
 let signModalCtx = null;
 
 function init(){
-  buildDatalists();
   // 오늘 날짜 자동입력
   const today = new Date();
   const yy = String(today.getFullYear()).slice(2);
@@ -752,11 +851,22 @@ function addRow(){
 
   tr.innerHTML = `
     <td>
-      <input class="td-input" id="supplier-${id}" list="dl-suppliers" placeholder="업체명 입력" autocomplete="off">
+      <div class="ac-wrap">
+        <input class="td-input" id="supplier-${id}" placeholder="업체명 입력" autocomplete="off"
+          onfocus="showAC('supplier-${id}','supplier')"
+          oninput="filterAC('supplier-${id}','supplier')"
+          onblur="setTimeout(()=>hideAC('supplier-${id}'),200)">
+        <div class="ac-list" id="ac-supplier-${id}"></div>
+      </div>
     </td>
     <td>
-      <input class="td-input" id="product-${id}" list="dl-products" placeholder="제품명 입력" autocomplete="off"
-        oninput="onProductInput(${id})">
+      <div class="ac-wrap">
+        <input class="td-input" id="product-${id}" placeholder="제품명 입력" autocomplete="off"
+          onfocus="showAC('product-${id}','product')"
+          oninput="filterAC('product-${id}','product')"
+          onblur="setTimeout(()=>hideAC('product-${id}'),200)">
+        <div class="ac-list" id="ac-product-${id}"></div>
+      </div>
     </td>
     <td>
       <div style="display:flex;align-items:center;gap:2px;margin-bottom:4px;">
@@ -798,19 +908,6 @@ function addRow(){
     <td><button class="row-del" onclick="delRow(${id})">×</button></td>
   `;
   tbody.appendChild(tr);
-}
-
-function onProductInput(id){
-  const val = document.getElementById('product-'+id).value.trim();
-  if(!val) return;
-
-  // INGREDIENT_DB에서 매칭 확인
-  const ing = INGREDIENT_DB.find(i=>i.name===val);
-  if(ing){
-    document.getElementById('lot-code-'+id).value = ing.code;
-    document.getElementById('lot-date-'+id).value = getInDateYYMMDD();
-    buildLot(id);
-  }
 }
 
 function buildLot(id){
@@ -1142,10 +1239,22 @@ function addEditRow(data=null){
 
   tr.innerHTML = `
     <td style="border:1px solid var(--border);padding:3px;">
-      <input class="td-input" id="edit-supplier-${id}" list="dl-suppliers" value="${d.supplier||''}" placeholder="업체명" autocomplete="off">
+      <div class="ac-wrap">
+        <input class="td-input" id="edit-supplier-${id}" value="${d.supplier||''}" placeholder="업체명" autocomplete="off"
+          onfocus="showAC('edit-supplier-${id}','supplier')"
+          oninput="filterAC('edit-supplier-${id}','supplier')"
+          onblur="setTimeout(()=>hideAC('edit-supplier-${id}'),200)">
+        <div class="ac-list" id="ac-edit-supplier-${id}"></div>
+      </div>
     </td>
     <td style="border:1px solid var(--border);padding:3px;">
-      <input class="td-input" id="edit-product-${id}" list="dl-products" value="${d.product||''}" placeholder="제품명" autocomplete="off">
+      <div class="ac-wrap">
+        <input class="td-input" id="edit-product-${id}" value="${d.product||''}" placeholder="제품명" autocomplete="off"
+          onfocus="showAC('edit-product-${id}','product')"
+          oninput="filterAC('edit-product-${id}','product')"
+          onblur="setTimeout(()=>hideAC('edit-product-${id}'),200)">
+        <div class="ac-list" id="ac-edit-product-${id}"></div>
+      </div>
     </td>
     <td style="border:1px solid var(--border);padding:3px;">
       <div style="display:flex;align-items:center;gap:1px;">
@@ -1485,7 +1594,7 @@ function saveEditSupplier(){
 }
 
 function updateSupplierSelects(){
-  buildDatalists();
+  // 커스텀 자동완성이 suppliers 배열을 실시간 참조하므로 별도 업데이트 불필요
 }
 
 // ===== 모달 =====
