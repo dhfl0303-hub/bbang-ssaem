@@ -220,7 +220,11 @@ tr:hover td{background:var(--bg);}
       <div style="display:flex;justify-content:space-between;"><span style="color:rgba(255,255,255,0.35);">부서</span><span id="profileDept">-</span></div>
       <div style="display:flex;justify-content:space-between;"><span style="color:rgba(255,255,255,0.35);">직급</span><span id="profileRank">-</span></div>
     </div>
-    <div onclick="doLogout()" style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:7px;cursor:pointer;">
+    <div onclick="openChangePwModal()" style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:7px;cursor:pointer;">
+      <span style="font-size:13px;">🔑</span>
+      <span style="font-size:12px;color:rgba(255,255,255,0.45);">비밀번호 변경</span>
+    </div>
+    <div onclick="doLogout()" style="margin-top:4px;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:7px;cursor:pointer;">
       <span style="font-size:13px;">↩</span>
       <span style="font-size:12px;color:rgba(255,255,255,0.45);">로그아웃</span>
     </div>
@@ -771,6 +775,37 @@ tr:hover td{background:var(--bg);}
         <div style="display:flex;gap:8px;justify-content:flex-end;padding:16px 24px;border-top:1px solid var(--border);background:var(--bg);">
           <button class="btn btn-outline" onclick="closeAccountModal()">취소</button>
           <button class="btn btn-primary" onclick="saveAccount()">저장</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 비밀번호 변경 모달 -->
+    <div id="changePwModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:12px;width:380px;max-width:92vw;box-shadow:0 8px 30px rgba(0,0,0,0.15);">
+        <div style="padding:20px 24px 0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+            <div style="font-size:16px;font-weight:700;">비밀번호 변경</div>
+            <span onclick="closeChangePwModal()" style="cursor:pointer;font-size:18px;color:var(--text3);">✕</span>
+          </div>
+          <div style="display:grid;gap:12px;">
+            <div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500;">현재 비밀번호</div>
+              <input id="cpwCurrent" type="password" placeholder="현재 비밀번호 입력" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" />
+            </div>
+            <div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500;">새 비밀번호</div>
+              <input id="cpwNew" type="password" placeholder="새 비밀번호 입력" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" />
+            </div>
+            <div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500;">새 비밀번호 확인</div>
+              <input id="cpwConfirm" type="password" placeholder="새 비밀번호 다시 입력" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" />
+            </div>
+            <div id="cpwErrMsg" style="font-size:12px;color:var(--danger);min-height:18px;"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;padding:16px 24px;border-top:1px solid var(--border);background:var(--bg);">
+          <button class="btn btn-outline" onclick="closeChangePwModal()">취소</button>
+          <button class="btn btn-primary" onclick="doChangePw()">변경</button>
         </div>
       </div>
     </div>
@@ -2904,6 +2939,7 @@ function showPanel(id){
   document.getElementById('panel-'+id).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if (id === 'account-mgmt') loadAccounts();
+  setTimeout(()=>applyPanelPermission(id), 100);
   // 날짜 드롭다운 채우기
   if(id==='batch-status'){
     fillDateDropdown('batchStatusDate','batchRecords_');
@@ -4265,6 +4301,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 로그아웃
 function doLogout() {
+
+// 비밀번호 변경
+function openChangePwModal() {
+  ['cpwCurrent','cpwNew','cpwConfirm'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cpwErrMsg').textContent = '';
+  document.getElementById('changePwModal').style.display = 'flex';
+}
+function closeChangePwModal() {
+  document.getElementById('changePwModal').style.display = 'none';
+}
+async function doChangePw() {
+  const curr = document.getElementById('cpwCurrent').value;
+  const newPw = document.getElementById('cpwNew').value;
+  const confirm = document.getElementById('cpwConfirm').value;
+  const errEl = document.getElementById('cpwErrMsg');
+  errEl.textContent = '';
+  if (!curr || !newPw || !confirm) { errEl.textContent = '모든 항목을 입력하세요.'; return; }
+  if (newPw !== confirm) { errEl.textContent = '새 비밀번호가 일치하지 않습니다.'; return; }
+  if (newPw.length < 4) { errEl.textContent = '비밀번호는 4자 이상이어야 합니다.'; return; }
+  const session = JSON.parse(localStorage.getItem(AUTH_KEY));
+  const currHash = await sha256(curr);
+  const ref = window._db.collection('appData').doc('userAccounts');
+  const snap = await ref.get();
+  const accounts = snap.data();
+  const user = accounts[session.empId];
+  if (!user || user.pwHash !== currHash) { errEl.textContent = '현재 비밀번호가 올바르지 않습니다.'; return; }
+  accounts[session.empId].pwHash = await sha256(newPw);
+  await ref.set(accounts);
+  closeChangePwModal();
+  alert('비밀번호가 변경되었습니다.');
+}
   localStorage.removeItem(AUTH_KEY);
   location.reload();
 }
@@ -4286,19 +4353,29 @@ function applySession(session) {
 
 // 권한 적용 — 없는 메뉴에 🔒 표시
 function applyPermissions(session) {
-  if (session.role === 'superadmin') return;
-  const perms = session.permissions || [];
-  document.querySelectorAll('.nav-item[onclick]').forEach(el => {
-    const match = el.getAttribute('onclick').match(/showPanel\('(.+?)'\)/);
-    if (!match) return;
-    const key = match[1];
-    if (!perms.includes(key)) {
-      el.style.opacity = '0.4';
-      el.style.pointerEvents = 'none';
-      const icon = el.querySelector('.nav-icon');
-      if (icon) icon.textContent = '🔒';
-      el.onclick = () => alert('접근 권한이 없습니다.');
-      el.style.pointerEvents = 'auto';
+  window._userRole = session.role;
+  window._userPerms = session.permissions || [];
+}
+
+// 현재 패널 권한 체크
+function hasPermission(panelKey) {
+  if (window._userRole === 'superadmin') return true;
+  return (window._userPerms || []).includes(panelKey);
+}
+
+// 패널 내 수정/삭제 버튼 제어
+function applyPanelPermission(panelId) {
+  if (window._userRole === 'superadmin') return;
+  const panel = document.getElementById('panel-' + panelId);
+  if (!panel) return;
+  const allowed = hasPermission(panelId);
+  const editBtns = panel.querySelectorAll('.btn-primary, .btn-pink, .btn-danger, [onclick*="delete"], [onclick*="Delete"], [onclick*="open"], [onclick*="add"], [onclick*="Add"], [onclick*="edit"], [onclick*="Edit"], [onclick*="save"], [onclick*="Save"]');
+  editBtns.forEach(btn => {
+    const oc = btn.getAttribute('onclick') || '';
+    if (oc.includes('filter') || oc.includes('Filter') || oc.includes('search') || oc.includes('Search') || oc.includes('load') || oc.includes('show') || oc.includes('toggle') || oc.includes('fill')) return;
+    if (!allowed) {
+      btn.dataset.origDisplay = btn.style.display;
+      btn.style.display = 'none';
     }
   });
 }
