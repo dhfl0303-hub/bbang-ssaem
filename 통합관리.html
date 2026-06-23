@@ -2940,6 +2940,7 @@ function showPanel(id){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if (id === 'account-mgmt') loadAccounts();
   setTimeout(()=>applyPanelPermission(id), 100);
+  setTimeout(()=>applyPanelPermission(id), 800);
   // 날짜 드롭다운 채우기
   if(id==='batch-status'){
     fillDateDropdown('batchStatusDate','batchRecords_');
@@ -4369,11 +4370,13 @@ function applyPanelPermission(panelId) {
   const panel = document.getElementById('panel-' + panelId);
   if (!panel) return;
   const allowed = hasPermission(panelId);
-  const editBtns = panel.querySelectorAll('.btn-primary, .btn-pink, .btn-danger, [onclick*="delete"], [onclick*="Delete"], [onclick*="open"], [onclick*="add"], [onclick*="Add"], [onclick*="edit"], [onclick*="Edit"], [onclick*="save"], [onclick*="Save"]');
-  editBtns.forEach(btn => {
+  if (allowed) return;
+  panel.querySelectorAll('button, a.btn, [onclick]').forEach(btn => {
     const oc = btn.getAttribute('onclick') || '';
-    if (oc.includes('filter') || oc.includes('Filter') || oc.includes('search') || oc.includes('Search') || oc.includes('load') || oc.includes('show') || oc.includes('toggle') || oc.includes('fill')) return;
-    if (!allowed) {
+    const txt = btn.textContent || '';
+    if (oc.match(/filter|Filter|search|Search|load|show|toggle|fill|close|sort|render|print|sync/i)) return;
+    if (oc.match(/delete|Delete|open|Open|add|Add|edit|Edit|save|Save|backup|restore|remove/i)
+      || txt.match(/삭제|등록|추가|수정|편집|전체삭제|폐기|반품/)) {
       btn.dataset.origDisplay = btn.style.display;
       btn.style.display = 'none';
     }
