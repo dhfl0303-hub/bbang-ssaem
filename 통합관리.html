@@ -712,61 +712,63 @@ tr:hover td{background:var(--bg);}
     <!-- ④ LOT 매핑 관리 -->
     <!-- 계정관리 패널 -->
     <div class="panel" id="panel-account-mgmt">
-      <div class="filter-row" style="justify-content:space-between;align-items:center;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
         <div style="font-size:15px;font-weight:700;">관리자 계정 관리</div>
         <button class="btn btn-primary" onclick="openAccountModal()">+ 계정 추가</button>
       </div>
-      <div class="card" style="margin-top:12px;">
+      <!-- 계정 목록 카드 -->
+      <div class="card">
+        <div class="card-hd"><div class="card-hd-title">등록된 계정</div></div>
         <div class="card-bd" style="padding:0;">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>사번</th><th>이름</th><th>부서</th><th>직급</th><th>등급</th><th>관리</th></tr></thead>
+              <thead><tr><th>사번</th><th>이름</th><th>부서</th><th>직급</th><th>등급</th><th style="text-align:center;">관리</th></tr></thead>
               <tbody id="accountTbody"><tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">로딩 중...</td></tr></tbody>
             </table>
           </div>
         </div>
       </div>
-      <!-- 권한 편집 영역 -->
-      <div id="permPanel" style="display:none;margin-top:16px;">
-        <div class="card">
-          <div class="card-hd"><div class="card-hd-title" id="permPanelTitle">권한 설정</div></div>
-          <div class="card-bd">
-            <div id="permCheckboxes" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;"></div>
-            <button class="btn btn-primary" onclick="savePermissions()">권한 저장</button>
-            <button class="btn btn-outline" onclick="document.getElementById('permPanel').style.display='none'" style="margin-left:8px;">닫기</button>
-          </div>
-        </div>
-      </div>
     </div>
 
-    <!-- 계정 추가/수정 모달 -->
-    <div id="accountModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;">
-      <div style="background:#fff;border-radius:12px;padding:24px;width:360px;max-width:90vw;">
-        <div style="font-size:16px;font-weight:700;margin-bottom:16px;" id="accountModalTitle">계정 추가</div>
-        <div style="display:grid;gap:12px;">
-          <div>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">사번</div>
-            <input id="accEmpId" type="text" placeholder="사번" style="width:100%;" />
+    <!-- 계정 추가/수정 모달 (권한 체크박스 포함) -->
+    <div id="accountModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:12px;width:480px;max-width:92vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,0.15);">
+        <div style="padding:20px 24px 0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+            <div style="font-size:16px;font-weight:700;" id="accountModalTitle">계정 추가</div>
+            <span onclick="closeAccountModal()" style="cursor:pointer;font-size:18px;color:var(--text3);">✕</span>
           </div>
-          <div>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">이름</div>
-            <input id="accName" type="text" placeholder="이름" style="width:100%;" />
+          <!-- 기본 정보 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500;">사번 *</div>
+              <input id="accEmpId" type="text" placeholder="예: 0001" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" />
+            </div>
+            <div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500;">이름 *</div>
+              <input id="accName" type="text" placeholder="예: 홍길동" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" />
+            </div>
+            <div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500;">부서</div>
+              <input id="accDept" type="text" placeholder="예: 생산팀" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" />
+            </div>
+            <div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500;">직급</div>
+              <input id="accRank" type="text" placeholder="예: 대리" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" />
+            </div>
           </div>
-          <div>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">부서</div>
-            <input id="accDept" type="text" placeholder="부서" style="width:100%;" />
+          <div style="margin-top:12px;">
+            <div style="font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500;">비밀번호 * <span id="accPwHint" style="color:var(--text3);font-size:11px;font-weight:400;">(수정 시 비워두면 유지)</span></div>
+            <input id="accPw" type="password" placeholder="비밀번호 입력" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" />
           </div>
-          <div>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">직급</div>
-            <input id="accRank" type="text" placeholder="직급" style="width:100%;" />
+          <!-- 권한 설정 -->
+          <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
+            <div style="font-size:13px;font-weight:700;margin-bottom:12px;">메뉴 접근 권한</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;" id="accPermChecks"></div>
           </div>
-          <div>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">비밀번호 <span id="accPwHint" style="color:var(--text3);font-size:11px;">(수정 시 비워두면 유지)</span></div>
-            <input id="accPw" type="password" placeholder="비밀번호" style="width:100%;" />
-          </div>
-          <div id="accErrMsg" style="font-size:12px;color:var(--danger);min-height:16px;"></div>
+          <div id="accErrMsg" style="font-size:12px;color:var(--danger);min-height:18px;margin-top:10px;"></div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+        <div style="display:flex;gap:8px;justify-content:flex-end;padding:16px 24px;border-top:1px solid var(--border);background:var(--bg);">
           <button class="btn btn-outline" onclick="closeAccountModal()">취소</button>
           <button class="btn btn-primary" onclick="saveAccount()">저장</button>
         </div>
@@ -4062,8 +4064,7 @@ async function cleanOrphanedBatchOut(){
 <script>
 /* ===================== 계정 관리 ===================== */
 
-let _editEmpId = null; // 수정 중인 사번 (null이면 추가 모드)
-let _permTargetId = null; // 권한 편집 대상 사번
+let _editEmpId = null;
 
 // 계정 목록 렌더링
 async function loadAccounts() {
@@ -4072,19 +4073,53 @@ async function loadAccounts() {
   const tbody = document.getElementById('accountTbody');
   const rows = Object.values(accounts);
   if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">등록된 계정이 없습니다</td></tr>'; return; }
-  tbody.innerHTML = rows.map(u => `
-    <tr>
+  tbody.innerHTML = rows.map(u => {
+    const isSA = u.role === 'superadmin';
+    const badge = `<span style="display:inline-block;background:${isSA?'var(--primary-light)':'var(--success-light)'};color:${isSA?'var(--primary)':'var(--success)'};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">${isSA?'슈퍼어드민':'관리자'}</span>`;
+    const permCount = isSA ? '전체' : (u.permissions||[]).length + '개';
+    const btns = isSA ? `<span style="font-size:11px;color:var(--text3);">-</span>` :
+      `<button class="btn btn-outline btn-sm" onclick="openAccountModal('${u.empId}')" style="font-size:11px;padding:4px 10px;">수정</button>
+       <button class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:var(--danger-light);color:var(--danger);border:1px solid rgba(214,48,49,0.2);" onclick="deleteAccount('${u.empId}','${u.name}')">삭제</button>`;
+    return `<tr>
       <td>${u.empId}</td>
-      <td>${u.name}</td>
+      <td style="font-weight:500;">${u.name}</td>
       <td>${u.dept||'-'}</td>
       <td>${u.rank||'-'}</td>
-      <td><span style="background:${u.role==='superadmin'?'var(--primary-light)':'var(--success-light)'};color:${u.role==='superadmin'?'var(--primary)':'var(--success)'};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;">${u.role==='superadmin'?'슈퍼어드민':'관리자'}</span></td>
-      <td style="display:flex;gap:6px;">
-        ${u.role!=='superadmin'?`<button class="btn btn-outline btn-sm" onclick="openPermPanel('${u.empId}','${u.name}')">권한</button>`:''}
-        ${u.role!=='superadmin'?`<button class="btn btn-outline btn-sm" onclick="openAccountModal('${u.empId}')">수정</button>`:''}
-        ${u.role!=='superadmin'?`<button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none;" onclick="deleteAccount('${u.empId}','${u.name}')">삭제</button>`:''}
-      </td>
-    </tr>`).join('');
+      <td>${badge}<div style="font-size:10px;color:var(--text3);margin-top:2px;">권한 ${permCount}</div></td>
+      <td style="text-align:center;">${btns}</td>
+    </tr>`;
+  }).join('');
+}
+
+// 권한 체크박스 렌더링
+function renderPermChecks(perms=[]) {
+  const container = document.getElementById('accPermChecks');
+  const groups = [
+    {label:'수불부 관리', keys:['ingredient-stock','incoming','material-ledger','subsidiary','finished-ledger']},
+    {label:'생산 관리', keys:['recipe','input-recipe','device','batch-status','input-status','pack-status']},
+    {label:'품질 관리', keys:['traceability','yield-mgmt','lot-mapping','product-name-map']},
+  ];
+  const labelMap = {};
+  ALL_PERMISSIONS.forEach(p=>labelMap[p.key]=p.label);
+  let html = '';
+  groups.forEach(g => {
+    html += `<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--primary);margin-top:8px;padding-bottom:4px;border-bottom:1px solid var(--border);">${g.label}</div>`;
+    g.keys.forEach(k => {
+      html += `<label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;padding:4px 0;">
+        <input type="checkbox" value="${k}" ${perms.includes(k)?'checked':''} style="width:16px;height:16px;accent-color:var(--primary);"/>
+        ${labelMap[k]||k}
+      </label>`;
+    });
+  });
+  html += `<div style="grid-column:1/-1;margin-top:6px;">
+    <button class="btn btn-outline btn-sm" onclick="toggleAllPerms(true)" style="font-size:11px;margin-right:4px;">전체 선택</button>
+    <button class="btn btn-outline btn-sm" onclick="toggleAllPerms(false)" style="font-size:11px;">전체 해제</button>
+  </div>`;
+  container.innerHTML = html;
+}
+
+function toggleAllPerms(val) {
+  document.querySelectorAll('#accPermChecks input[type=checkbox]').forEach(c=>c.checked=val);
 }
 
 // 계정 추가/수정 모달 열기
@@ -4102,9 +4137,11 @@ async function openAccountModal(empId=null) {
     document.getElementById('accDept').value = u.dept||'';
     document.getElementById('accRank').value = u.rank||'';
     document.getElementById('accPw').value = '';
+    renderPermChecks(u.permissions||[]);
   } else {
     ['accEmpId','accName','accDept','accRank','accPw'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('accEmpId').disabled = false;
+    renderPermChecks([]);
   }
   document.getElementById('accountModal').style.display = 'flex';
 }
@@ -4114,7 +4151,7 @@ function closeAccountModal() {
   _editEmpId = null;
 }
 
-// 계정 저장
+// 계정 저장 (권한 포함)
 async function saveAccount() {
   const empId = document.getElementById('accEmpId').value.trim();
   const name  = document.getElementById('accName').value.trim();
@@ -4124,55 +4161,30 @@ async function saveAccount() {
   const errEl = document.getElementById('accErrMsg');
   if (!empId || !name) { errEl.textContent = '사번과 이름은 필수입니다.'; return; }
   if (!_editEmpId && !pw) { errEl.textContent = '비밀번호를 입력하세요.'; return; }
+  const permissions = [...document.querySelectorAll('#accPermChecks input[type=checkbox]:checked')].map(el=>el.value);
   const ref = window._db.collection('appData').doc('userAccounts');
   const snap = await ref.get();
   const accounts = snap.exists ? snap.data() : {};
   if (!_editEmpId && accounts[empId]) { errEl.textContent = '이미 존재하는 사번입니다.'; return; }
   const existing = _editEmpId ? accounts[_editEmpId] : {};
   const pwHash = pw ? await sha256(pw) : existing.pwHash;
-  accounts[empId] = { empId, name, dept, rank, role:'admin', pwHash, permissions: existing.permissions||[] };
+  accounts[empId] = { empId, name, dept, rank, role:'admin', pwHash, permissions };
   await ref.set(accounts);
   closeAccountModal();
   loadAccounts();
+  alert((_editEmpId?'수정':'추가')+'되었습니다.');
 }
 
 // 계정 삭제
 async function deleteAccount(empId, name) {
-  if (!confirm(`'${name}' 계정을 삭제하시겠습니까?`)) return;
+  if (!confirm(`'${name}' (${empId}) 계정을 삭제하시겠습니까?`)) return;
   const ref = window._db.collection('appData').doc('userAccounts');
   const snap = await ref.get();
   const accounts = snap.data();
   delete accounts[empId];
   await ref.set(accounts);
   loadAccounts();
-}
-
-// 권한 패널 열기
-async function openPermPanel(empId, name) {
-  _permTargetId = empId;
-  document.getElementById('permPanelTitle').textContent = `${name} 권한 설정`;
-  const snap = await window._db.collection('appData').doc('userAccounts').get();
-  const perms = snap.data()[empId]?.permissions || [];
-  const container = document.getElementById('permCheckboxes');
-  container.innerHTML = ALL_PERMISSIONS.filter(p=>p.key!=='account-mgmt').map(p=>`
-    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
-      <input type="checkbox" value="${p.key}" ${perms.includes(p.key)?'checked':''} />
-      ${p.label}
-    </label>`).join('');
-  document.getElementById('permPanel').style.display = 'block';
-  document.getElementById('permPanel').scrollIntoView({behavior:'smooth'});
-}
-
-// 권한 저장
-async function savePermissions() {
-  const checked = [...document.querySelectorAll('#permCheckboxes input:checked')].map(el=>el.value);
-  const ref = window._db.collection('appData').doc('userAccounts');
-  const snap = await ref.get();
-  const accounts = snap.data();
-  accounts[_permTargetId].permissions = checked;
-  await ref.set(accounts);
-  document.getElementById('permPanel').style.display = 'none';
-  alert('권한이 저장되었습니다.');
+  alert('삭제되었습니다.');
 }
 
 /* ===================== 로그인 / 권한 시스템 ===================== */
