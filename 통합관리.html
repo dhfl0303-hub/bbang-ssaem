@@ -173,13 +173,57 @@ tr:hover td{background:var(--bg);}
 </script>
 </head>
 <body>
+<!-- 로그인 화면 -->
+<div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0d3f75;z-index:9999;align-items:center;justify-content:center;">
+  <div style="width:340px;">
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:3px;margin-bottom:10px;">BBANG SSAEM</div>
+      <div style="font-size:22px;font-weight:700;color:#fff;letter-spacing:1px;">MES SYSTEM</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin-top:4px;">생산관리시스템</div>
+      <div style="width:40px;height:2px;background:#1a5fa8;margin:14px auto 0;border-radius:2px;"></div>
+    </div>
+    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:24px;">
+      <div style="margin-bottom:14px;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:6px;">사번</div>
+        <input id="loginEmpId" type="text" placeholder="사번을 입력하세요" style="width:100%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:11px 14px;font-size:13px;color:#fff;outline:none;" />
+      </div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:6px;">비밀번호</div>
+        <input id="loginPw" type="password" placeholder="비밀번호를 입력하세요" style="width:100%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:11px 14px;font-size:13px;color:#fff;outline:none;" />
+      </div>
+      <div id="loginError" style="font-size:12px;color:#ff6b6b;margin-bottom:12px;min-height:18px;text-align:center;"></div>
+      <div onclick="doLogin()" style="background:#1a5fa8;border-radius:8px;padding:13px;text-align:center;cursor:pointer;font-size:14px;font-weight:700;color:#fff;letter-spacing:0.5px;">로그인</div>
+    </div>
+    <div style="text-align:center;margin-top:16px;">
+      <span style="font-size:11px;color:rgba(255,255,255,0.15);">㈜빵쌤에프앤비</span>
+    </div>
+  </div>
+</div>
+
 <div class="layout">
 
 <!-- 사이드바 -->
 <div class="sidebar">
-  <div class="sidebar-logo">
-    <div class="sidebar-logo-title">MES SYSTEM</div>
-    <div class="sidebar-logo-sub">생산관리시스템</div>
+  <!-- 프로필 카드 -->
+  <div class="sidebar-logo" id="sidebarProfile" style="display:none;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <div style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:16px;">👤</span>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#fff;" id="profileName">-</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:1px;" id="profileRole">-</div>
+      </div>
+    </div>
+    <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:8px 10px;font-size:11px;color:rgba(255,255,255,0.6);line-height:2;">
+      <div style="display:flex;justify-content:space-between;"><span style="color:rgba(255,255,255,0.35);">사번</span><span id="profileEmpId">-</span></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:rgba(255,255,255,0.35);">부서</span><span id="profileDept">-</span></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:rgba(255,255,255,0.35);">직급</span><span id="profileRank">-</span></div>
+    </div>
+    <div onclick="doLogout()" style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:7px;cursor:pointer;">
+      <span style="font-size:13px;">↩</span>
+      <span style="font-size:12px;color:rgba(255,255,255,0.45);">로그아웃</span>
+    </div>
   </div>
 
   <!-- 1. 생산관리 아코디언 -->
@@ -265,7 +309,10 @@ tr:hover td{background:var(--bg);}
   </div>
 
   <!-- 브랜드 -->
-  <div class="sidebar-brand" style="color:#fff;font-size:13px;">BBANG SSAEM</div>
+  <div class="sidebar-brand" style="text-align:left;">
+    <div style="font-size:13px;font-weight:700;color:#fff;letter-spacing:1px;">BBANG SSAEM</div>
+    <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">MES SYSTEM</div>
+  </div>
 </div>
 
 <!-- 메인 -->
@@ -3935,6 +3982,130 @@ async function cleanOrphanedBatchOut(){
 })();
 </script>
 
+<script>
+/* ===================== 로그인 / 권한 시스템 ===================== */
+
+const AUTH_KEY = 'mesAuth';
+const SUPER_ADMIN_ID = '0018';
+
+// SHA-256 해시
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// 권한 항목 전체 목록
+const ALL_PERMISSIONS = [
+  {key:'ingredient-stock', label:'원료 재고현황'},
+  {key:'incoming',         label:'입고현황'},
+  {key:'material-ledger',  label:'원료수불부'},
+  {key:'subsidiary',       label:'부자재수불부'},
+  {key:'finished-ledger',  label:'완제품수불부'},
+  {key:'recipe',           label:'배합비 관리'},
+  {key:'input-recipe',     label:'투입비 관리'},
+  {key:'device',           label:'설비 세팅값'},
+  {key:'batch-status',     label:'배합현황'},
+  {key:'input-status',     label:'투입현황'},
+  {key:'pack-status',      label:'포장현황'},
+  {key:'traceability',     label:'LOT 추적'},
+  {key:'yield-mgmt',       label:'생산수율현황'},
+  {key:'lot-mapping',      label:'LOT 매핑 관리'},
+  {key:'product-name-map', label:'완제품명 매핑'},
+  {key:'account-mgmt',     label:'관리자 계정 관리 (슈퍼어드민 전용)'},
+];
+
+// 슈퍼어드민 초기 계정 Firebase 저장
+async function initSuperAdmin() {
+  const ref = db.collection('appData').doc('userAccounts');
+  const snap = await ref.get();
+  if (!snap.exists || !snap.data()[SUPER_ADMIN_ID]) {
+    const hash = await sha256('wndusdl1024@');
+    const accounts = snap.exists ? snap.data() : {};
+    accounts[SUPER_ADMIN_ID] = {
+      empId: SUPER_ADMIN_ID,
+      name: '이광훈',
+      dept: '품질관리',
+      rank: '과장',
+      role: 'superadmin',
+      pwHash: hash,
+      permissions: ALL_PERMISSIONS.map(p=>p.key)
+    };
+    await ref.set(accounts);
+  }
+}
+
+// 로그인 처리
+async function doLogin() {
+  const empId = document.getElementById('loginEmpId').value.trim();
+  const pw    = document.getElementById('loginPw').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if (!empId || !pw) { errEl.textContent = '사번과 비밀번호를 입력하세요.'; return; }
+  try {
+    const hash = await sha256(pw);
+    const snap = await db.collection('appData').doc('userAccounts').get();
+    const accounts = snap.exists ? snap.data() : {};
+    const user = accounts[empId];
+    if (!user || user.pwHash !== hash) { errEl.textContent = '사번 또는 비밀번호가 올바르지 않습니다.'; return; }
+    const session = { empId: user.empId, name: user.name, dept: user.dept, rank: user.rank, role: user.role, permissions: user.permissions };
+    localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+    applySession(session);
+  } catch(e) { errEl.textContent = '로그인 중 오류가 발생했습니다.'; }
+}
+
+// 엔터키 로그인
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('loginPw')?.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+  document.getElementById('loginEmpId')?.addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('loginPw').focus(); });
+});
+
+// 로그아웃
+function doLogout() {
+  localStorage.removeItem(AUTH_KEY);
+  location.reload();
+}
+
+// 세션 적용 (로그인 후 UI 세팅)
+function applySession(session) {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('sidebarProfile').style.display = 'block';
+  document.getElementById('profileName').textContent  = session.name;
+  document.getElementById('profileRole').textContent  = session.role === 'superadmin' ? '최고관리자' : '관리자';
+  document.getElementById('profileEmpId').textContent = session.empId;
+  document.getElementById('profileDept').textContent  = session.dept || '-';
+  document.getElementById('profileRank').textContent  = session.rank || '-';
+  applyPermissions(session);
+}
+
+// 권한 적용 — 없는 메뉴에 🔒 표시
+function applyPermissions(session) {
+  if (session.role === 'superadmin') return;
+  const perms = session.permissions || [];
+  document.querySelectorAll('.nav-item[onclick]').forEach(el => {
+    const match = el.getAttribute('onclick').match(/showPanel\('(.+?)'\)/);
+    if (!match) return;
+    const key = match[1];
+    if (!perms.includes(key)) {
+      el.style.opacity = '0.4';
+      el.style.pointerEvents = 'none';
+      const icon = el.querySelector('.nav-icon');
+      if (icon) icon.textContent = '🔒';
+      el.onclick = () => alert('접근 권한이 없습니다.');
+      el.style.pointerEvents = 'auto';
+    }
+  });
+}
+
+// 초기 실행
+(async () => {
+  await initSuperAdmin();
+  const saved = localStorage.getItem(AUTH_KEY);
+  if (saved) {
+    try { applySession(JSON.parse(saved)); return; } catch(e) {}
+  }
+  document.getElementById('loginScreen').style.display = 'flex';
+})();
+</script>
 
 </body>
 </html>
