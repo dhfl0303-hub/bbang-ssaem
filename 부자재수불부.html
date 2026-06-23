@@ -247,6 +247,32 @@ firebase.initializeApp({
 window._db = firebase.firestore();
 </script>
 <script>
+(function(){
+  var s=localStorage.getItem("mesAuth");
+  if(!s){alert("로그인이 필요합니다.");location.href="통합관리.html";return;}
+  try{window._mesSession=JSON.parse(s);}catch(e){alert("로그인이 필요합니다.");location.href="통합관리.html";}
+})();
+function _hasEditPerm(){
+  var s=window._mesSession;if(!s)return false;
+  if(s.role==="superadmin")return true;
+  return (s.permissions||[]).includes("subsidiary");
+}
+function _hideEditBtns(){
+  if(_hasEditPerm())return;
+  document.querySelectorAll("button,a").forEach(function(b){
+    var oc=b.getAttribute("onclick")||"";var txt=b.textContent||"";
+    if(oc.match(/delete|Delete|open|Open|add|Add|save|Save|backup|restore|Restore|remove|Remove|edit|Edit/i)
+      && !oc.match(/filter|search|toggle|render|sort|print|load|show|close|fill|sync/i)){
+      b.style.display="none";
+    }
+    if(txt.match(/삭제|등록|추가|수정|편집|전체삭제/)){
+      b.style.display="none";
+    }
+  });
+}
+window.addEventListener("DOMContentLoaded",function(){setTimeout(_hideEditBtns,500);});
+</script>
+<script>
 
 function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
 function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
