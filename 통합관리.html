@@ -4302,6 +4302,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 로그아웃
 function doLogout() {
+  localStorage.removeItem(AUTH_KEY);
+  location.reload();
+}
 
 // 비밀번호 변경
 function openChangePwModal() {
