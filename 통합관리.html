@@ -4303,6 +4303,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // 로그아웃
 function doLogout() {
   localStorage.removeItem(AUTH_KEY);
+  sessionStorage.removeItem('mesTabAlive');
   location.reload();
 }
 
@@ -4340,11 +4341,13 @@ async function doChangePw() {
 // 로그아웃
 function doLogout() {
   localStorage.removeItem(AUTH_KEY);
+  sessionStorage.removeItem('mesTabAlive');
   location.reload();
 }
 
 // 세션 적용 (로그인 후 UI 세팅)
 function applySession(session) {
+  sessionStorage.setItem('mesTabAlive', '1');
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('sidebarProfile').style.display = 'block';
   document.getElementById('profileName').textContent  = session.name;
@@ -4392,10 +4395,15 @@ function applyPanelPermission(panelId) {
 // 초기 실행
 (async () => {
   await initSuperAdmin();
+  // sessionStorage는 탭이 살아있는 동안만 유지 (새로고침 OK, 탭 닫으면 사라짐)
+  const tabAlive = sessionStorage.getItem('mesTabAlive');
   const saved = localStorage.getItem(AUTH_KEY);
-  if (saved) {
+  if (tabAlive && saved) {
+    // 새로고침 → 세션 유지
     try { applySession(JSON.parse(saved)); return; } catch(e) {}
   }
+  // 탭 새로 열었거나 세션 없음 → 로그인 화면
+  localStorage.removeItem(AUTH_KEY);
   document.getElementById('loginScreen').style.display = 'flex';
 })();
 </script>

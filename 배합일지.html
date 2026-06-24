@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>생산 배합일지</title>
+<title>배합일지</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
 :root{--primary:#1a5fa8;--primary-light:#e8f0fb;--primary-dark:#0d3f75;--success:#1e9e6e;--success-light:#e6f5ef;--border:#e0e4ea;--bg:#f4f6fa;--bg2:#fff;--text:#1a1d23;--text2:#5a6070;--text3:#9aa0ad;--danger:#d63031;--radius:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);}
@@ -33,6 +33,21 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 .btn-primary{background:var(--primary);color:#fff;padding:16px;font-size:18px;}
 .btn-success{background:var(--success);color:#fff;padding:16px;font-size:18px;}
 .btn-outline{background:transparent;color:var(--primary);border:1.5px solid var(--primary);padding:14px;font-size:16px;}
+
+/* 테스트 모드 */
+@keyframes testBlink{0%,100%{opacity:1;}50%{opacity:0.5;}}
+.topbar.test-mode{background:#c0392b !important;}
+.test-auth-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;align-items:center;justify-content:center;}
+.test-auth-overlay.open{display:flex;}
+.test-auth-modal{background:#fff;border-radius:16px;width:360px;max-width:90vw;overflow:hidden;}
+.test-auth-hd{padding:16px 20px;border-bottom:1px solid var(--border);font-size:16px;font-weight:700;}
+.test-auth-bd{padding:20px;}
+.test-auth-ft{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+.test-auth-input{width:100%;border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;font-family:"Noto Sans KR",sans-serif;outline:none;margin-bottom:12px;}
+.test-auth-input:focus{border-color:var(--primary);}
+.test-auth-btn{border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:"Noto Sans KR",sans-serif;}
+.test-auth-cancel{background:#f0f0f0;color:var(--text2);}
+.test-auth-ok{background:var(--danger);color:#fff;}
 
 /* 메인 */
 .main-hd{background:var(--primary);padding:20px 16px 20px;margin:-16px -16px 16px;}
@@ -201,7 +216,9 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
     <span class="tb-sep">·</span>
     <span class="tb-num" id="tbNum"></span>
   </div>
-  <div style="margin-left:auto;display:flex;gap:8px;">
+  <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+    <div id="testModeIndicator" style="display:none;background:#ff6b6b;color:#fff;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;animation:testBlink 1.2s infinite;">⚠️ 테스트</div>
+    <button onclick="openTestModeAuth()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:1.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🧪</button>
     <button onclick="openAdmin()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⚙️ 설정</button>
     <button onclick="downloadRecipeDB()" style="background:rgba(255,255,255,0.15);color:#fff;border:1.5px solid rgba(255,255,255,0.4);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;margin-right:6px;">⬇️ 배합비</button><button id="syncBtn" onclick="syncToServer()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>
   </div>
@@ -1310,6 +1327,7 @@ function showComplete(){
       extraIngredients: extraIngs,
       disposeIngredients: disposeIngs
     };
+    if(window._testMode) sessionData._isTest = true;
     S.todayRecords.push(sessionData);
   }
   saveLocal();
@@ -1770,14 +1788,14 @@ async function syncToServer(){
     const batchDeleted = deletedKeys.filter(k=>k.startsWith('batchRecords_'));
     batchDeleted.forEach(k=>{ localStorage.removeItem(k); });
 
-    // 1. localStorage의 모든 배합 기록 수집 (삭제된 키 제외)
+    // 1. localStorage의 모든 배합 기록 수집 (삭제된 키 제외, 테스트 기록 제외)
     const keys = Object.keys(localStorage).filter(k=>k.startsWith('batchRecords_'));
-    let recs = []; keys.forEach(k=>{ recs = recs.concat(JSON.parse(localStorage.getItem(k)||'[]')); });
+    let recs = []; keys.forEach(k=>{ recs = recs.concat(JSON.parse(localStorage.getItem(k)||'[]').filter(r=>!r._isTest)); });
     if(!recs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
 
-    // 2. 배합기록 Firebase 업로드 (날짜별 키로 저장)
+    // 2. 배합기록 Firebase 업로드 (날짜별 키로 저장, 테스트 기록 제외)
     for(const key of keys){
-      const dayRecs = JSON.parse(localStorage.getItem(key)||'[]');
+      const dayRecs = JSON.parse(localStorage.getItem(key)||'[]').filter(r=>!r._isTest);
       if(dayRecs.length){
         await db.collection('appData').doc(key).set({ data: JSON.stringify(dayRecs), updatedAt: new Date().toISOString() });
       }
@@ -1898,6 +1916,70 @@ async function downloadRecipeDB(){
     }
   }catch(e){ alert('다운로드 실패: 네트워크를 확인해주세요'); }
 }
+
+// ===== 테스트 모드 =====
+window._testMode = false;
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function openTestModeAuth(){
+  if(window._testMode){
+    // 이미 테스트 모드 → 해제
+    if(confirm('테스트 모드를 해제하시겠습니까?')){
+      window._testMode = false;
+      document.getElementById('testModeIndicator').style.display = 'none';
+      document.querySelector('.topbar').classList.remove('test-mode');
+    }
+    return;
+  }
+  document.getElementById('testAuthEmpId').value = '';
+  document.getElementById('testAuthPw').value = '';
+  document.getElementById('testAuthError').textContent = '';
+  document.getElementById('testAuthTitle').textContent = '🧪 테스트 모드 활성화';
+  document.getElementById('testAuthModal').classList.add('open');
+  setTimeout(()=>document.getElementById('testAuthEmpId').focus(),100);
+}
+
+async function verifyTestMode(){
+  const empId = document.getElementById('testAuthEmpId').value.trim();
+  const pw = document.getElementById('testAuthPw').value;
+  const errEl = document.getElementById('testAuthError');
+  errEl.textContent = '';
+  if(!empId || !pw){ errEl.textContent = '사번과 비밀번호를 입력하세요.'; return; }
+  try{
+    if(!window._db){ errEl.textContent = '인터넷 연결을 확인해주세요.'; return; }
+    const hash = await sha256(pw);
+    const snap = await window._db.collection('appData').doc('userAccounts').get();
+    const accounts = snap.exists ? snap.data() : {};
+    const user = accounts[empId];
+    if(!user || user.pwHash !== hash){ errEl.textContent = '사번 또는 비밀번호가 올바르지 않습니다.'; return; }
+    if(user.role !== 'superadmin'){ errEl.textContent = '최고관리자만 테스트 모드를 사용할 수 있습니다.'; return; }
+    // 인증 성공 → 테스트 모드 ON
+    window._testMode = true;
+    document.getElementById('testModeIndicator').style.display = '';
+    document.querySelector('.topbar').classList.add('test-mode');
+    document.getElementById('testAuthModal').classList.remove('open');
+    alert('🧪 테스트 모드가 활성화되었습니다.\n\n이 상태에서 작성한 배합은 동기화에서 자동 제외됩니다.');
+  }catch(e){ errEl.textContent = '인증 중 오류가 발생했습니다.'; }
+}
 </script>
+<div class="test-auth-overlay" id="testAuthModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="test-auth-modal">
+    <div class="test-auth-hd" id="testAuthTitle">🧪 테스트 모드 활성화</div>
+    <div class="test-auth-bd">
+      <div style="background:#fff0f0;border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#d63031;line-height:1.5;">⚠️ 최고관리자 전용 기능입니다.<br>테스트 중 작성한 배합은 동기화에서 제외됩니다.</div>
+      <input class="test-auth-input" id="testAuthEmpId" type="text" placeholder="사번" autocomplete="off">
+      <input class="test-auth-input" id="testAuthPw" type="password" placeholder="비밀번호" onkeydown="if(event.key==='Enter')verifyTestMode()">
+      <div id="testAuthError" style="font-size:12px;color:#d63031;min-height:18px;"></div>
+    </div>
+    <div class="test-auth-ft">
+      <button class="test-auth-btn test-auth-cancel" onclick="document.getElementById('testAuthModal').classList.remove('open')">취소</button>
+      <button class="test-auth-btn test-auth-ok" onclick="verifyTestMode()">확인</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

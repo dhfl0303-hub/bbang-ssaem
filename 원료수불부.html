@@ -322,19 +322,21 @@ async function initLedger(){
 
     // 2) incomingRecords 기반으로 type='in' 재생성 (날짜+원료명+소비기한 기준 중복 제거)
     const seen = new Set();
+    const skipped = [];
     recs.forEach(rec=>{
       const date = rec.date||'';
       (rec.rows||[]).forEach(row=>{
         const qty = parseFloat(row.qty)||0;
         if(!row.product || qty<=0) return;
+        const ing = getIngByName(row.product);
+        if(!ing||!ing.code){ skipped.push(row.product); return; }
         const dedupKey = date+'|'+(row.product||'').trim()+'|'+(row.exp||'').trim();
         if(seen.has(dedupKey)) return;
         seen.add(dedupKey);
-        const ing = getIngByName(row.product);
         ledgerRecords.push({
           date: date,
           name: row.product,
-          code: ing ? ing.code : '',
+          code: ing.code,
           qty: qty,
           exp: row.exp||'',
           lot: row.lot||'',
@@ -342,6 +344,10 @@ async function initLedger(){
         });
       });
     });
+    if(skipped.length){
+      const unique = [...new Set(skipped)];
+      alert('⚠️ 원료DB에 코드가 없어 동기화에서 제외된 원료:\n\n' + unique.join(', ') + '\n\n해당 원료를 신규 등록 후 다시 확인해주세요.');
+    }
 
     // 3) 변경이 있을 때만 저장
     const newInCount = ledgerRecords.filter(r=>r.type==='in').length;
@@ -727,7 +733,8 @@ function addInitRow(){
   const date = dateRaw.length===6 ? yymmddToISO(dateRaw) : (dateRaw||getTodayISO2());
   if(!name||!qty||(!exp&&!mfg)){ alert('원료명, 재고량, 소비기한 또는 제조일자를 입력해주세요'); return; }
   const ing = getIngByName(name);
-  const code = ing?ing.code:'';
+  if(!ing||!ing.code){alert('⚠️ 원료DB에 등록되지 않은 원료입니다.\n원료명: '+name+'\n\n신규 원료 등록 후 다시 시도해주세요.');return;}
+  const code = ing.code;
   const datepart = (exp||mfg).replace(/\./g,'');
   const lot = code + '-OI-' + datepart;
   const row = {date, name, code, qty, exp, mfg, lot, type:'init'};
@@ -1074,7 +1081,8 @@ async function saveIn(){
   const exp=document.getElementById('inExp').value;
   if(!name||!qty){alert('원료명과 수량을 입력해주세요');return;}
   const ing=getIngByName(name);
-  ledgerRecords.push({date,name,code:ing?ing.code:'',qty,lot,exp,type:'in'});
+  if(!ing||!ing.code){alert('⚠️ 원료DB에 등록되지 않은 원료입니다.\n원료명: '+name+'\n\n신규 원료 등록 후 다시 시도해주세요.');return;}
+  ledgerRecords.push({date,name,code:ing.code,qty,lot,exp,type:'in'});
   await saveLedger();closeModal('inModal');renderLedger();
 }
 function openOutModal(){
@@ -1093,7 +1101,8 @@ async function saveOut(){
   const note=document.getElementById('outNote').value.trim();
   if(!name||!qty){alert('원료명과 수량을 입력해주세요');return;}
   const ing=getIngByName(name);
-  ledgerRecords.push({date,name,code:ing?ing.code:'',qty,lot,note,type:'out'});
+  if(!ing||!ing.code){alert('⚠️ 원료DB에 등록되지 않은 원료입니다.\n원료명: '+name+'\n\n신규 원료 등록 후 다시 시도해주세요.');return;}
+  ledgerRecords.push({date,name,code:ing.code,qty,lot,note,type:'out'});
   await saveLedger();closeModal('outModal');renderLedger();
 }
 
