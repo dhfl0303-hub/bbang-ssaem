@@ -1040,7 +1040,7 @@ function setExpiry(months){
   const yy=parseInt('20'+today.slice(0,2));
   const mm=parseInt(today.slice(2,4))-1;
   const dd=parseInt(today.slice(4,6));
-  const exp=new Date(yy,mm+months,dd);
+  const exp=new Date(yy,mm+months,dd-1);
   const ey=exp.getFullYear();
   const em=String(exp.getMonth()+1).padStart(2,'0');
   const ed=String(exp.getDate()).padStart(2,'0');
