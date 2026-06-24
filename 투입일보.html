@@ -117,7 +117,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
   <div class="tb-main" id="tbMain">투입일보</div>
   <div style="margin-left:auto;display:flex;gap:8px;">
     <button onclick="openAdmin()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⚙️ 설정</button>
-    <button onclick="downloadInputDB()" style="background:rgba(255,255,255,0.15);color:#fff;border:1.5px solid rgba(255,255,255,0.4);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;margin-right:6px;">⬇️ 투입비</button><button id="syncBtn" onclick="syncToServer()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>
+    <button onclick="downloadInputDB()" style="background:rgba(255,255,255,0.15);color:#fff;border:1.5px solid rgba(255,255,255,0.4);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⬇️ 투입비</button>
   </div>
 </div>
 
@@ -838,13 +838,21 @@ function renderTodayList(){
   if(!S.todayRecords.length){ el.innerHTML='<div class="tc txs" style="padding:16px 0">오늘 투입된 내역이 없습니다</div>'; return; }
   el.innerHTML = S.todayRecords.slice().reverse().map((r,ri)=>{
     const idx = S.todayRecords.length-1-ri;
+    const syncBadge = r._isTest
+      ? '<span style="background:#ff6b6b;color:#fff;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;">🧪 테스트</span>'
+      : r._synced
+        ? '<span style="background:#d4edda;color:#155724;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;">✅ 완료</span>'
+        : `<button onclick="event.stopPropagation();syncSingleInput(${idx})" id="syncBtn_${idx}" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>`;
     return `<div class="accordion-item">
       <div class="accordion-hd" onclick="toggleAcc(${idx})">
         <div>
           <div class="accordion-lot">${r.lot}</div>
           <div class="accordion-sub">${r.product||'제품명 미입력'} · ${r.worker||'-'} · ${r.startTime||'-'}~${r.endTime||'-'}</div>
         </div>
-        <span class="accordion-arrow" id="arrow_${idx}">▼</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${syncBadge}
+          <span class="accordion-arrow" id="arrow_${idx}">▼</span>
+        </div>
       </div>
       <div class="accordion-body" id="body_${idx}">
         <table class="acc-table">
@@ -869,6 +877,51 @@ function delRecord(idx){
   S.todayRecords.splice(idx,1);
   saveLocal();
   renderTodayList(); updateStats();
+}
+
+// ===== 개별 투입 동기화 =====
+async function syncSingleInput(idx){
+  const rec = S.todayRecords[idx];
+  if(!rec || rec._synced || rec._isTest) return;
+  const btn = document.getElementById('syncBtn_'+idx);
+  if(btn){ btn.textContent='⏳'; btn.disabled=true; }
+  try{
+    if(!window._db) throw new Error('Firebase 연결 없음');
+    const db = window._db;
+
+    // 1. ledgerRecords 로드
+    let ledgerSnap=await db.collection('appData').doc('ledgerRecords').get();
+    let ledgerRecords=(ledgerSnap.exists&&ledgerSnap.data().data)?JSON.parse(ledgerSnap.data().data):[];
+
+    // 2. 이 레코드의 출고만 반영
+    rec.ingredients.forEach(ing=>{
+      const exists=ledgerRecords.find(r=>r.type==='out'&&r.lot===ing.lot&&r.inputLot===rec.lot);
+      if(!exists && ing.qty>0){
+        const ingInfo=INGREDIENT_DB.find(i=>i.name===ing.name)||{};
+        ledgerRecords.push({
+          date:'20'+rec.date.slice(0,2)+'-'+rec.date.slice(2,4)+'-'+rec.date.slice(4,6),
+          name:ing.name, code:ingInfo.code||'', qty:ing.qty, lot:ing.lot, exp:ing.exp||'',
+          inputLot:rec.lot, type:'out'
+        });
+      }
+    });
+
+    // 3. Firebase 저장
+    await db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledgerRecords),updatedAt:new Date().toISOString()});
+
+    // 4. 투입기록 Firebase 업로드
+    const todayKey='inputRecords_'+getWorkDateKey();
+    const dayRecs=JSON.parse(localStorage.getItem(todayKey)||'[]');
+    if(dayRecs.length) await db.collection('appData').doc(todayKey).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
+
+    // 5. _synced 표시
+    rec._synced=true;
+    saveLocal();
+    renderTodayList();
+  }catch(e){
+    console.error('개별 동기화 실패',e);
+    if(btn){ btn.textContent='❌'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); }
+  }
 }
 
 // ===== 관리자 =====

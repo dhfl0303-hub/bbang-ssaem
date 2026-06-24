@@ -168,7 +168,6 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
   <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
     <div id="testModeIndicator" style="display:none;background:#ff6b6b;color:#fff;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;animation:testBlink 1.2s infinite;">⚠️ 테스트</div>
     <button onclick="openTestModeAuth()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:1.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🧪</button>
-    <button id="syncBtn" onclick="syncToServer()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>
   </div>
 </div>
 
@@ -983,13 +982,21 @@ function renderTodayList(){
   if(!S.todayRecords.length){ el.innerHTML='<div class="tc txs" style="padding:16px 0">오늘 완료된 포장이 없습니다</div>'; return; }
   el.innerHTML=S.todayRecords.slice().reverse().map((r,i)=>{
     const idx=S.todayRecords.length-1-i;
+    const syncBadge = r._isTest
+      ? '<span style="background:#ff6b6b;color:#fff;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;">🧪 테스트</span>'
+      : r._synced
+        ? '<span style="background:#d4edda;color:#155724;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;">✅ 완료</span>'
+        : `<button onclick="event.stopPropagation();syncSinglePack(${idx})" id="syncBtn_${idx}" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>`;
     return `<div class="accordion-item">
       <div class="accordion-hd" onclick="toggleAcc(${idx})">
         <div>
           <div class="accordion-lot">${r.lot}</div>
           <div class="accordion-sub">${r.product} · ${r.qtyPcs}개 · ${r.time}</div>
         </div>
-        <div class="accordion-arrow" id="arr-${idx}">▼</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${syncBadge}
+          <div class="accordion-arrow" id="arr-${idx}">▼</div>
+        </div>
       </div>
       <div class="accordion-body" id="acc-${idx}">
         <table class="acc-table">
@@ -1498,6 +1505,51 @@ async function syncToServer(){
 }
 
 // ===== 개별 포장 기록 삭제 =====
+function deletePackRecord(idx){
+
+// ===== 개별 포장 동기화 =====
+async function syncSinglePack(idx){
+  const rec = S.todayRecords[idx];
+  if(!rec || rec._synced || rec._isTest) return;
+  const btn = document.getElementById('syncBtn_'+idx);
+  if(btn){ btn.textContent='⏳'; btn.disabled=true; }
+  try{
+    if(!window._db) throw new Error('Firebase 연결 없음');
+    const db = window._db;
+    const rawDate=rec.date||'';
+    const isoDate=rawDate.length===6?'20'+rawDate.slice(0,2)+'-'+rawDate.slice(2,4)+'-'+rawDate.slice(4,6):(rawDate||new Date().toISOString().slice(0,10));
+
+    // 1. 부자재수불부 출고 반영
+    let subSnap=await db.collection('appData').doc('subLedgerRecords').get();
+    let subRecs=(subSnap.exists&&subSnap.data().data)?JSON.parse(subSnap.data().data):[];
+    const filmLot=rec.filmLot||''; const bulkLot=rec.bulkLot||''; const boxLot=rec.boxLot||''; const pkgBoxLot=rec.pkgBoxLot||'';
+    [{lot:filmLot,cat:'필름포장지'},{lot:bulkLot,cat:'비닐'},{lot:boxLot,cat:'박스'},{lot:pkgBoxLot,cat:'패키지박스'}]
+      .filter(x=>x.lot)
+      .forEach(x=>{
+        const exists=subRecs.find(r=>r.type==='out'&&r.lot===x.lot&&r.packLot===rec.lot);
+        if(!exists){
+          const matched=subRecs.find(r=>r.lot===x.lot&&(r.type==='in'||r.type==='init'));
+          const itemName=matched?matched.name:x.cat;
+          subRecs.push({date:isoDate,name:itemName,lot:x.lot,qty:1,packLot:rec.lot,type:'out'});
+        }
+      });
+    await db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subRecs),updatedAt:new Date().toISOString()});
+
+    // 2. 포장기록 Firebase 업로드
+    const todayKey='packRecords_'+getWorkDateKey();
+    const dayRecs=JSON.parse(localStorage.getItem(todayKey)||'[]').filter(r=>!r._isTest);
+    if(dayRecs.length) await db.collection('appData').doc(todayKey).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
+
+    // 3. _synced 표시
+    rec._synced=true;
+    saveLocal();
+    renderTodayList();
+  }catch(e){
+    console.error('개별 동기화 실패',e);
+    if(btn){ btn.textContent='❌'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); }
+  }
+}
+
 function deletePackRecord(idx){
   const r=S.todayRecords[idx];
   if(!r) return;
