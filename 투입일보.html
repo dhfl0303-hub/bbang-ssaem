@@ -767,9 +767,12 @@ async function syncToServer(){
       localStorage.removeItem(k);
     }
 
-    const keys = Object.keys(localStorage).filter(k=>k.startsWith('inputRecords_'));
-    let recs = []; keys.forEach(k=>{ recs = recs.concat(JSON.parse(localStorage.getItem(k)||'[]')); });
-    if(!recs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
+    const todayKey = 'inputRecords_'+getWorkDateKey();
+    const keys = localStorage.getItem(todayKey) ? [todayKey] : [];
+    let allRecs = []; keys.forEach(k=>{ allRecs = allRecs.concat(JSON.parse(localStorage.getItem(k)||'[]')); });
+    if(!allRecs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
+    // 출고 반영은 아직 동기화 안 된 건만
+    let recs = allRecs.filter(r=>!r._synced);
 
     // 1. inputRecords Firebase 업로드
     for(const key of keys){
@@ -806,7 +809,16 @@ async function syncToServer(){
     });
     await db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledgerRecords),updatedAt:new Date().toISOString()});
 
-    btn.textContent = '✅ '+recs.length+'건 완료';
+    // 동기화 완료된 기록에 _synced 표시 → 다음 동기화 시 중복 방지
+    for(const key of keys){
+      const dayRecs = JSON.parse(localStorage.getItem(key)||'[]');
+      let changed = false;
+      dayRecs.forEach(r=>{ if(!r._synced){ r._synced=true; changed=true; } });
+      if(changed) localStorage.setItem(key, JSON.stringify(dayRecs));
+    }
+
+    const newCount = recs.length;
+    btn.textContent = newCount ? '✅ '+newCount+'건 동기화' : '✅ 변경없음';
     setTimeout(()=>{ btn.textContent='🔄 동기화'; btn.disabled=false; }, 2500);
   }catch(e){
     console.error(e);
