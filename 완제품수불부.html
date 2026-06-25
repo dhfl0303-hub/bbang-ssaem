@@ -691,7 +691,7 @@ function flOnGroupSelected(){}  // 구 호환용 빈 함수
 function flRenderAccordion(){
   const container = document.getElementById('fl-accordion-list');
   if(!container) return;
-  const allGroups = flGetGroups(); // 잔량 0 포함 전체
+  const allGroups = flGetGroups(true); // 잔량 있는 것만
   const clients = FL_STATE.clients;
   if(!allGroups.length){
     container.innerHTML='<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px;">등록된 LOT가 없습니다</div>';
