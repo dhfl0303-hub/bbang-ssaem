@@ -178,17 +178,6 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 .acc-print-btn{display:flex;align-items:center;justify-content:center;gap:6px;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;width:100%;}
 @media print{body *{display:none!important;}.print-area{display:block!important;}.print-area *{display:revert!important;}@page{margin:10mm;size:A4 portrait;}}
 </style>
-<script>
-  firebase.initializeApp({
-    apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
-    authDomain:"bbang-ssaem-prod.firebaseapp.com",
-    projectId:"bbang-ssaem-prod",
-    storageBucket:"bbang-ssaem-prod.firebasestorage.app",
-    messagingSenderId:"685237617449",
-    appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
-  });
-  window._db = firebase.firestore();
-</script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
@@ -1923,6 +1912,7 @@ async function syncToServer(){
 
 // 배합비 Firebase에서 다운로드
 async function downloadRecipeDB(){
+}
 
 // ===== 개별 배합 동기화 =====
 async function syncSingleBatch(idx){

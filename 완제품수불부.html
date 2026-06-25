@@ -192,7 +192,7 @@ tr:hover td{background:var(--bg);}
       </div>
       <div>
         <div class="card"><div class="card-hd"><div class="card-hd-title">🏢 출고처 관리</div></div><div class="card-bd"><div style="display:flex;gap:8px;margin-bottom:10px;"><input class="form-input" id="fl-cl-new" placeholder="출고처명 입력"><button class="btn btn-primary btn-sm" onclick="flAddClient()">추가</button></div><div class="table-wrap"><table style="min-width:200px"><thead><tr><th>출고처명</th><th></th></tr></thead><tbody id="fl-client-tbody"></tbody></table></div></div></div>
-        <div class="card"><div class="card-hd"><div class="card-hd-title">⚙ 데이터 관리</div></div><div class="card-bd" style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-primary btn-sm" style="width:100%" onclick="flSyncFromPack()">🔄 포장 데이터 동기화</button><button class="btn btn-outline btn-sm" style="width:100%" onclick="flClearDeletedLots()">♻️ 삭제이력 초기화 후 재동기화</button><button class="btn btn-sm" style="width:100%;background:var(--warning-light);color:var(--warning);border:1px solid #f0c080;" onclick="flResetLotsOnly()">🔄 LOT만 초기화 후 재동기화</button><button class="btn btn-sm" style="width:100%;background:var(--success-light);color:var(--success);border:1px solid #8dc;" onclick="flRestoreDefaultProducts()">📋 제품목록 기본값 복구</button><button class="btn btn-danger btn-sm" style="width:100%" onclick="flResetData()">🗑 전체 데이터 초기화</button></div></div>
+        <div class="card"><div class="card-hd"><div class="card-hd-title">⚙ 데이터 관리</div></div><div class="card-bd" style="display:flex;flex-direction:column;gap:8px;"><button class="btn btn-primary btn-sm" style="width:100%" onclick="flRefreshAndSync()">🔄 포장 데이터 동기화</button><button class="btn btn-outline btn-sm" style="width:100%" onclick="flClearDeletedLots()">♻️ 삭제이력 초기화 후 재동기화</button><button class="btn btn-sm" style="width:100%;background:var(--warning-light);color:var(--warning);border:1px solid #f0c080;" onclick="flResetLotsOnly()">🔄 LOT만 초기화 후 재동기화</button><button class="btn btn-sm" style="width:100%;background:var(--success-light);color:var(--success);border:1px solid #8dc;" onclick="flRestoreDefaultProducts()">📋 제품목록 기본값 복구</button><button class="btn btn-danger btn-sm" style="width:100%" onclick="flResetData()">🗑 전체 데이터 초기화</button></div></div>
       </div>
     </div>
   </div>
@@ -424,6 +424,16 @@ function flGetGroups(hideZero=false,clientFilter='전체',groupFilter='전체'){
   return res;
 }
 function flFmtDate6(d6){if(!d6||d6.length!==6)return d6||'-';return `20${d6.slice(0,2)}.${d6.slice(2,4)}.${d6.slice(4,6)}`;}
+async function flRefreshAndSync(){
+  if(window._db){
+    try{
+      window._fbPackCache = {};
+      const allSnap = await window._db.collection('appData').get();
+      allSnap.forEach(doc=>{ if(doc.id.startsWith('packRecords_')&&doc.data().data) window._fbPackCache[doc.id]=JSON.parse(doc.data().data); });
+    }catch(e){ console.warn('packRecords 재조회 실패',e); }
+  }
+  flSyncFromPack();
+}
 function flSyncFromPack(silent=false){
   const keys=Object.keys(window._fbPackCache||{});
   const lotMapping=window._lotMapping||[];
