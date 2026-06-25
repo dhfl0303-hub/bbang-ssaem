@@ -129,7 +129,12 @@ tr:hover td{background:var(--bg);}
         </div>
       </div>
       <div class="card">
-        <div class="card-hd"><div class="card-hd-title">📋 최근 출고 내역</div></div>
+        <div class="card-hd" style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="card-hd-title">📋 출고 내역</div>
+          <select id="fl-ob-month-filter" onchange="flRenderOutbound()" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:'Noto Sans KR',sans-serif;">
+            <option value="">전체</option>
+          </select>
+        </div>
         <div class="card-bd" style="padding:0"><div class="table-wrap"><table style="min-width:400px"><thead><tr><th>그룹LOT</th><th>품명</th><th>출고처</th><th>출고일</th><th>박스</th><th></th></tr></thead><tbody id="fl-outbound-tbody"></tbody></table></div></div>
       </div>
     </div>
@@ -781,8 +786,8 @@ function flRenderOutbound(){
   const groups=flGetGroups().filter(g=>g.total_out>0);
   const tbody=document.getElementById('fl-outbound-tbody');
   if(!tbody) return;
-  if(!groups.length){tbody.innerHTML='<tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">출고 내역이 없습니다</td></tr>';return;}
-  // 전체 출고 내역 수집 후 날짜 최신순 정렬
+
+  // 전체 출고 내역 수집
   const allOutbounds=[];
   for(const g of groups){
     for(const l of g.lots) for(let oi=0;oi<l.outbound.length;oi++){
@@ -790,8 +795,23 @@ function flRenderOutbound(){
     }
   }
   allOutbounds.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  // 월 드롭다운 갱신
+  const monthSel=document.getElementById('fl-ob-month-filter');
+  if(monthSel){
+    const months=[...new Set(allOutbounds.map(o=>(o.date||'').slice(0,4)).filter(m=>m.length===4))].sort((a,b)=>b.localeCompare(a));
+    const cur=monthSel.value;
+    monthSel.innerHTML='<option value="">전체</option>'+months.map(m=>`<option value="${m}">20${m.slice(0,2)}년 ${m.slice(2,4)}월</option>`).join('');
+    if(cur) monthSel.value=cur;
+  }
+
+  // 월 필터 적용
+  const selMonth=monthSel?monthSel.value:'';
+  const filtered=selMonth?allOutbounds.filter(o=>(o.date||'').startsWith(selMonth)):allOutbounds;
+
+  if(!filtered.length){tbody.innerHTML='<tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">출고 내역이 없습니다</td></tr>';return;}
   let html='';
-  allOutbounds.forEach(o=>{html+=`<tr>
+  filtered.forEach(o=>{html+=`<tr>
     <td style="font-size:11px;color:var(--primary);font-weight:700">${o.groupKey}</td>
     <td style="font-weight:600">${o.groupName}</td>
     <td style="font-size:12px">${o.client}</td>
