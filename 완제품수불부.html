@@ -723,7 +723,7 @@ function flRenderAccordion(){
         <span style="font-size:12px;font-weight:700;color:${g.remain_box>0?'var(--success)':'var(--text3)'};">잔량 ${g.remain_box}box</span>
         <button onclick="event.stopPropagation();flDeleteStockGroup('${g.key}')"
           style="padding:3px 8px;background:#fff0f0;color:var(--danger);border:1px solid #fcc;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🗑 삭제</button>
-        <span style="font-size:14px;color:var(--text3);transition:transform 0.2s;${isOpen?'transform:rotate(180deg)':''}">▼</span>
+        <span style="font-size:14px;color:var(--text3);transition:transform 0.2s;pointer-events:none;${isOpen?'transform:rotate(180deg)':''}">▼</span>
       </div>
       ${formHtml}
     </div>`;
@@ -805,8 +805,7 @@ function flRenderOutbound(){
   });
   monthOrder.sort((a,b)=>b.localeCompare(a));
 
-  // 첫 로드 시 최신 월 자동 펼치기
-  if(_flOpenMonths.size===0 && monthOrder.length) _flOpenMonths.add(monthOrder[0]);
+  // 첫 로드 시 모두 접힌 상태
 
   container.innerHTML = monthOrder.map(m=>{
     const isOpen = _flOpenMonths.has(m);
@@ -842,7 +841,7 @@ function flRenderOutbound(){
         <div style="font-size:13px;font-weight:700;">${label}</div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:12px;color:var(--danger);font-weight:700;">총 ${totalBox.toLocaleString()}box</span>
-          <span style="font-size:13px;color:var(--text3);transition:transform 0.2s;${isOpen?'transform:rotate(180deg)':''}">▼</span>
+          <span style="font-size:13px;color:var(--text3);transition:transform 0.2s;pointer-events:none;${isOpen?'transform:rotate(180deg)':''}">▼</span>
         </div>
       </div>
       ${tableHtml}
