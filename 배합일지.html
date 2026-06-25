@@ -844,36 +844,35 @@ function getIngLots(ingName){
   try{
     const lots=[];
     const seen=new Set();
-    const ledger = JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
-    // window._ledgerRecords가 있고 localStorage보다 크면 (Firebase가 더 최신) 그걸 사용
-    if(window._ledgerRecords && window._ledgerRecords.length > ledger.length){
-      ledger.length = 0;
-      window._ledgerRecords.forEach(r=>ledger.push(r));
-    }
+    // init/in 기록은 Firebase(최신) 우선, out 기록은 localStorage(미동기화 포함) 사용
+    const fireLedger = window._ledgerRecords || [];
+    const localLedger = JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
+    // init/in: Firebase에 있으면 Firebase, 없으면 localStorage
+    const inLedger = fireLedger.length > 0 ? fireLedger : localLedger;
+    // out: localStorage (미동기화 출고 포함)
+    const outLedger = localLedger;
+
     const ingN=ingName.trim().replace(/\n/g,' ');
-    // 원료코드로 매칭 (정확한 매칭)
     const ingCode = INGREDIENT_DB_STATIC[ingN]||'';
 
     function recMatch(r){
-      // code 필드가 있으면 코드로 매칭
       if(ingCode && r.code) return r.code === ingCode;
-      // code 없는 init 레코드(원료수불부 전일재고)는 이름으로 매칭
       if(!ingCode) return false;
       return (r.name||'').trim().replace(/\n/g,' ') === ingN;
     }
 
-    // 1) LOT별 입고량 합산 (init + in)
+    // 1) LOT별 입고량 합산 (init + in) - Firebase 기준
     const inQty={};
-    ledger.forEach(r=>{
+    inLedger.forEach(r=>{
       if(r.type!=='init' && r.type!=='in') return;
       if(!recMatch(r)) return;
       if(!r.lot) return;
       inQty[r.lot]=(inQty[r.lot]||0)+(parseFloat(r.qty)||0);
     });
 
-    // 2) LOT별 출고량 합산 (out/dispose/return) - ledger 기준
+    // 2) LOT별 출고량 합산 (out/return) - localStorage 기준 (미동기화 출고 포함)
     const outQty={};
-    ledger.forEach(r=>{
+    outLedger.forEach(r=>{
       if(r.type!=='out' && r.type!=='return') return;
       if(!recMatch(r)) return;
       if(!r.lot) return;
@@ -892,7 +891,7 @@ function getIngLots(ingName){
     });
 
     // 3) LOT 목록 생성 + 잔여재고 표시
-    ledger.forEach(r=>{
+    inLedger.forEach(r=>{
       if(r.type!=='init' && r.type!=='in') return;
       if(!recMatch(r)) return;
       if(!r.lot || seen.has(r.lot)) return;
