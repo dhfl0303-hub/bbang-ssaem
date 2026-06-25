@@ -844,13 +844,10 @@ function getIngLots(ingName){
   try{
     const lots=[];
     const seen=new Set();
-    // init/in 기록은 Firebase(최신) 우선, out 기록은 localStorage(미동기화 포함) 사용
-    const fireLedger = window._ledgerRecords || [];
-    const localLedger = JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
-    // init/in: Firebase에 있으면 Firebase, 없으면 localStorage
-    const inLedger = fireLedger.length > 0 ? fireLedger : localLedger;
-    // out: localStorage (미동기화 출고 포함)
-    const outLedger = localLedger;
+    // Firebase(window._ledgerRecords) 우선, 없으면 localStorage 캐시 사용
+    const ledger = (window._ledgerRecords && window._ledgerRecords.length > 0)
+      ? window._ledgerRecords
+      : JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
 
     const ingN=ingName.trim().replace(/\n/g,' ');
     const ingCode = INGREDIENT_DB_STATIC[ingN]||'';
@@ -861,18 +858,18 @@ function getIngLots(ingName){
       return (r.name||'').trim().replace(/\n/g,' ') === ingN;
     }
 
-    // 1) LOT별 입고량 합산 (init + in) - Firebase 기준
+    // 1) LOT별 입고량 합산 (init + in)
     const inQty={};
-    inLedger.forEach(r=>{
+    ledger.forEach(r=>{
       if(r.type!=='init' && r.type!=='in') return;
       if(!recMatch(r)) return;
       if(!r.lot) return;
       inQty[r.lot]=(inQty[r.lot]||0)+(parseFloat(r.qty)||0);
     });
 
-    // 2) LOT별 출고량 합산 (out/return) - localStorage 기준 (미동기화 출고 포함)
+    // 2) LOT별 출고량 합산 (out/return)
     const outQty={};
-    outLedger.forEach(r=>{
+    ledger.forEach(r=>{
       if(r.type!=='out' && r.type!=='return') return;
       if(!recMatch(r)) return;
       if(!r.lot) return;
@@ -891,7 +888,7 @@ function getIngLots(ingName){
     });
 
     // 3) LOT 목록 생성 + 잔여재고 표시
-    inLedger.forEach(r=>{
+    ledger.forEach(r=>{
       if(r.type!=='init' && r.type!=='in') return;
       if(!recMatch(r)) return;
       if(!r.lot || seen.has(r.lot)) return;
