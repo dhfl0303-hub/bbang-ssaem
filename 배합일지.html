@@ -1784,6 +1784,12 @@ async function refreshLedgerRecords(){
       window._ledgerRecords = JSON.parse(snap.data().data);
       localStorage.setItem('ledgerRecords', JSON.stringify(window._ledgerRecords));
     }
+    // 현재 배합 화면에 있으면 LOT 드롭다운 즉시 갱신
+    const batchPage = document.getElementById('page-batch');
+    if(batchPage && batchPage.classList.contains('active') && S.product && S.machine){
+      const md = DB[S.product]?.batches[S.machine];
+      if(md) renderIngredients(md.ingredients);
+    }
     if(btn){ btn.textContent='✅ 갱신 완료'; setTimeout(()=>{ btn.textContent='🔄 재고 갱신'; btn.disabled=false; },1500); }
   }catch(e){
     console.warn('재고 갱신 실패',e);
