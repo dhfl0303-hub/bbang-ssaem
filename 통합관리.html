@@ -3530,7 +3530,7 @@ function renderDisposeLog(){
     tbody.innerHTML='<tr><td colspan="6" class="tc" style="padding:20px;color:var(--text3)">폐기 이력이 없습니다</td></tr>';
     return;
   }
-  tbody.innerHTML = disposed.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(r=>`
+  tbody.innerHTML = disposed.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map((r,i)=>`
     <tr>
       <td style="font-size:12px">${r.date||'-'}</td>
       <td><span class="badge badge-blue" style="font-size:10px">${r.code||'-'}</span></td>
