@@ -635,7 +635,7 @@ tr:hover td{background:var(--bg);}
         <div class="card-bd" id="disposeAccBody" style="padding:0;display:none;">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>폐기일</th><th>코드</th><th>원료명</th><th>폐기량</th><th>LOT</th><th>사유</th></tr></thead>
+              <thead><tr><th>폐기일</th><th>코드</th><th>원료명</th><th>폐기량</th><th>LOT</th><th>사유</th><th></th></tr></thead>
               <tbody id="disposeTbody"></tbody>
             </table>
           </div>
@@ -3538,7 +3538,23 @@ function renderDisposeLog(){
       <td style="color:var(--danger);font-weight:700">${r.qty}kg</td>
       <td style="font-size:11px">${r.lot||'-'}</td>
       <td><span class="badge badge-red">${r.reason||'-'}</span></td>
+      <td class="tc"><button class="btn btn-sm btn-danger" onclick="deleteDispose(${i})">삭제</button></td>
     </tr>`).join('');
+}
+
+async function deleteDispose(disposeIdx){
+  const disposed = ledgerRecords.filter(r=>r.type==='dispose');
+  const target = disposed[disposeIdx];
+  if(!target) return;
+  if(!confirm(`폐기 기록을 삭제하시겠습니까?\n원료: ${target.name}\n수량: ${target.qty}kg\n사유: ${target.reason||'-'}\n\n삭제 시 원료수불부 재고에 다시 반영됩니다.`)) return;
+  // ledgerRecords에서 해당 기록 제거
+  const globalIdx = ledgerRecords.findIndex(r=>r===target);
+  if(globalIdx !== -1) ledgerRecords.splice(globalIdx, 1);
+  await saveLedger();
+  syncIngStockFromLedger();
+  renderIngStock();
+  renderDisposeLog();
+  alert('삭제 완료. 원료수불부 재고가 복원됐습니다.');
 }
 
 // ===== 반품 처리 =====
