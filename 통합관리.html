@@ -3530,7 +3530,7 @@ function renderDisposeLog(){
     tbody.innerHTML='<tr><td colspan="6" class="tc" style="padding:20px;color:var(--text3)">폐기 이력이 없습니다</td></tr>';
     return;
   }
-  tbody.innerHTML = disposed.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map((r,i)=>`
+  tbody.innerHTML = disposed.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(r=>`
     <tr>
       <td style="font-size:12px">${r.date||'-'}</td>
       <td><span class="badge badge-blue" style="font-size:10px">${r.code||'-'}</span></td>
@@ -3538,18 +3538,16 @@ function renderDisposeLog(){
       <td style="color:var(--danger);font-weight:700">${r.qty}kg</td>
       <td style="font-size:11px">${r.lot||'-'}</td>
       <td><span class="badge badge-red">${r.reason||'-'}</span></td>
-      <td class="tc"><button class="btn btn-sm btn-danger" onclick="deleteDispose(${i})">삭제</button></td>
+      <td class="tc"><button class="btn btn-sm btn-danger" onclick="deleteDispose('${r.date||''}','${(r.name||'').replace(/'/g,'&#39;')}','${r.lot||''}',${r.qty})">삭제</button></td>
     </tr>`).join('');
 }
 
-async function deleteDispose(disposeIdx){
-  const disposed = ledgerRecords.filter(r=>r.type==='dispose');
-  const target = disposed[disposeIdx];
-  if(!target) return;
+async function deleteDispose(date, name, lot, qty){
+  const idx = ledgerRecords.findIndex(r=>r.type==='dispose'&&r.date===date&&r.name===name&&r.lot===lot&&r.qty===qty);
+  if(idx===-1){ alert('기록을 찾을 수 없습니다'); return; }
+  const target = ledgerRecords[idx];
   if(!confirm(`폐기 기록을 삭제하시겠습니까?\n원료: ${target.name}\n수량: ${target.qty}kg\n사유: ${target.reason||'-'}\n\n삭제 시 원료수불부 재고에 다시 반영됩니다.`)) return;
-  // ledgerRecords에서 해당 기록 제거
-  const globalIdx = ledgerRecords.findIndex(r=>r===target);
-  if(globalIdx !== -1) ledgerRecords.splice(globalIdx, 1);
+  ledgerRecords.splice(idx, 1);
   await saveLedger();
   syncIngStockFromLedger();
   renderIngStock();
