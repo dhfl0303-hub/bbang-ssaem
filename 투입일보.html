@@ -141,7 +141,10 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
       </div>
     </div>
     <div class="card">
-      <div class="card-hd">➕ 새 투입 등록</div>
+      <div class="card-hd" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>➕ 새 투입 등록</span>
+        <button id="refreshStockBtn" onclick="refreshInputStock()" style="padding:4px 10px;background:#e8f4fd;color:#2563eb;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 재고 갱신</button>
+      </div>
       <div class="card-bd">
         <div id="inputProductList">
           <div class="tc txs" style="padding:8px 0;margin-bottom:8px;">투입비에서 제품을 선택하거나 직접 시작하세요</div>
@@ -1037,6 +1040,31 @@ async function downloadInputDB(){
     }
   }catch(e){ alert('다운로드 실패: 네트워크를 확인해주세요'); }
 }
+// ===== 재고 갱신 =====
+async function refreshInputStock(){
+  const btn = document.getElementById('refreshStockBtn');
+  if(btn){ btn.textContent='⏳ 갱신 중...'; btn.disabled=true; }
+  try{
+    if(!window._db) throw new Error('Firebase 없음');
+    const [incomingSnap, ledgerSnap] = await Promise.all([
+      window._db.collection('appData').doc('incomingRecords').get(),
+      window._db.collection('appData').doc('ledgerRecords').get()
+    ]);
+    if(incomingSnap.exists && incomingSnap.data().data){
+      window._incomingRecords = JSON.parse(incomingSnap.data().data);
+      localStorage.setItem('incomingRecords', JSON.stringify(window._incomingRecords));
+    }
+    if(ledgerSnap.exists && ledgerSnap.data().data){
+      window._ledgerRecords = JSON.parse(ledgerSnap.data().data);
+      localStorage.setItem('ledgerRecords', JSON.stringify(window._ledgerRecords));
+    }
+    if(btn){ btn.textContent='✅ 갱신 완료'; setTimeout(()=>{ btn.textContent='🔄 재고 갱신'; btn.disabled=false; },1500); }
+  }catch(e){
+    console.warn('재고 갱신 실패',e);
+    if(btn){ btn.textContent='❌ 실패'; setTimeout(()=>{ btn.textContent='🔄 재고 갱신'; btn.disabled=false; },2000); }
+  }
+}
+
 function renderInputProductList(){
   const el = document.getElementById('inputProductList');
   if(!el) return;

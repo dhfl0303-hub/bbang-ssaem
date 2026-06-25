@@ -195,7 +195,10 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
     <div class="sec">오늘 완료된 포장</div>
     <div id="todayList"><div class="tc txs" style="padding:16px 0">오늘 완료된 포장이 없습니다</div></div>
 
-    <div class="sec mt-12">배합 / 투입 LOT 선택</div>
+    <div class="sec mt-12" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>배합 / 투입 LOT 선택</span>
+      <button id="refreshStockBtn" onclick="refreshBatchLot()" style="padding:4px 10px;background:#e8f4fd;color:#2563eb;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 재고 갱신</button>
+    </div>
     <div id="batchLotList"></div>
   </div>
 
@@ -510,6 +513,19 @@ function onWorkDateInput(input){
     loadBatchForDate();
   }
 }
+// ===== 재고 갱신 =====
+async function refreshBatchLot(){
+  const btn = document.getElementById('refreshStockBtn');
+  if(btn){ btn.textContent='⏳ 갱신 중...'; btn.disabled=true; }
+  try{
+    await loadBatchForDate();
+    if(btn){ btn.textContent='✅ 갱신 완료'; setTimeout(()=>{ btn.textContent='🔄 재고 갱신'; btn.disabled=false; },1500); }
+  }catch(e){
+    console.warn('재고 갱신 실패',e);
+    if(btn){ btn.textContent='❌ 실패'; setTimeout(()=>{ btn.textContent='🔄 재고 갱신'; btn.disabled=false; },2000); }
+  }
+}
+
 async function loadBatchForDate(){
   if(!window._db) return;
   const dateKey = getWorkDateKey();

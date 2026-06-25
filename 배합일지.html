@@ -235,7 +235,10 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
     </div>
     <div class="sec">오늘 완료된 배합</div>
     <div class="card"><div class="card-bd" id="todayList"><div class="tc txs" style="padding:16px 0">오늘 완료된 배합이 없습니다</div></div></div>
-    <div class="sec mt-12">제품 선택</div>
+    <div class="sec mt-12" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>제품 선택</span>
+      <button id="refreshStockBtn" onclick="refreshLedgerRecords()" style="padding:4px 10px;background:#e8f4fd;color:#2563eb;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 재고 갱신</button>
+    </div>
     <div class="search-box">
       <span style="color:var(--text3);font-size:18px">🔍</span>
       <input class="search-input" placeholder="제품명 검색..." id="searchInput" oninput="filterProducts()">
@@ -1765,6 +1768,24 @@ function deleteBatchRecord(idx){
   localStorage.setItem('batchRecords_'+getWorkDateKey(),JSON.stringify(S.todayRecords));
   renderTodayList();
   updateStats();
+}
+
+// ===== 재고 갱신 =====
+async function refreshLedgerRecords(){
+  const btn = document.getElementById('refreshStockBtn');
+  if(btn){ btn.textContent='⏳ 갱신 중...'; btn.disabled=true; }
+  try{
+    if(!window._db) throw new Error('Firebase 없음');
+    const snap = await window._db.collection('appData').doc('ledgerRecords').get();
+    if(snap.exists && snap.data().data){
+      window._ledgerRecords = JSON.parse(snap.data().data);
+      localStorage.setItem('ledgerRecords', JSON.stringify(window._ledgerRecords));
+    }
+    if(btn){ btn.textContent='✅ 갱신 완료'; setTimeout(()=>{ btn.textContent='🔄 재고 갱신'; btn.disabled=false; },1500); }
+  }catch(e){
+    console.warn('재고 갱신 실패',e);
+    if(btn){ btn.textContent='❌ 실패'; setTimeout(()=>{ btn.textContent='🔄 재고 갱신'; btn.disabled=false; },2000); }
+  }
 }
 
 // ===== 동기화 =====
