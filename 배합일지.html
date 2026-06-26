@@ -755,7 +755,7 @@ function printSingleRecord(idx){
             <td style="border:1px solid #999;padding:4px">${d.name}</td>
             <td style="border:1px solid #999;padding:4px;text-align:center;font-size:9px">${d.lot||'-'}</td>
             <td style="border:1px solid #999;padding:4px;text-align:right">${parseFloat(d.qty).toFixed(3)}</td>
-            <td style="border:1px solid #999;padding:4px;text-align:center">공정중 잔량폐기</td>
+            <td style="border:1px solid #999;padding:4px;text-align:center">${d.reason||'공정중 잔량폐기'}</td>
           </tr>`;
         }).join('')}
       </table>`;
@@ -1367,7 +1367,7 @@ function showComplete(){
   // 폐기 기록도 저장
   const disposeIngs = (S.disposeIngredients||[])
     .filter(d=>d.name && parseFloat(d.qty)>0)
-    .map(d=>({name:d.name, qty:parseFloat(d.qty)||0, lot:d.lot||'', exp:d.exp||'', reason:'공정중 잔량폐기'}));
+    .map(d=>({name:d.name, qty:parseFloat(d.qty)||0, lot:d.lot||'', exp:d.exp||'', reason:d.reason||'공정중 잔량폐기'}));
   const sessionKey=S.product+'-'+getWorkDateKey();
   const existIdx=S.todayRecords.findIndex(r=>r.sessionKey===sessionKey);
   const newBatchRecords=JSON.parse(JSON.stringify(S.batchRecords));
@@ -1429,7 +1429,7 @@ function showComplete(){
     disposeHtml = `<div class="sec" style="color:#c0392b;">🗑️ 공정중 잔량 폐기</div>
     <table class="result-table">
       <tr><th>원료명</th><th>LOT</th><th>폐기량(kg)</th><th>사유</th></tr>
-      ${disposeRows.map(d=>`<tr><td>${d.name}</td><td style="font-size:11px">${d.lot||'-'}</td><td>${parseFloat(d.qty).toFixed(3)}</td><td>공정중 잔량폐기</td></tr>`).join('')}
+      ${disposeRows.map(d=>`<tr><td>${d.name}</td><td style="font-size:11px">${d.lot||'-'}</td><td>${parseFloat(d.qty).toFixed(3)}</td><td>${d.reason||'공정중 잔량폐기'}</td></tr>`).join('')}
     </table>`;
   }
   document.getElementById('doneResult').innerHTML=`
@@ -1543,7 +1543,7 @@ function genPrint(){
             <td style="border:1px solid #999;padding:4px">${d.name}</td>
             <td style="border:1px solid #999;padding:4px;text-align:center;font-size:9px">${d.lot||'-'}</td>
             <td style="border:1px solid #999;padding:4px;text-align:right">${parseFloat(d.qty).toFixed(3)}</td>
-            <td style="border:1px solid #999;padding:4px;text-align:center">공정중 잔량폐기</td>
+            <td style="border:1px solid #999;padding:4px;text-align:center">${d.reason||'공정중 잔량폐기'}</td>
           </tr>`;
         }).join('')}
       </table>`;
@@ -1714,7 +1714,7 @@ function goDispose(){
     });
   });
   S._usedIngMap = usedMap;
-  S.disposeIngredients = [{name:'', lot:'', qty:'', exp:''}];
+  S.disposeIngredients = [{name:'', lot:'', qty:'', exp:'', reason:''}];
   renderDisposePage();
   showPage('dispose');
 }
@@ -1792,12 +1792,18 @@ function renderDisposePage(){
               style="background:#f8f9fb;">
           </div>
         </div>
+        <div style="margin-top:6px;">
+          <div style="font-size:12px;color:var(--text3);font-weight:500;margin-bottom:4px;">폐기 사유</div>
+          <input class="exp-input" type="text" placeholder="사유 입력 (예: 공정중 잔량폐기)" value="${ing.reason||''}"
+            oninput="S.disposeIngredients[${ii}].reason=this.value"
+            style="border-color:#f5a0a0;">
+        </div>
       </div>
     </div>`).join('');
 }
 
 function addDisposeRow(){
-  S.disposeIngredients.push({name:'', lot:'', qty:'', exp:''});
+  S.disposeIngredients.push({name:'', lot:'', qty:'', exp:'', reason:''});
   renderDisposePage();
 }
 function delDisposeRow(ii){
@@ -1980,7 +1986,7 @@ async function syncToServer(){
           if(!exists){
             disposeLog.push({
               date:isoDate, name:d.name, qty:parseFloat(d.qty)||0,
-              lot:d.lot||'', unit:'kg', reason:'공정중 잔량폐기',
+              lot:d.lot||'', unit:'kg', reason:d.reason||'공정중 잔량폐기',
               source:'배합일지', product:rec.product||'', createdAt:new Date().toISOString()
             });
           }
@@ -2063,8 +2069,8 @@ async function syncSingleBatch(idx){
       const ingCode=INGREDIENT_DB_STATIC[d.name]||'';
       if(ingCode==='M000') return;
       const qty=parseFloat(d.qty)||0;
-      const exists=ledgerRecords.find(r=>r.type==='dispose'&&r.name===d.name&&r.batchLot===lastBatchLot&&r.lot===d.lot&&r.reason==='공정중 잔량폐기');
-      if(!exists){ ledgerRecords.push({date:isoDate,name:d.name,code:ingCode,qty,lot:d.lot||'',exp:d.exp||'',batchLot:lastBatchLot,type:'dispose',reason:'공정중 잔량폐기'}); }
+      const exists=ledgerRecords.find(r=>r.type==='dispose'&&r.name===d.name&&r.batchLot===lastBatchLot&&r.lot===d.lot);
+      if(!exists){ ledgerRecords.push({date:isoDate,name:d.name,code:ingCode,qty,lot:d.lot||'',exp:d.exp||'',batchLot:lastBatchLot,type:'dispose',reason:d.reason||'공정중 잔량폐기'}); }
     });
 
     // 3. Firebase 저장
