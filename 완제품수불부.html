@@ -697,7 +697,13 @@ function flRenderAccordion(){
     container.innerHTML='<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px;">등록된 LOT가 없습니다</div>';
     return;
   }
-  container.innerHTML = allGroups.map(g=>{
+  const getLotDate=lot=>{const m=(lot||'').match(/-([0-9]{6})(?:-[0-9]+)?$/);return m?m[1]:'999999';};
+  const isOHGroup=g=>g.key&&g.key.includes('-OH-')||g.lots&&g.lots.some(l=>l.lot_number&&l.lot_number.includes('-OH-'));
+  const ohGroups=allGroups.filter(g=>isOHGroup(g));
+  const normalGroups=allGroups.filter(g=>!isOHGroup(g));
+  normalGroups.sort((a,b)=>{const da=getLotDate(a.key),db=getLotDate(b.key);return da>db?-1:da<db?1:0;});
+  ohGroups.sort((a,b)=>a.key.localeCompare(b.key));
+  const renderGroupCard=g=>{
     const isOpen = _flOpenAccordion === g.key;
     const clientOpts = '<option value="">-- 선택 --</option>'+clients.map(c=>`<option value="${c}">${c}</option>`).join('');
     const todayRaw = (()=>{const d=new Date();return String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');})();
@@ -727,7 +733,18 @@ function flRenderAccordion(){
       </div>
       ${formHtml}
     </div>`;
-  }).join('');
+  };
+  const ohSection = ohGroups.length ? `
+    <div style="margin-bottom:8px;">
+      <div style="font-size:11px;font-weight:700;color:#7f8c8d;background:#f4f4f4;padding:5px 10px;border-radius:6px;margin-bottom:6px;letter-spacing:0.5px;">📦 OH 초기재고</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">${ohGroups.map(renderGroupCard).join('')}</div>
+    </div>` : '';
+  const normalSection = normalGroups.length ? `
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:5px 10px;border-radius:6px;margin-bottom:6px;letter-spacing:0.5px;">🚚 일반 LOT</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">${normalGroups.map(renderGroupCard).join('')}</div>
+    </div>` : '';
+  container.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px;">${ohSection}${normalSection}</div>`;
 }
 
 function flToggleAccordion(gk){
@@ -793,7 +810,15 @@ function flRenderOutbound(){
   }
   if(!allOutbounds.length){ container.innerHTML='<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px;">출고 내역이 없습니다</div>'; return; }
 
-  allOutbounds.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const getLotDate2=lot=>{const m=(lot||'').match(/-([0-9]{6})(?:-[0-9]+)?$/);return m?m[1]:'999999';};
+  const isOHLot=lot=>(lot||'').includes('-OH-');
+  allOutbounds.sort((a,b)=>{
+    const aOH=isOHLot(a.lotNumber), bOH=isOHLot(b.lotNumber);
+    if(aOH!==bOH) return aOH?-1:1;
+    const da=getLotDate2(a.lotNumber),db=getLotDate2(b.lotNumber);
+    if(da!==db)return da>db?-1:1;
+    return (a.date||'').localeCompare(b.date||'');
+  });
 
   // 월별 그룹핑 (YYMM 기준)
   const monthMap = {};
