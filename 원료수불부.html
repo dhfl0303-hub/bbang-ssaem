@@ -107,6 +107,7 @@ tr:hover td{background:var(--bg);}
     <button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;" onclick="openDeleteAllLedger()">⚠️ 수불내역 전체삭제</button>
     <button class="btn btn-sm" style="background:var(--success-light);color:var(--success);border:1px solid #8dc;" onclick="backupLedger()">💾 백업</button>
     <button class="btn btn-sm" style="background:var(--primary-light);color:var(--primary);border:1px solid #acd;" onclick="restoreLedger()">🔄 복원</button>
+    <button class="btn btn-sm" style="background:#f0e6ff;color:#7c3aed;border:1px solid #c4b5fd;" onclick="findEmptyCodes()">🔍 빈 코드 조회</button>
 
   </div>
   <div class="card">
@@ -390,6 +391,22 @@ function selectIngAC(inputId, name){
 function getIngByName(name){ return INGREDIENT_DB.find(i=>i.name===name||i.name.replace(/\n/g,' ')===name); }
 
 function getIngByCode(code){ return INGREDIENT_DB.find(i=>i.code===code); }
+
+function findEmptyCodes(){
+  const nums = INGREDIENT_DB.map(i=>parseInt((i.code||'').replace('M',''))||0);
+  const maxNum = Math.max(...nums);
+  if(maxNum<=0){ alert('등록된 원료가 없습니다.'); return; }
+  const usedSet = new Set(nums);
+  const empty = [];
+  for(let n=1; n<=maxNum; n++){
+    if(!usedSet.has(n)) empty.push('M'+String(n).padStart(3,'0'));
+  }
+  if(!empty.length){
+    alert(`M001 ~ M${String(maxNum).padStart(3,'0')} 범위에 비어있는 코드가 없습니다.\n\n총 ${maxNum}개 코드 모두 사용 중입니다.`);
+  } else {
+    alert(`비어있는 코드 (${empty.length}건)\n\n${empty.join(', ')}\n\n전체 범위: M001 ~ M${String(maxNum).padStart(3,'0')} (${maxNum}개 중 ${maxNum-empty.length}개 사용 중)`);
+  }
+}
 
 function yymmddToISO(v){
   if(!v||v.length!==6) return getTodayISO2();
