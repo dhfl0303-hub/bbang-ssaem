@@ -630,6 +630,32 @@ function toggleAccordion(idx){
   body.classList.toggle('open',!isOpen);
   arrow.classList.toggle('open',!isOpen);
 }
+// LOT 마지막 부분에 * 있으면 제조일자, 없으면 소비기한
+function parseLotDates(lot, exp, dateType){
+  const parts=(lot||'').split('-');
+  if(parts.length>=3){
+    const last=parts[parts.length-1];
+    const isMfg=last.endsWith('*');
+    const dateVal=last.replace('*','');
+    if(/^\d{6}$/.test(dateVal)){
+      const f=fmtExp(dateVal);
+      if(isMfg) return {mfg:f, exp:''};
+      return {mfg:'', exp:f};
+    }
+  }
+  // fallback: dateType 기반
+  const f=fmtExp(exp);
+  if(!f||f==='-') return {mfg:'', exp:''};
+  if(dateType==='mfg') return {mfg:f, exp:''};
+  return {mfg:'', exp:f};
+}
+function fmtBothDates(mfg, exp){
+  if(mfg&&exp) return `제조:${mfg} / 소비:${exp}`;
+  if(mfg) return `제조:${mfg}`;
+  if(exp) return `소비:${exp}`;
+  return '-';
+}
+
 function buildAccTable(batchRecords, extraIngredients){
   const totals={};
   batchRecords.forEach(r=>r.ingredients.forEach(ing=>{
@@ -637,7 +663,10 @@ function buildAccTable(batchRecords, extraIngredients){
     ing.exps.forEach(e=>{
       const key=e.lot||e.exp||'';
       if(!key) return;
-      if(!totals[ing.name][key])totals[ing.name][key]={lot:e.lot||'',exp:e.exp||'',dateType:e.dateType||'exp',amt:0};
+      if(!totals[ing.name][key]){
+        const d=parseLotDates(e.lot,e.exp,e.dateType||'exp');
+        totals[ing.name][key]={lot:e.lot||'',mfg:d.mfg,exp:d.exp,amt:0};
+      }
       totals[ing.name][key].amt+=e.amount||0;
     });
   }));
@@ -646,17 +675,20 @@ function buildAccTable(batchRecords, extraIngredients){
     if(!ing.name || !(parseFloat(ing.qty)>0)) return;
     if(!totals[ing.name]) totals[ing.name]={};
     const key=ing.lot||ing.exp||ing.name;
-    if(!totals[ing.name][key]) totals[ing.name][key]={lot:ing.lot||'',exp:ing.exp||'',dateType:'exp',amt:0};
+    if(!totals[ing.name][key]){
+      const d=parseLotDates(ing.lot,ing.exp||'','exp');
+      totals[ing.name][key]={lot:ing.lot||'',mfg:d.mfg,exp:d.exp,amt:0};
+    }
     totals[ing.name][key].amt+=(parseFloat(ing.qty)||0)*1000;
   });
   const ingDB=JSON.parse(localStorage.getItem('customIngredients')||'[]');
   return `<table class="acc-table">
-    <tr><th>원료코드</th><th>원료명</th><th>LOT</th><th>소비기한/제조일자</th><th>총 사용량(g)</th></tr>
+    <tr><th>원료코드</th><th>원료명</th><th>LOT</th><th>제조일자/소비기한</th><th>총 사용량(g)</th></tr>
     ${Object.entries(totals).map(([n,keys])=>{
       const found=ingDB.find(i=>i.name===n)||{code:''};
       const code=found.code||INGREDIENT_DB_STATIC[n]||'';
       return Object.entries(keys).map(([k,v])=>
-        `<tr><td style="color:var(--primary);font-weight:700">${code}</td><td>${n}</td><td>${v.lot||'-'}</td><td>${fmtDateLabel(v.exp,v.dateType)}</td><td>${Math.round(v.amt).toLocaleString()}</td></tr>`
+        `<tr><td style="color:var(--primary);font-weight:700">${code}</td><td>${n}</td><td>${v.lot||'-'}</td><td>${code==='M000'?'-':fmtBothDates(v.mfg,v.exp)}</td><td>${Math.round(v.amt).toLocaleString()}</td></tr>`
       ).join('');
     }).join('')}
   </table>`;
@@ -857,7 +889,7 @@ function fmtDateLabel(exp, dateType){
   const f=fmtExp(exp);
   if(!f||f==='-') return '-';
   if(dateType==='mfg') return '제조:'+f;
-  return f;
+  return '소비:'+f;
 }
 function onExpInput(input){
   const raw=input.value.replace(/\D/g,'').slice(0,6);

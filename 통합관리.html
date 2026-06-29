@@ -1960,7 +1960,7 @@ function loadBatchStatus(){
         </div>
         <div class="bs-acc-bd">
           <table>
-            <thead><tr><th>코드</th><th>원료명</th><th>LOT</th><th>소비기한</th><th style="text-align:right">사용량(g)</th></tr></thead>
+            <thead><tr><th>코드</th><th>원료명</th><th>LOT</th><th>제조일자/소비기한</th><th style="text-align:right">사용량(g)</th></tr></thead>
             <tbody>`;
 
       if(!ings.length){
@@ -1974,10 +1974,29 @@ function loadBatchStatus(){
             html += `<tr><td><span class="badge badge-gray" style="font-size:10px;">${code}</span></td><td>${ing.name}</td><td>-</td><td>-</td><td style="text-align:right;">${(ing.total||0).toLocaleString()}</td></tr>`;
           } else {
             exps.forEach((e,ei)=>{
+              // LOT 마지막 부분 * 있으면 제조일자, 없으면 소비기한
+              // M000(정제수)는 날짜 없음
+              const lotParts=(e.lot||'').split('-');
+              let dateStr='-';
+              if(code!=='M000'&&ing.name!=='정제수'){
+                if(lotParts.length>=3){
+                  const last=lotParts[lotParts.length-1];
+                  const isMfg=last.endsWith('*');
+                  const dateVal=last.replace('*','');
+                  if(/^\d{6}$/.test(dateVal)){
+                    const f=dateVal.replace(/(\d{2})(\d{2})(\d{2})/,'$1.$2.$3');
+                    dateStr=isMfg?`제조:${f}`:`소비:${f}`;
+                  }
+                }
+                if(dateStr==='-'&&e.exp){
+                  const f=e.exp.replace(/(\d{2})(\d{2})(\d{2})/,'$1.$2.$3');
+                  dateStr=e.dateType==='mfg'?`제조:${f}`:`소비:${f}`;
+                }
+              }
               html += `<tr>
                 ${ei===0?`<td rowspan="${exps.length}"><span class="badge badge-gray" style="font-size:10px;">${code}</span></td><td rowspan="${exps.length}">${ing.name}</td>`:''}
                 <td style="font-size:12px;">${e.lot||'-'}</td>
-                <td style="font-size:12px;">${e.exp||'-'}</td>
+                <td style="font-size:12px;">${dateStr}</td>
                 <td style="text-align:right;">${(e.amount||0).toLocaleString()}</td>
               </tr>`;
             });
