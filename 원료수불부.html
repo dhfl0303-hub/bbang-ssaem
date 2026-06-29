@@ -125,7 +125,7 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<div class="modal-overlay" id="inModal" onclick="closeModalOutside(event,'inModal')">
+<div class="modal-overlay" id="inModal">
   <div class="modal">
     <div class="modal-hd"><div class="modal-title">+ 입고 등록</div><button class="modal-close" onclick="closeModal('inModal')">×</button></div>
     <div class="modal-bd">
@@ -141,7 +141,7 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<div class="modal-overlay" id="outModal" onclick="closeModalOutside(event,'outModal')">
+<div class="modal-overlay" id="outModal">
   <div class="modal">
     <div class="modal-hd"><div class="modal-title">- 출고 등록</div><button class="modal-close" onclick="closeModal('outModal')">×</button></div>
     <div class="modal-bd">
@@ -157,7 +157,7 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<div class="modal-overlay" id="newIngModal" onclick="closeModalOutside(event,'newIngModal')">
+<div class="modal-overlay" id="newIngModal">
   <div class="modal" style="width:520px">
     <div class="modal-hd"><div class="modal-title">➕ 신규 원료 등록</div><button class="modal-close" onclick="closeModal('newIngModal')">×</button></div>
     <div class="modal-bd">
@@ -173,7 +173,7 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<div class="modal-overlay" id="deleteCodeModal" onclick="closeModalOutside(event,'deleteCodeModal')">
+<div class="modal-overlay" id="deleteCodeModal">
   <div class="modal" style="width:400px">
     <div class="modal-hd"><div class="modal-title">🗑️ 코드 삭제</div><button class="modal-close" onclick="closeModal('deleteCodeModal')">×</button></div>
     <div class="modal-bd">
@@ -184,12 +184,12 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<div class="modal-overlay" id="editIngModal" onclick="closeModalOutside(event,'editIngModal')">
+<div class="modal-overlay" id="editIngModal">
   <div class="modal" style="width:480px">
     <div class="modal-hd"><div class="modal-title">✏️ 원료 수정</div><button class="modal-close" onclick="closeModal('editIngModal')">×</button></div>
     <div class="modal-bd">
       <input type="hidden" id="editIngCode">
-      <div class="form-row"><label class="form-label">원료명</label><input class="form-input" id="editIngNameDisplay" disabled style="background:#f4f6fa;color:var(--text2)"></div>
+      <div class="form-row"><label class="form-label">원료명</label><input class="form-input" id="editIngNameDisplay" placeholder="원료명 입력"></div>
       <div class="form-row"><label class="form-label">원산지</label><input class="form-input" id="editIngOrigin" placeholder="예: 국산"></div>
       <div class="form-row"><label class="form-label">보관기준</label><input class="form-input" id="editIngStorage" placeholder="예: 1~35℃ 실온보관"></div>
       <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
@@ -224,7 +224,7 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<div class="modal-overlay" id="deleteByInputLotModal" onclick="closeModalOutside(event,'deleteByInputLotModal')">
+<div class="modal-overlay" id="deleteByInputLotModal">
   <div class="modal" style="width:480px">
     <div class="modal-hd"><div class="modal-title">🗑️ 투입LOT 출고삭제</div><button class="modal-close" onclick="closeModal('deleteByInputLotModal')">×</button></div>
     <div class="modal-bd">
@@ -244,7 +244,7 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<div class="modal-overlay" id="deleteAllLedgerModal" onclick="closeModalOutside(event,'deleteAllLedgerModal')">
+<div class="modal-overlay" id="deleteAllLedgerModal">
   <div class="modal" style="width:400px">
     <div class="modal-hd"><div class="modal-title">⚠️ 수불내역 전체삭제</div><button class="modal-close" onclick="closeModal('deleteAllLedgerModal')">×</button></div>
     <div class="modal-bd">
@@ -841,6 +841,20 @@ function saveEditIngredient(){
   const code = document.getElementById('editIngCode').value;
   const ing = getIngByCode(code);
   if(!ing) return;
+  const oldName = ing.name;
+  const newName = document.getElementById('editIngNameDisplay').value.trim();
+  if(!newName){ alert('원료명을 입력해주세요'); return; }
+  // 원료명 중복 체크 (다른 코드에 같은 이름이 있는지)
+  if(newName !== oldName && INGREDIENT_DB.find(i=>i.code!==code && (i.name===newName || i.name.replace(/\n/g,' ')===newName))){
+    alert('이미 존재하는 원료명입니다'); return;
+  }
+  // 원료명 변경 시 ledgerRecords 일괄 업데이트
+  if(newName !== oldName && newName !== oldName.replace(/\n/g,' ')){
+    ledgerRecords.forEach(r=>{
+      if(r.name===oldName || r.name===oldName.replace(/\n/g,' ')) r.name=newName;
+    });
+  }
+  ing.name = newName;
   // 원산지, 보관기준 업데이트
   ing.origin = document.getElementById('editIngOrigin').value.trim();
   ing.storage = document.getElementById('editIngStorage').value.trim();
@@ -849,11 +863,13 @@ function saveEditIngredient(){
   const exp = getInitDateVal('editIngExp');
   const mfg = getInitDateVal('editIngMfg')||'';
   if(qty>0){
-    ledgerRecords = ledgerRecords.filter(r=>!(r.name===ing.name&&r.type==='init'));
+    ledgerRecords = ledgerRecords.filter(r=>!(r.name===newName&&r.type==='init'));
     const today = getLedgerDateISO();
     const datepart = (exp||mfg||'').replace(/\./g,'');
     const lot = ing.code + '-OI-' + datepart;
-    ledgerRecords.push({date:today, name:ing.name, code:ing.code, qty, exp, mfg, lot, type:'init'});
+    ledgerRecords.push({date:today, name:newName, code:ing.code, qty, exp, mfg, lot, type:'init'});
+    saveLedger();
+  } else {
     saveLedger();
   }
   saveIngredientDB();
