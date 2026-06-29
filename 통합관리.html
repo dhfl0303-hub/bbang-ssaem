@@ -515,11 +515,17 @@ tr:hover td{background:var(--bg);}
 
     <!-- 생산수율관리 패널 -->
     <div class="panel" id="panel-yield-mgmt">
-      <div class="filter-row">
+      <div class="filter-row" style="flex-wrap:wrap;gap:8px;">
         <div>
           <label style="font-size:12px;font-weight:700;color:var(--text2);margin-right:6px;">조회 날짜</label>
           <select class="search-input" id="yieldDate" style="min-width:160px;">
             <option value="">날짜 선택...</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--text2);margin-right:6px;">제품</label>
+          <select class="search-input" id="yieldProductFilter" style="min-width:180px;" onchange="loadYield()">
+            <option value="">전체 제품</option>
           </select>
         </div>
         <button class="btn btn-primary btn-sm" onclick="loadYield()">🔄 조회</button>
@@ -538,12 +544,15 @@ tr:hover td{background:var(--bg);}
             <table>
               <thead>
                 <tr>
-                  <th>제품명</th><th>배합 투입량(g)</th><th>포장 생산량(ea)</th>
-                  <th>포장 생산량(box)</th><th>수율(%)</th><th>로스율(%)</th><th>비고</th><th style="width:120px">관리</th>
+                  <th style="width:32px;"></th>
+                  <th>제품명</th>
+                  <th style="width:100px">수율(%)</th>
+                  <th style="width:100px">로스율(%)</th>
+                  <th style="width:70px">상태</th>
                 </tr>
               </thead>
               <tbody id="yieldTbody">
-                <tr><td colspan="8" class="tc" style="padding:24px;color:var(--text3);">조회 날짜를 선택하고 조회 버튼을 눌러주세요</td></tr>
+                <tr><td colspan="5" class="tc" style="padding:24px;color:var(--text3);">조회 날짜를 선택하고 조회 버튼을 눌러주세요</td></tr>
               </tbody>
             </table>
           </div>
@@ -657,9 +666,12 @@ tr:hover td{background:var(--bg);}
         </div>
       </div>
       <div class="card">
-        <div class="card-hd">
+        <div class="card-hd" style="flex-wrap:wrap;gap:8px;">
           <div class="card-hd-title">원료 재고 목록</div>
-          <div style="display:flex;gap:6px;align-items:center;">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="ingStockSearch" placeholder="🔍 코드 또는 원료명 검색"
+              style="border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:13px;width:190px;background:var(--bg);color:var(--text1);outline:none;"
+              oninput="renderIngStock()">
             <button class="btn btn-sm btn-outline" id="sortCodeBtn" onclick="setIngSort('code')" style="background:var(--primary);color:#fff;border-color:var(--primary)">코드순</button>
             <button class="btn btn-sm btn-outline" id="sortNameBtn" onclick="setIngSort('name')">원료명순</button>
             <button class="btn btn-primary btn-sm" onclick="openAddIngStock()">+ 원료 등록</button>
@@ -2712,17 +2724,26 @@ async function deleteYield(){
 }
 
 // ===== 수율 =====
+function parseTimeToMin(t){
+  if(!t) return null;
+  const m=t.match(/(오전|오후)\s*(\d+):(\d+)/);
+  if(!m) return null;
+  let h=parseInt(m[2]),min=parseInt(m[3]);
+  if(m[1]==='오후'&&h!==12) h+=12;
+  if(m[1]==='오전'&&h===12) h=0;
+  return h*60+min;
+}
+
 function loadYield(){
   const dateVal = document.getElementById('yieldDate').value;
   const key = dateToYYMMDD(dateVal);
   const batchRecs = (window._fbCache&&window._fbCache['batchRecords_'+key])||[];
   const packRecs  = (window._fbCache&&window._fbCache['packRecords_'+key])||[];
+  const inputRecs = (window._fbCache&&window._fbCache['inputRecords_'+key])||[];
   const tbody = document.getElementById('yieldTbody');
 
-  const inputRecs = (window._fbCache&&window._fbCache['inputRecords_'+key])||[];
-
   if(!batchRecs.length && !packRecs.length && !inputRecs.length){
-    tbody.innerHTML='<tr><td colspan="8" class="tc" style="padding:24px;color:var(--text3);">해당 날짜의 데이터가 없습니다</td></tr>';
+    tbody.innerHTML='<tr><td colspan="11" class="tc" style="padding:24px;color:var(--text3);">해당 날짜의 데이터가 없습니다</td></tr>';
     document.getElementById('avgYield').textContent='-';
     document.getElementById('avgLoss').textContent='-';
     document.getElementById('yieldCnt').textContent='-';
@@ -2731,92 +2752,161 @@ function loadYield(){
 
   const showDeleted=document.getElementById('showDeletedYield')?.checked||false;
 
-  // 제품별 배합 투입량 계산 (정제수 등 기타원재료 포함)
+  // ① 포장기록 기준으로 맵 먼저 생성
   const batchMap={};
-  batchRecs.forEach(r=>{
-    if(!batchMap[r.productCode]) batchMap[r.productCode]={name:r.product,input:0,pcs:0,boxes:0,_deleted:false};
-    // _deleted 상태 확인
-    if(r._deleted) batchMap[r.productCode]._deleted=true;
-    if(r._deleted) return;
-    if(r.batchRecords) r.batchRecords.forEach(b=>{
-      b.ingredients&&b.ingredients.forEach(ing=>{ batchMap[r.productCode].input+=ing.total||0; });
-    });
-    // 기타사용원재료 (정제수 등) 투입량 합산
-    if(r.extraIngredients) r.extraIngredients.forEach(ext=>{
-      batchMap[r.productCode].input += (parseFloat(ext.amount)||0);
-    });
-  });
-  // 투입일보 투입량 합산 (제품명 기준)
-  inputRecs.forEach(r=>{
-    if(!r.product) return;
-    if(r._deleted) return;
-    // productCode가 있으면 그대로, 없으면 이름 매칭
-    let pCode = r.productCode || Object.keys(batchMap).find(k=>batchMap[k].name===r.product);
-    if(!pCode){
-      pCode = 'INPUT_'+r.product;
-    }
-    if(!batchMap[pCode]) batchMap[pCode] = {name:r.product, input:0, pcs:0, boxes:0, _deleted:r._deleted||false};
-    (r.ingredients||[]).forEach(ing=>{
-      batchMap[pCode].input += (parseFloat(ing.qty)||0)*1000; // kg→g
-    });
-  });
-  // 포장 생산량
   packRecs.forEach(r=>{
-    if(!batchMap[r.productCode]) batchMap[r.productCode]={name:r.product,input:0,pcs:0,boxes:0,itemWeight:0,_deleted:false};
-    if(r._deleted){ batchMap[r.productCode]._deleted=true; return; }
-    batchMap[r.productCode].pcs  += parseInt(r.qtyPcs)||0;
-    batchMap[r.productCode].boxes+= parseInt(r.qtyBoxes)||0;
-    // itemWeight: 저장된 값 우선, 없으면 완제품_products의 spec에서 중량 추출
-    if(parseInt(r.itemWeight)){
-      batchMap[r.productCode].itemWeight = parseInt(r.itemWeight);
-    } else if(!batchMap[r.productCode].itemWeight){
-      try{
-        // lotMapping에서 productCode → lot_code 찾기
-        const lm = lotMapping.find(m=>m.pLot===r.productCode);
-        const wLotCode = lm&&lm.wLots.length ? lm.wLots[0].lot : null;
-        if(wLotCode){
-          const finProds = (window._fbCache&&window._fbCache['완제품_products'])||[];
-          const prod = finProds.find(p=>p.lot_code===wLotCode);
-          if(prod && prod.spec){
-            const m = prod.spec.match(/^(\d+)g/);
-            if(m) batchMap[r.productCode].itemWeight = parseInt(m[1]);
-          }
-        }
-      }catch(e){}
-    }
+    if(!batchMap[r.productCode]) batchMap[r.productCode]={
+      name:r.product, input:0, pcs:0, boxes:0, itemWeight:0,
+      workers:0, startMin:null, endMin:null, _deleted:false
+    };
+    const d=batchMap[r.productCode];
+    if(r._deleted){ d._deleted=true; return; }
+    d.pcs   += parseInt(r.qtyPcs)||0;
+    d.boxes += parseInt(r.qtyBoxes)||0;
+    if(parseInt(r.itemWeight)) d.itemWeight=parseInt(r.itemWeight);
+    d.workers = Math.max(d.workers, parseInt(r.workers)||0);
+    const sMin=parseTimeToMin(r.startTime), eMin=parseTimeToMin(r.endTime);
+    if(sMin!==null) d.startMin = d.startMin===null ? sMin : Math.min(d.startMin,sMin);
+    if(eMin!==null) d.endMin   = d.endMin===null   ? eMin : Math.max(d.endMin,eMin);
+    // itemWeight fallback: lotMapping
+    if(!d.itemWeight){ try{
+      const lm=lotMapping.find(m=>m.pLot===r.productCode);
+      const wLotCode=lm&&lm.wLots.length?lm.wLots[0].lot:null;
+      if(wLotCode){ const finProds=(window._fbCache&&window._fbCache['완제품_products'])||[];
+        const prod=finProds.find(p=>p.lot_code===wLotCode);
+        if(prod&&prod.spec){ const mm=prod.spec.match(/^(\d+)g/); if(mm) d.itemWeight=parseInt(mm[1]); }
+      }
+    }catch(e){} }
   });
 
-  const rows = Object.entries(batchMap);
-  let yieldSum=0, yieldCnt=0;
-  const activeRows = rows.filter(([code,d])=>showDeleted||!d._deleted);
-  tbody.innerHTML = activeRows.map(([code,d])=>{
-    const inputKg = d.input;
-    const weight = d.itemWeight || 65;
-    const outputKg = d.pcs * weight;
-    const yieldPct = inputKg>0&&!d._deleted ? Math.round((outputKg/inputKg)*1000)/10 : '-';
-    const lossPct  = inputKg>0&&!d._deleted ? Math.round(((inputKg-outputKg)/inputKg)*1000)/10 : '-';
-    if(typeof yieldPct==='number'){ yieldSum+=yieldPct; yieldCnt++; }
-    const isDeleted = d._deleted;
-    return `<tr style="${isDeleted?'opacity:0.4;text-decoration:line-through;':''}">
-      <td style="font-weight:700;">${d.name}${isDeleted?' <span class="badge badge-gray" style="font-size:9px">삭제됨</span>':''}</td>
-      <td style="text-align:center;">${inputKg>0?inputKg.toLocaleString()+' g':'-'}</td>
-      <td style="text-align:center;">${d.pcs>0?d.pcs.toLocaleString()+' ea':'-'}</td>
-      <td style="text-align:center;">${d.boxes>0?d.boxes.toLocaleString()+' box':'-'}</td>
-      <td style="text-align:center;font-weight:700;color:var(--success);">${typeof yieldPct==='number'?yieldPct+'%':'-'}</td>
-      <td style="text-align:center;font-weight:700;color:var(--danger);">${typeof lossPct==='number'?lossPct+'%':'-'}</td>
-      <td style="font-size:11px;color:var(--text3);">※ ${weight}g 기준</td>
-      <td style="white-space:nowrap;text-align:center;">${isDeleted
-        ?`<button class="btn btn-sm btn-primary" style="font-size:10px;padding:2px 8px" onclick="yieldRestore('${code}')">복원</button>
-           <button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 8px" onclick="yieldForceDelete('${code}')">강제삭제</button>`
-        :`<button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 8px;margin-right:2px" onclick="yieldSoftDelete('${code}')">삭제</button>
-           <button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 8px" onclick="yieldForceDelete('${code}')">강제삭제</button>`
-      }</td>
-    </tr>`;
-  }).join('')||`<tr><td colspan="8" class="tc" style="padding:24px;color:var(--text3);">데이터가 없습니다</td></tr>`;
+  // ② 포장 제품명 목록 (반죽/속배합 병합 기준)
+  const packProductNames={};
+  Object.entries(batchMap).forEach(([code,d])=>{ packProductNames[code]=d.name; });
 
-  document.getElementById('avgYield').textContent = yieldCnt>0 ? (yieldSum/yieldCnt).toFixed(1)+'%' : '-';
-  document.getElementById('avgLoss').textContent  = yieldCnt>0 ? (100-(yieldSum/yieldCnt)).toFixed(1)+'%' : '-';
-  document.getElementById('yieldCnt').textContent = activeRows.filter(([,d])=>!d._deleted).length;
+  // ③ 배합투입량 계산 (반죽+속배합 자동 합산)
+  batchRecs.forEach(r=>{
+    if(r._deleted) return;
+    let targetCode=r.productCode;
+    if(!batchMap[targetCode]){
+      // 이름 기반 병합: "쫀득고구마빵 속배합" → "쫀득고구마빵" 에 합산
+      const bName=r.product||'';
+      const matched=Object.entries(packProductNames).find(([,pName])=>bName!==pName&&bName.startsWith(pName));
+      if(matched){ targetCode=matched[0]; }
+      else { batchMap[targetCode]={name:r.product,input:0,pcs:0,boxes:0,itemWeight:0,workers:0,startMin:null,endMin:null,_deleted:false}; }
+    }
+    if(batchMap[targetCode]._deleted) return;
+    if(r.batchRecords) r.batchRecords.forEach(b=>{
+      b.ingredients&&b.ingredients.forEach(ing=>{ batchMap[targetCode].input+=ing.total||0; });
+    });
+    if(r.extraIngredients) r.extraIngredients.forEach(ext=>{
+      batchMap[targetCode].input+=(parseFloat(ext.qty)||0)*1000; // kg→g
+    });
+  });
+
+  // ④ 투입일보 합산
+  inputRecs.forEach(r=>{
+    if(!r.product||r._deleted) return;
+    let pCode=r.productCode||Object.keys(batchMap).find(k=>batchMap[k].name===r.product);
+    if(!pCode) pCode='INPUT_'+r.product;
+    if(!batchMap[pCode]) batchMap[pCode]={name:r.product,input:0,pcs:0,boxes:0,itemWeight:0,workers:0,startMin:null,endMin:null,_deleted:r._deleted||false};
+    (r.ingredients||[]).forEach(ing=>{ batchMap[pCode].input+=(parseFloat(ing.qty)||0)*1000; });
+  });
+
+  // ⑤ 드롭다운 갱신
+  const filterSel=document.getElementById('yieldProductFilter');
+  const prevFilter=filterSel?filterSel.value:'';
+  if(filterSel){
+    filterSel.innerHTML='<option value="">전체 제품</option>'+
+      Object.entries(batchMap).filter(([,d])=>!d._deleted||showDeleted)
+        .map(([code,d])=>`<option value="${code}"${code===prevFilter?' selected':''}>${d.name}</option>`).join('');
+  }
+  const filterCode=filterSel?filterSel.value:'';
+
+  // ⑥ 렌더링
+  const rows=Object.entries(batchMap);
+  let yieldSum=0, yieldCnt=0;
+  const activeRows=rows.filter(([code,d])=>{
+    if(!showDeleted&&d._deleted) return false;
+    if(filterCode&&code!==filterCode) return false;
+    return true;
+  });
+
+  tbody.innerHTML=activeRows.map(([code,d])=>{
+    const weight=d.itemWeight||65;
+    const outputG=d.pcs*weight;
+    const yieldPct=d.input>0&&!d._deleted?Math.round((outputG/d.input)*1000)/10:null;
+    const lossPct =d.input>0&&!d._deleted?Math.round(((d.input-outputG)/d.input)*1000)/10:null;
+    if(yieldPct!==null){ yieldSum+=yieldPct; yieldCnt++; }
+    const workMin=(d.startMin!==null&&d.endMin!==null)?d.endMin-d.startMin:null;
+    const workStr=workMin!==null?`${Math.floor(workMin/60)}h ${workMin%60}m`:'-';
+    const per10=(workMin&&d.workers&&d.pcs)?Math.round(d.pcs/workMin/d.workers*10):'-';
+    const isDeleted=d._deleted;
+    const sid=code.replace(/[^a-zA-Z0-9]/g,'_');
+    const yieldColor=yieldPct===null?'var(--text3)':yieldPct>=90?'var(--success)':yieldPct>=70?'#e6a817':'var(--danger)';
+    const lossColor =lossPct===null?'var(--text3)':lossPct<=10?'var(--success)':lossPct<=30?'#e6a817':'var(--danger)';
+    const badge=yieldPct===null?'badge-gray':yieldPct>=90?'badge-green':yieldPct>=70?'badge-orange':'badge-red';
+    const badgeLabel=yieldPct===null?'-':yieldPct>=90?'우수':yieldPct>=70?'보통':'주의';
+    return `
+    <tr onclick="toggleYieldRow('${sid}')" style="cursor:pointer;${isDeleted?'opacity:0.4;text-decoration:line-through;':''}">
+      <td style="text-align:center;font-size:13px;color:var(--text3);" id="yieldArrow_${sid}">▶</td>
+      <td style="font-weight:700;">${d.name}${isDeleted?' <span class="badge badge-gray" style="font-size:9px">삭제됨</span>':''}</td>
+      <td style="text-align:center;font-weight:700;color:${yieldColor};">${yieldPct!==null?yieldPct+'%':'-'}</td>
+      <td style="text-align:center;font-weight:700;color:${lossColor};">${lossPct!==null?lossPct+'%':'-'}</td>
+      <td style="text-align:center;"><span class="badge ${badge}">${badgeLabel}</span></td>
+    </tr>
+    <tr id="yieldDetail_${sid}" style="display:none;background:var(--bg2);">
+      <td colspan="5" style="padding:0;">
+        <div style="padding:16px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;border-top:1px solid var(--border);">
+          <div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">배합 투입량</div>
+            <div style="font-weight:700;font-size:15px;">${d.input>0?d.input.toLocaleString()+' g':'-'}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">포장량</div>
+            <div style="font-weight:700;font-size:15px;">${d.pcs>0?d.pcs.toLocaleString()+' ea':'-'} / ${d.boxes>0?d.boxes.toLocaleString()+' box':'-'}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">기준중량</div>
+            <div style="font-weight:700;font-size:15px;">※ ${weight}g 기준</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">작업시간</div>
+            <div style="font-weight:700;font-size:15px;">${workStr}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">인원</div>
+            <div style="font-weight:700;font-size:15px;">${d.workers?d.workers+'명':'-'}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">10분/인당</div>
+            <div style="font-weight:700;font-size:15px;">${per10!=='-'?per10+'개':'-'}</div>
+          </div>
+        </div>
+        <div style="padding:0 20px 14px;display:flex;gap:6px;justify-content:flex-end;border-top:1px solid var(--border);">
+          ${isDeleted
+            ?`<button class="btn btn-sm btn-primary" style="font-size:11px;" onclick="event.stopPropagation();yieldRestore('${code}')">복원</button>
+              <button class="btn btn-sm btn-danger" style="font-size:11px;" onclick="event.stopPropagation();yieldForceDelete('${code}')">강제삭제</button>`
+            :`<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="event.stopPropagation();yieldSoftDelete('${code}')">삭제</button>
+              <button class="btn btn-sm btn-danger" style="font-size:11px;" onclick="event.stopPropagation();yieldForceDelete('${code}')">강제삭제</button>`
+          }
+        </div>
+      </td>
+    </tr>`;
+  }).join('')||`<tr><td colspan="5" class="tc" style="padding:24px;color:var(--text3);">데이터가 없습니다</td></tr>`;
+
+  document.getElementById('avgYield').textContent=yieldCnt>0?(yieldSum/yieldCnt).toFixed(1)+'%':'-';
+  document.getElementById('avgLoss').textContent =yieldCnt>0?(100-(yieldSum/yieldCnt)).toFixed(1)+'%':'-';
+  document.getElementById('yieldCnt').textContent=activeRows.filter(([,d])=>!d._deleted).length;
+}
+
+// 수율 아코디언 토글
+function toggleYieldRow(sid){
+  const detail=document.getElementById('yieldDetail_'+sid);
+  const arrow=document.getElementById('yieldArrow_'+sid);
+  if(!detail) return;
+  const isOpen=detail.style.display!=='none';
+  detail.style.display=isOpen?'none':'';
+  if(arrow) arrow.textContent=isOpen?'▶':'▼';
 }
 
 // 수율 항목별 삭제/복원
@@ -3396,9 +3486,13 @@ function renderIngStock(){
     return a.name.localeCompare(b.name,'ko');
   });
 
+  // 검색 필터
+  const q=(document.getElementById('ingStockSearch')?.value||'').trim().toLowerCase();
+  const filtered=q?sorted.filter(s=>(s.code||'').toLowerCase().includes(q)||(s.name||'').toLowerCase().includes(q)):sorted;
+
   // 코드별 그룹 생성
   const groups={}, groupOrder=[];
-  sorted.forEach(s=>{
+  filtered.forEach(s=>{
     const ing=(typeof INGREDIENT_DB!=='undefined')?INGREDIENT_DB.find(x=>x.name===s.name):null;
     const code=s.code||(ing?ing.code:'-');
     if(!groups[code]){ groups[code]={code,name:s.name,items:[]}; groupOrder.push(code); }
@@ -3406,7 +3500,8 @@ function renderIngStock(){
   });
 
   if(!groupOrder.length){
-    document.getElementById('ingStockTbody').innerHTML='<tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">등록된 원료가 없습니다</td></tr>';
+    const msg=q?`'${q}' 검색 결과가 없습니다`:'등록된 원료가 없습니다';
+    document.getElementById('ingStockTbody').innerHTML=`<tr><td colspan="6" class="tc" style="padding:24px;color:var(--text3)">${msg}</td></tr>`;
     return;
   }
 
