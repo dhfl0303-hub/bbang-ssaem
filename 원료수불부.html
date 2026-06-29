@@ -287,6 +287,27 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
+
+<div class="modal-overlay" id="skippedIngModal">
+  <div class="modal" style="width:480px">
+    <div class="modal-hd">
+      <div class="modal-title">⚠️ 원료DB 미등록 원료</div>
+      <button class="modal-close" onclick="closeModal('skippedIngModal')">×</button>
+    </div>
+    <div class="modal-bd">
+      <div style="background:var(--warning-light);border:1px solid #f0c080;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--warning);">
+        입고검사일지에 원료DB에 없는 원료가 있어 동기화에서 제외됐습니다.<br>
+        신규 등록 후 다시 확인하거나, <strong>"이 원료 무시"</strong>를 누르면 다음부터 표시되지 않습니다.<br>
+        <span style="font-size:11px;color:var(--text3);">(새 입고 데이터가 추가되면 다시 알림)</span>
+      </div>
+      <div id="skippedIngList"></div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-outline" onclick="closeModal('skippedIngModal')">닫기</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
@@ -368,7 +389,7 @@ async function initLedger(){
     });
     if(skipped.length){
       const unique = [...new Set(skipped)];
-      alert('⚠️ 원료DB에 코드가 없어 동기화에서 제외된 원료:\n\n' + unique.join(', ') + '\n\n해당 원료를 신규 등록 후 다시 확인해주세요.');
+      openSkippedModal(unique);
     }
 
     // 3) 변경이 있을 때만 저장
@@ -382,6 +403,51 @@ function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
 function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
 
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+// ===== 미등록 원료 팝업 (무시 기능) =====
+function getIgnoredIngs(){
+  try{ return JSON.parse(localStorage.getItem('ignoredSkippedIngs')||'{}'); }
+  catch(e){ return {}; }
+}
+function saveIgnoredIngs(obj){
+  localStorage.setItem('ignoredSkippedIngs', JSON.stringify(obj));
+}
+function countIngInIncoming(name){
+  return (window._incomingRecords||[]).reduce((cnt,rec)=>{
+    return cnt + (rec.rows||[]).filter(r=>r.product===name).length;
+  }, 0);
+}
+function openSkippedModal(names){
+  const ignored = getIgnoredIngs();
+  // 무시 목록에 없거나, 입고 건수가 늘어난 것만 표시
+  const toShow = names.filter(name=>{
+    if(!(name in ignored)) return true;
+    return countIngInIncoming(name) > ignored[name];
+  });
+  if(!toShow.length) return;
+  document.getElementById('skippedIngList').innerHTML = toShow.map(name=>{
+    const cnt = countIngInIncoming(name);
+    const safeName = name.replace(/'/g,"\\'");
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:13px;font-weight:600;">${name}</span>
+      <button class="btn btn-sm" style="background:#f0f4ff;color:var(--primary);border:1px solid #c0d0f0;white-space:nowrap;"
+        onclick="ignoreSkippedIng('${safeName}',${cnt},this)">이 원료 무시</button>
+    </div>`;
+  }).join('');
+  document.getElementById('skippedIngModal').classList.add('open');
+}
+function ignoreSkippedIng(name, count, btn){
+  const ignored = getIgnoredIngs();
+  ignored[name] = count;
+  saveIgnoredIngs(ignored);
+  // 해당 항목 제거
+  const row = btn.closest('div[style]');
+  if(row) row.remove();
+  // 남은 항목 없으면 모달 닫기
+  if(!document.querySelectorAll('#skippedIngList > div').length){
+    closeModal('skippedIngModal');
+  }
+}
 
 // ===== 보관기준 토글 헬퍼 =====
 function getStorageValue(wrapId){
