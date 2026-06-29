@@ -71,6 +71,10 @@ tr:hover td{background:var(--bg);}
 .acc-table td{padding:6px 10px;border-bottom:1px solid var(--border);text-align:center;font-size:12px;}
 .acc-table tr:last-child td{border-bottom:none;}
 .acc-empty{padding:16px;text-align:center;color:var(--text3);font-size:13px;}
+.storage-toggle-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
+.storage-toggle-btn{padding:6px 12px;border-radius:20px;border:1.5px solid var(--border);background:#fff;color:var(--text2);font-size:12px;font-family:"Noto Sans KR",sans-serif;cursor:pointer;transition:all 0.15s;font-weight:600;}
+.storage-toggle-btn:hover{border-color:var(--primary);color:var(--primary);}
+.storage-toggle-btn.active{background:var(--primary);color:#fff;border-color:var(--primary);}
 @media print{
   .topbar,.filter-row,.btn,.accordion-detail,.acc-arrow{display:none!important;}
   .card-hd .badge{display:none!important;}
@@ -167,7 +171,16 @@ tr:hover td{background:var(--bg);}
         <div class="form-row"><label class="form-label">원료명 <span style="color:var(--danger)">*</span></label><input class="form-input" id="newIngName" placeholder="예: 버터크림"></div>
         <div class="form-row"><label class="form-label">원산지</label><input class="form-input" id="newIngOrigin" placeholder="예: 국내제조"></div>
         <div class="form-row"><label class="form-label">단위</label><select class="form-input" id="newIngUnit"><option value="kg">kg</option><option value="g">g</option><option value="L">L</option><option value="EA">EA</option></select></div>
-        <div class="form-row" style="grid-column:1/-1"><label class="form-label">보관기준</label><input class="form-input" id="newIngStorage" placeholder="예: 1~35℃ 실온보관"></div>
+        <div class="form-row" style="grid-column:1/-1">
+          <label class="form-label">보관기준</label>
+          <div class="storage-toggle-wrap" id="newIngStorageToggle">
+            <button type="button" class="storage-toggle-btn" onclick="this.classList.toggle('active')">상온(25~35도)</button>
+            <button type="button" class="storage-toggle-btn" onclick="this.classList.toggle('active')">실온(1~35도)</button>
+            <button type="button" class="storage-toggle-btn" onclick="this.classList.toggle('active')">냉장보관(0~10도)</button>
+            <button type="button" class="storage-toggle-btn" onclick="this.classList.toggle('active')">냉장보관(0~5도)</button>
+            <button type="button" class="storage-toggle-btn" onclick="this.classList.toggle('active')">냉동보관(-18도이하)</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('newIngModal')">취소</button><button class="btn btn-primary" onclick="saveNewIng()">저장</button></div>
@@ -192,7 +205,15 @@ tr:hover td{background:var(--bg);}
       <input type="hidden" id="editIngCode">
       <div class="form-row"><label class="form-label">원료명</label><input class="form-input" id="editIngNameDisplay" placeholder="원료명 입력"></div>
       <div class="form-row"><label class="form-label">원산지</label><input class="form-input" id="editIngOrigin" placeholder="예: 국산"></div>
-      <div class="form-row"><label class="form-label">보관기준</label><input class="form-input" id="editIngStorage" placeholder="예: 1~35℃ 실온보관"></div>
+      <div class="form-row"><label class="form-label">보관기준</label>
+        <div class="storage-toggle-wrap" id="editIngStorageToggle">
+          <button type="button" class="storage-toggle-btn" onclick="this.classList.toggle('active')">상온(25~35도)</button>
+          <button type="button" class="storage-toggle-btn" onclick="this.classList.toggle('active')">실온(1~35도)</button>
+          <button type="button" class="storage-toggle-btn" onclick="this.classList.toggle('active')">냉장보관(0~10도)</button>
+          <button type="button" class="storage-toggle-btn" onclick="this.classList.toggle('active')">냉장보관(0~5도)</button>
+          <button type="button" class="storage-toggle-btn" onclick="this.classList.toggle('active')">냉동보관(-18도이하)</button>
+        </div>
+      </div>
       <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
         <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:12px;">전일재고 수정</div>
         <div class="form-grid">
@@ -361,6 +382,34 @@ function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
 function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
 
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+// ===== 보관기준 토글 헬퍼 =====
+function getStorageValue(wrapId){
+  const btns = document.querySelectorAll('#'+wrapId+' .storage-toggle-btn.active');
+  return Array.from(btns).map(b=>b.textContent.trim()).join(' / ');
+}
+function setStorageToggle(wrapId, storageStr){
+  document.querySelectorAll('#'+wrapId+' .storage-toggle-btn').forEach(b=>b.classList.remove('active'));
+  if(!storageStr) return;
+  const keywords = [
+    {key:'상온', label:'상온(25~35도)'},
+    {key:'실온', label:'실온(1~35도)'},
+    {key:'0~5', label:'냉장보관(0~5도)'},
+    {key:'0~10', label:'냉장보관(0~10도)'},
+    {key:'-18', label:'냉동보관(-18도이하)'},
+    {key:'냉동', label:'냉동보관(-18도이하)'},
+  ];
+  document.querySelectorAll('#'+wrapId+' .storage-toggle-btn').forEach(btn=>{
+    const label = btn.textContent.trim();
+    // 슬래시 구분 저장값 직접 매칭
+    const parts = storageStr.split('/').map(s=>s.trim());
+    if(parts.includes(label)){ btn.classList.add('active'); return; }
+    // 키워드 기반 매칭 (기존 텍스트 대응)
+    keywords.forEach(m=>{
+      if(m.label===label && storageStr.includes(m.key)) btn.classList.add('active');
+    });
+  });
+}
 function closeAllModals(){ document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open')); }
 
 function closeModalOutside(e,id){ if(e.target===document.getElementById(id)) closeModal(id); }
@@ -802,7 +851,7 @@ function openEditIngredient(code){
   document.getElementById('editIngCode').value = code;
   document.getElementById('editIngNameDisplay').value = ing.name;
   document.getElementById('editIngOrigin').value = ing.origin||'';
-  document.getElementById('editIngStorage').value = ing.storage||'';
+  setStorageToggle('editIngStorageToggle', ing.storage||'');
   document.getElementById('editIngQty').value = initRec ? initRec.qty : '';
   document.getElementById('editIngExp').value = initRec ? (initRec.exp||'') : '';
   document.getElementById('editIngMfg').value = initRec ? (initRec.mfg||'') : '';
@@ -816,15 +865,15 @@ function openNewIngModal(){
   document.getElementById('newIngCode').value = 'M' + String(next).padStart(3,'0');
   document.getElementById('newIngName').value = '';
   document.getElementById('newIngOrigin').value = '';
-  document.getElementById('newIngStorage').value = '';
   document.getElementById('newIngUnit').value = 'kg';
+  setStorageToggle('newIngStorageToggle', '');
   document.getElementById('newIngModal').classList.add('open');
 }
 function saveNewIng(){
   const code = document.getElementById('newIngCode').value;
   const name = document.getElementById('newIngName').value.trim();
   const origin = document.getElementById('newIngOrigin').value.trim();
-  const storage = document.getElementById('newIngStorage').value.trim();
+  const storage = getStorageValue('newIngStorageToggle');
   const unit = document.getElementById('newIngUnit').value;
   if(!name){ alert('원료명을 입력해주세요'); return; }
   if(INGREDIENT_DB.find(i=>i.name===name)){ alert('이미 존재하는 원료명입니다'); return; }
@@ -865,16 +914,34 @@ function saveEditIngredient(){
   if(newName !== oldName && INGREDIENT_DB.find(i=>i.code!==code && (i.name===newName || i.name.replace(/\n/g,' ')===newName))){
     alert('이미 존재하는 원료명입니다'); return;
   }
-  // 원료명 변경 시 ledgerRecords 일괄 업데이트
+  // 원료명 변경 시 ledgerRecords + incomingRecords 일괄 업데이트
   if(newName !== oldName && newName !== oldName.replace(/\n/g,' ')){
     ledgerRecords.forEach(r=>{
       if(r.name===oldName || r.name===oldName.replace(/\n/g,' ')) r.name=newName;
     });
+    // incomingRecords(입고검사일지) 안의 원료명도 업데이트
+    if(window._incomingRecords && window._incomingRecords.length){
+      let incomingChanged = false;
+      window._incomingRecords.forEach(rec=>{
+        (rec.rows||[]).forEach(row=>{
+          if(row.product===oldName || row.product===oldName.replace(/\n/g,' ')){
+            row.product = newName;
+            incomingChanged = true;
+          }
+        });
+      });
+      if(incomingChanged && window._db){
+        window._db.collection('appData').doc('incomingRecords').set({
+          data: JSON.stringify(window._incomingRecords),
+          updatedAt: new Date().toISOString()
+        }).catch(e=>console.warn('incomingRecords 저장 실패', e));
+      }
+    }
   }
   ing.name = newName;
   // 원산지, 보관기준 업데이트
   ing.origin = document.getElementById('editIngOrigin').value.trim();
-  ing.storage = document.getElementById('editIngStorage').value.trim();
+  ing.storage = getStorageValue('editIngStorageToggle');
   // 전일재고 업데이트
   const qty = parseFloat(document.getElementById('editIngQty').value)||0;
   const exp = getInitDateVal('editIngExp');
