@@ -43,6 +43,15 @@ body{font-family:"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text
 .sidebar-brand{margin-top:auto;padding:16px;text-align:center;color:#fff;font-size:16.5px;font-weight:700;letter-spacing:1px;border-top:1px solid rgba(255,255,255,0.08);}
 .nav-icon{font-size:16px;flex-shrink:0;}
 .main{margin-left:220px;width:calc(100% - 220px);height:100vh;overflow-y:auto;}
+.hamburger-btn{display:none;position:fixed;top:12px;left:12px;z-index:200;background:var(--primary-dark);color:#fff;border:none;border-radius:8px;width:40px;height:40px;font-size:22px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);font-family:'Noto Sans KR',sans-serif;}
+.sidebar-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99;}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);transition:transform 0.25s ease;}
+  .sidebar.open{transform:translateX(0);}
+  .sidebar-overlay.open{display:block;}
+  .main{margin-left:0;width:100%;padding-top:56px;}
+  .hamburger-btn{display:block;}
+}
 .topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
 .topbar-title{font-size:17px;font-weight:700;}
 .topbar-badge{background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;}
@@ -203,7 +212,9 @@ tr:hover td{background:var(--bg);}
 <div class="layout">
 
 <!-- 사이드바 -->
-<div class="sidebar">
+<button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<div class="sidebar" id="sidebarEl">
   <!-- 프로필 카드 -->
   <div class="sidebar-logo" id="sidebarProfile" style="display:none;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
@@ -3084,7 +3095,21 @@ function toggleCardAccordion(bodyId){
     if(arrow) arrow.style.transform='';
   }
 }
+// 모바일 사이드바 토글
+function toggleSidebar(){
+  const sb=document.getElementById('sidebarEl');
+  const ov=document.getElementById('sidebarOverlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('open');
+}
+
 function showPanel(id){
+  // 모바일에서 메뉴 선택 시 사이드바 닫기
+  const sb=document.getElementById('sidebarEl');
+  const ov=document.getElementById('sidebarOverlay');
+  if(sb) sb.classList.remove('open');
+  if(ov) ov.classList.remove('open');
+
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+id).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
