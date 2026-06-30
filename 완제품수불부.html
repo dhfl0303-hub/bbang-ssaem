@@ -432,7 +432,7 @@ function flSyncFromPack(silent=false){
       const existingPending=(window._flPending||[]).find(p=>p.pkg_lot===r.lot);
       if(existingPending) return;
 
-      const mappingEntry=lotMapping.find(m=>m.pLot===r.productCode);
+      const mappingEntry=(window._lotMapping||[]).find(m=>m.pLot===r.productCode);
       const isOneToOne=mappingEntry&&mappingEntry.wLots&&mappingEntry.wLots.length===1;
 
       if(isOneToOne){
