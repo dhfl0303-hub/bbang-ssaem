@@ -2005,9 +2005,29 @@ function loadBatchStatus(){
                     dateStr=isMfg?`제조:${f}`:`소비:${f}`;
                   }
                 }
+                // LOT에 *없고 dateType도 없는 기존 데이터 → incomingRecords에서 mfg 필드 확인
+                if(dateStr!=='-'&&!dateStr.startsWith('제조')&&e.dateType!=='mfg'){
+                  const incRecs=window._incomingRecords||[];
+                  for(const rec of incRecs){
+                    const matched=(rec.rows||[]).find(rw=>rw.lot===e.lot);
+                    if(matched&&matched.mfg&&!matched.exp){
+                      dateStr=dateStr.replace('소비:','제조:');
+                      break;
+                    }
+                  }
+                }
                 if(dateStr==='-'&&e.exp){
                   const f=e.exp.replace(/(\d{2})(\d{2})(\d{2})/,'$1.$2.$3');
-                  dateStr=e.dateType==='mfg'?`제조:${f}`:`소비:${f}`;
+                  // dateType 또는 incomingRecords mfg 필드 확인
+                  let isMfgType=e.dateType==='mfg';
+                  if(!isMfgType){
+                    const incRecs=window._incomingRecords||[];
+                    for(const rec of incRecs){
+                      const matched=(rec.rows||[]).find(rw=>rw.lot===e.lot);
+                      if(matched&&matched.mfg&&!matched.exp){ isMfgType=true; break; }
+                    }
+                  }
+                  dateStr=isMfgType?`제조:${f}`:`소비:${f}`;
                 }
               }
               html += `<tr>
