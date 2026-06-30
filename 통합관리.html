@@ -116,6 +116,13 @@ tr:hover td{background:var(--bg);}
 .badge-gray{background:#f0f0f0;color:#666;}
 .badge-pink{background:var(--pink-light);color:var(--pink);}
 
+/* 로딩 오버레이 */
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,0.75);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
+.loading-overlay.active{display:flex;}
+.loading-spinner{width:36px;height:36px;border:3.5px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.75s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:14px;color:var(--text2);font-weight:500;}
+
 /* 모달 */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
@@ -351,6 +358,11 @@ tr:hover td{background:var(--bg);}
 
 <!-- 메인 -->
 <div class="main">
+  <!-- 로딩 오버레이 -->
+  <div class="loading-overlay" id="dataLoadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">데이터를 불러오는 중...</div>
+  </div>
   <div class="topbar">
     <div class="topbar-title" id="topbarTitle">원료 재고 현황</div>
     <div style="display:flex;gap:8px;align-items:center;">
@@ -4292,29 +4304,42 @@ async function cleanOrphanedBatchOut(){
 }
 
 // ===== 초기화 =====
+let _dataReadyResolve;
+const _dataReady = new Promise(r => { _dataReadyResolve = r; });
+
+function showLoadingOverlay(show){
+  const el = document.getElementById('dataLoadingOverlay');
+  if(el){ show ? el.classList.add('active') : el.classList.remove('active'); }
+}
+
 (async ()=>{
-  await loadFromFirebase();
-  initData();
-  await cleanOrphanedBatchOut();
-  // LOT 없는 init 레코드 자동 보정
-  let _lotFixed = false;
-  ledgerRecords.forEach(r=>{
-    if(r.type==='init' && !r.lot){
-      let code = r.code || '';
-      if(!code){ const ing=getIngByName(r.name); if(ing) { code=ing.code; r.code=code; } }
-      const datepart = (r.exp||r.mfg||'').replace(/\./g,'').replace(/-/g,'');
-      r.lot = code ? code + '-OI-' + datepart : 'OI-' + (r.name||'').slice(0,4) + '-' + datepart;
-      _lotFixed = true;
-    }
-  });
-  if(_lotFixed) saveLedger();
-  syncIncomingToLedger();
-  syncIngStockFromLedger();
-  document.getElementById('topbarDate').textContent=getToday();
-  const _ld=document.getElementById('ledgerDate'); if(_ld) _ld.value=getTodayISO2();
-  renderRecipe();
-  renderDisposeLog();
-  renderReturnLog();
+  try{
+    await loadFromFirebase();
+    initData();
+    await cleanOrphanedBatchOut();
+    // LOT 없는 init 레코드 자동 보정
+    let _lotFixed = false;
+    ledgerRecords.forEach(r=>{
+      if(r.type==='init' && !r.lot){
+        let code = r.code || '';
+        if(!code){ const ing=getIngByName(r.name); if(ing) { code=ing.code; r.code=code; } }
+        const datepart = (r.exp||r.mfg||'').replace(/\./g,'').replace(/-/g,'');
+        r.lot = code ? code + '-OI-' + datepart : 'OI-' + (r.name||'').slice(0,4) + '-' + datepart;
+        _lotFixed = true;
+      }
+    });
+    if(_lotFixed) saveLedger();
+    syncIncomingToLedger();
+    syncIngStockFromLedger();
+    document.getElementById('topbarDate').textContent=getToday();
+    const _ld=document.getElementById('ledgerDate'); if(_ld) _ld.value=getTodayISO2();
+    renderRecipe();
+    renderDisposeLog();
+    renderReturnLog();
+    renderIngStock();
+  } catch(e){ console.error('초기화 오류:', e); }
+  _dataReadyResolve();
+  showLoadingOverlay(false);
 })();
 </script>
 
@@ -4510,7 +4535,7 @@ async function doLogin() {
     if (!user || user.pwHash !== hash) { errEl.textContent = '사번 또는 비밀번호가 올바르지 않습니다.'; return; }
     const session = { empId: user.empId, name: user.name, dept: user.dept, rank: user.rank, role: user.role, permissions: user.permissions };
     localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-    applySession(session);
+    await applySession(session);
   } catch(e) { errEl.textContent = '로그인 중 오류가 발생했습니다.'; }
 }
 
@@ -4566,7 +4591,7 @@ function doLogout() {
 }
 
 // 세션 적용 (로그인 후 UI 세팅)
-function applySession(session) {
+async function applySession(session) {
   sessionStorage.setItem('mesTabAlive', '1');
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('sidebarProfile').style.display = 'block';
@@ -4579,6 +4604,11 @@ function applySession(session) {
     document.getElementById('menu-account-mgmt').style.display = 'block';
   }
   applyPermissions(session);
+  // 데이터 로딩 완료까지 오버레이 표시
+  showLoadingOverlay(true);
+  await _dataReady;
+  renderIngStock();
+  showLoadingOverlay(false);
 }
 
 // 권한 적용 — 없는 메뉴에 🔒 표시
@@ -4620,7 +4650,7 @@ function applyPanelPermission(panelId) {
   const saved = localStorage.getItem(AUTH_KEY);
   if (tabAlive && saved) {
     // 새로고침 → 세션 유지
-    try { applySession(JSON.parse(saved)); return; } catch(e) {}
+    try { await applySession(JSON.parse(saved)); return; } catch(e) {}
   }
   // 탭 새로 열었거나 세션 없음 → 로그인 화면
   localStorage.removeItem(AUTH_KEY);
