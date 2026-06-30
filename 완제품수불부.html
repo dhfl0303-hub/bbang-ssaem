@@ -527,19 +527,24 @@ function flRenderPending(){
     el.innerHTML='<div style="padding:24px;text-align:center;color:var(--text3);">대기 중인 포장LOT가 없습니다</div>';
     return;
   }
-  el.innerHTML=pending.map((p,i)=>`
-    <div style="border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;background:#fff;">
+  el.innerHTML=pending.map((p,i)=>{
+    const registeredLots=FL_STATE.lots.filter(l=>l.pkg_lot===p.pkg_lot);
+    const registeredBox=registeredLots.reduce((s,l)=>s+(parseInt(l.total_box)||0),0);
+    const isPartial=registeredBox>0;
+    return `
+    <div style="border:1.5px solid ${isPartial?'var(--warning)':'var(--border)'};border-radius:10px;padding:14px 16px;margin-bottom:8px;background:${isPartial?'#fffaf0':'#fff'};">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div>
-          <div style="font-weight:700;font-size:15px;">${p.product||p.productCode}</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px;">${p.pkg_lot} · ${p.date} · <span style="font-weight:700;color:var(--primary)">${p.total_box.toLocaleString()} box</span></div>
+          <div style="font-weight:700;font-size:15px;">${p.product||p.productCode}${isPartial?' <span style="font-size:11px;color:var(--warning);font-weight:600;">⚠️ 잔여분</span>':''}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;">${p.pkg_lot} · ${p.date} · <span style="font-weight:700;color:var(--primary)">남은 ${p.total_box.toLocaleString()} box</span>${isPartial?` <span style="color:var(--text3);">(등록완료: ${registeredBox}box)</span>`:''}</div>
         </div>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-primary btn-sm" onclick="flOpenSplit(${i})">✂️ 분할 입고</button>
           <button class="btn btn-success btn-sm" onclick="flDirectInbound(${i})">✅ 직접 입고</button>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 // 직접 입고 (분할 없이 완제품코드 선택)
 function flDirectInbound(idx){
@@ -650,13 +655,8 @@ function flConfirmSplit(){
   }
   if(!splits.length){alert('완제품을 추가해주세요');return;}
   if(sumQty>total){alert(`총 수량(${total}box)을 초과했습니다`);return;}
-  // 남은 수량 처리
+  // 남은 수량 자동 차감
   const remainBox = total - sumQty;
-  if(remainBox > 0){
-    if(!confirm(`${remainBox}box가 배정되지 않았습니다.\n입고대기에 남겨두시겠습니까?\n\n[확인] → 남은 수량 대기 유지\n[취소] → 입력 화면으로 돌아감`)) return;
-    // 남은 수량으로 대기 유지
-    p.total_box = remainBox;
-  }
   // 각 완제품으로 입고
   const mfg=(document.getElementById('flSplitDate')?.value||p.date||'').replace(/\D/g,'').slice(0,6)||p.date||'';
   splits.forEach(sp=>{
@@ -669,12 +669,14 @@ function flConfirmSplit(){
       spec:prod?.spec||'', mfg_date:mfg,
       exp_date:p.exp_date||'',
       total_box:sp.qty, remain_box:sp.qty,
-      is_partial:splits.length>1, pkg_lot:p.pkg_lot,
+      is_partial:true, pkg_lot:p.pkg_lot,
       outbound:[], reg_date:getTodayISO2()
     });
   });
   if(remainBox <= 0){
     window._flPending.splice(idx,1);
+  } else {
+    p.total_box = remainBox;
   }
   flSavePending();
   flSave();
@@ -682,7 +684,10 @@ function flConfirmSplit(){
   document.getElementById('flSplitModal').classList.remove('open');
   flRenderPending();
   flRenderStock();
-  alert(`분할 입고 완료: ${splits.length}개 완제품`);
+  const msg = remainBox > 0
+    ? `입고 완료: ${splits.length}개 완제품 (${sumQty}box)\n남은 ${remainBox}box는 입고대기에 유지됩니다.`
+    : `분할 입고 완료: ${splits.length}개 완제품 (${sumQty}box)`;
+  alert(msg);
 }
 function flSavePending(){
   if(window._db) window._db.collection('appData').doc('완제품_pending').set({data:JSON.stringify(window._flPending||[]),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
