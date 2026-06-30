@@ -423,9 +423,11 @@ function flSyncFromPack(silent=false){
     recs.forEach(r=>{
       if(!r.lot||!r.productCode) return;
       if(deletedLots.includes(r.lot)) return;
-      // 이미 처리된 LOT면 스킵
-      const existing=FL_STATE.lots.find(l=>l.pkg_lot===r.lot);
-      if(existing) return;
+      // 이미 처리된 LOT면 — 등록된 수량 합계 vs 포장 수량 비교
+      const existingLots=FL_STATE.lots.filter(l=>l.pkg_lot===r.lot);
+      const registeredBox=existingLots.reduce((s,l)=>s+(parseInt(l.total_box)||0),0);
+      const totalBox=parseInt(r.qtyBoxes)||0;
+      if(existingLots.length && registeredBox>=totalBox) return; // 전량 처리 완료
       // 대기 목록에도 있으면 스킵
       const existingPending=(window._flPending||[]).find(p=>p.pkg_lot===r.lot);
       if(existingPending) return;
@@ -456,12 +458,13 @@ function flSyncFromPack(silent=false){
       } else {
         // 매핑 없거나 1:N → 대기 상태
         if(!window._flPending) window._flPending=[];
+        const remainBox = totalBox - registeredBox;
         window._flPending.push({
           pkg_lot:r.lot,
           productCode:r.productCode,
           product:r.product||'',
           date:r.date||'',
-          total_box:parseInt(r.qtyBoxes)||0,
+          total_box:remainBox > 0 ? remainBox : (parseInt(r.qtyBoxes)||0),
           exp_date:r.expiryDate||''
         });
         pending++;
@@ -648,8 +651,11 @@ function flConfirmSplit(){
   if(!splits.length){alert('완제품을 추가해주세요');return;}
   if(sumQty>total){alert(`총 수량(${total}box)을 초과했습니다`);return;}
   // 남은 수량 처리
-  if(sumQty<total){
-    if(!confirm(`${total-sumQty}box가 배정되지 않았습니다. 계속하시겠습니까?`)) return;
+  const remainBox = total - sumQty;
+  if(remainBox > 0){
+    if(!confirm(`${remainBox}box가 배정되지 않았습니다.\n입고대기에 남겨두시겠습니까?\n\n[확인] → 남은 수량 대기 유지\n[취소] → 입력 화면으로 돌아감`)) return;
+    // 남은 수량으로 대기 유지
+    p.total_box = remainBox;
   }
   // 각 완제품으로 입고
   const mfg=(document.getElementById('flSplitDate')?.value||p.date||'').replace(/\D/g,'').slice(0,6)||p.date||'';
@@ -667,7 +673,9 @@ function flConfirmSplit(){
       outbound:[], reg_date:getTodayISO2()
     });
   });
-  window._flPending.splice(idx,1);
+  if(remainBox <= 0){
+    window._flPending.splice(idx,1);
+  }
   flSavePending();
   flSave();
   flUpdatePendingBadge();
