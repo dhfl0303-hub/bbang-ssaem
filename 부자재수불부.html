@@ -170,6 +170,10 @@ tr:hover td{background:var(--bg);}
       <div class="form-grid">
         <div class="form-row"><label class="form-label">분류</label><select class="form-input" id="newItemCat" onchange="updateNewItemCode()"><option value="필름포장지">필름포장지</option><option value="비닐">벌크비닐</option><option value="박스">박스</option><option value="패키지박스">패키지박스</option><option value="기타">기타</option></select></div>
         <div class="form-row"><label class="form-label">코드 (자동)</label><input class="form-input" id="newItemCode" readonly style="background:#f8f9fb;color:var(--primary);font-weight:700"></div>
+        <div id="emptyCodesWrap" style="display:none;grid-column:1/-1;margin-top:-8px;margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--warning);margin-bottom:6px;">📌 빈 코드 (클릭하여 선택)</div>
+          <div id="emptyCodesList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
         <div class="form-row"><label class="form-label">품목명 <span style="color:var(--danger)">*</span></label><input class="form-input" id="newItemName" placeholder="예: 고메버터소금빵"></div>
         <div class="form-row"><label class="form-label">거래처</label><input class="form-input" id="newItemSupplier" placeholder="예: 포장나라"></div>
         <div class="form-row"><label class="form-label">규격</label><input class="form-input" id="newItemSpec" placeholder="예: 280*220*1000m"></div>
@@ -695,7 +699,30 @@ function openNewItemModal(){
   document.getElementById('newItemUnit').value='EA';
   document.getElementById('newItemModal').classList.add('open');
 }
-function updateNewItemCode(){document.getElementById('newItemCode').value=autoCode(document.getElementById('newItemCat').value);}
+function updateNewItemCode(){
+  const cat=document.getElementById('newItemCat').value;
+  document.getElementById('newItemCode').value=autoCode(cat);
+  // 빈 코드 찾기
+  const prefix=CAT_PREFIX[cat]||'Z';
+  const nums=SUB_ITEM_DB.filter(i=>i.category===cat).map(i=>parseInt((i.code||'').replace(prefix,''))||0).sort((a,b)=>a-b);
+  const wrap=document.getElementById('emptyCodesWrap');
+  const list=document.getElementById('emptyCodesList');
+  if(!nums.length){wrap.style.display='none';return;}
+  const max=Math.max(...nums);
+  const empty=[];
+  for(let n=1;n<=max;n++){if(!nums.includes(n))empty.push(prefix+String(n).padStart(3,'0'));}
+  if(!empty.length){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  list.innerHTML=empty.map(c=>`<button type="button" onclick="selectEmptyCode('${c}')" style="padding:4px 10px;border:1.5px solid var(--warning);background:var(--warning-light);color:var(--warning);border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">${c}</button>`).join('');
+}
+function selectEmptyCode(code){
+  document.getElementById('newItemCode').value=code;
+  // 선택된 버튼 강조
+  document.querySelectorAll('#emptyCodesList button').forEach(b=>{
+    if(b.textContent===code){b.style.background='var(--primary)';b.style.color='#fff';b.style.borderColor='var(--primary)';}
+    else{b.style.background='var(--warning-light)';b.style.color='var(--warning)';b.style.borderColor='var(--warning)';}
+  });
+}
 async function saveNewItem(){
   const cat=document.getElementById('newItemCat').value;
   const code=document.getElementById('newItemCode').value;
