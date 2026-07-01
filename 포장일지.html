@@ -645,19 +645,24 @@ function onBatchLotSelect(){
   }
 }
 
-// 부자재 LOT 셀렉트 채우기
+// 부자재 LOT 셀렉트 채우기 (잔여재고 표시)
 function loadSubLots(){
   const recs=window._subLedgerRecords||[];
   const catMap={
-    'filmLot':['필름포장지'],
     'bulkLot':['비닐','PE봉투'],
     'boxLot':['박스'],
     'pkgBoxLot':['패키지박스']
   };
   const itemDB=window._subItemDB||[];
-  // subItemDB에서 name→category 매핑
   const nameTocat={};
   itemDB.forEach(i=>{ if(i.name&&i.category) nameTocat[i.name]=i.category; });
+  // LOT별 입고/출고 합산
+  const inQty={}, outQty={};
+  recs.forEach(r=>{
+    if(!r.lot) return;
+    if(r.type==='init'||r.type==='in') inQty[r.lot]=(inQty[r.lot]||0)+(parseFloat(r.qty)||0);
+    if(r.type==='out'||r.type==='dispose') outQty[r.lot]=(outQty[r.lot]||0)+(parseFloat(r.qty)||0);
+  });
   Object.entries(catMap).forEach(([selId,cats])=>{
     const sel=document.getElementById(selId);
     if(!sel) return;
@@ -668,17 +673,29 @@ function loadSubLots(){
       return (catItems.includes(r.name)||cats.includes(rCat));
     });
     const seen=new Set();
-    const lots=catRecs.filter(r=>{
+    const lots=[];
+    catRecs.forEach(r=>{
       const key=r.lot||r.name;
-      if(seen.has(key)) return false;
+      if(seen.has(key)||(r.type!=='init'&&r.type!=='in')) return;
       seen.add(key);
-      return true;
+      const remaining=Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
+      const item=itemDB.find(i=>i.name===r.name);
+      const unit=item?.unit||'EA';
+      lots.push({name:r.name,lot:r.lot,remaining,unit,type:r.type,date:r.date||'',mfg:r.mfg||''});
+    });
+    // 재고 있는 것 먼저, 입고일 빠른 순
+    lots.sort((a,b)=>{
+      if(a.remaining>0&&b.remaining<=0) return -1;
+      if(a.remaining<=0&&b.remaining>0) return 1;
+      return (a.date||'').localeCompare(b.date||'');
     });
     sel.innerHTML='<option value="">-- 선택 --</option>'+
       lots.map(r=>{
-        const isOI=r.lot&&r.lot.includes('-OF-');
-        const label=isOI?`${r.name} - ${r.lot} (초기재고)`:`${r.name} - ${r.lot}`;
-        return `<option value="${r.lot||r.name}">${label}</option>`;
+        const isOI=r.lot&&(r.lot.includes('-OF-')||r.lot.includes('-OI-'));
+        const stockLbl=r.remaining>0?` [재고:${r.remaining}${r.unit}]`:' [재고없음]';
+        const label=isOI?`${r.name} - ${r.lot} (초기재고)${stockLbl}`:`${r.name} - ${r.lot}${stockLbl}`;
+        const style=r.remaining<=0?'color:var(--text3);':'';
+        return `<option value="${r.lot||r.name}" style="${style}">${label}</option>`;
       }).join('');
   });
 }
@@ -1176,8 +1193,36 @@ function populateFilmLots(){
   const itemName=sel.options[sel.selectedIndex]?.text?.replace(/^\[.*?\]\s*/,'').replace(/\s*\(.*\)$/,'')||'';
   const lotSel=document.getElementById('fpLot');
   const subRecs=window._subLedgerRecords||[];
-  const lots=[...new Set(subRecs.filter(r=>(r.type==='in'||r.type==='init')&&r.name===itemName).map(r=>r.lot))];
-  lotSel.innerHTML='<option value="">-- LOT 선택 --</option>'+lots.map(l=>`<option value="${l}">${l}</option>`).join('');
+  const itemDB=window._subItemDB||[];
+  const item=itemDB.find(i=>i.name===itemName);
+  const unit=item?.unit||'Rl';
+  // LOT별 입고/출고 합산
+  const inQty={}, outQty={};
+  subRecs.forEach(r=>{
+    if(!r.lot) return;
+    if(r.type==='init'||r.type==='in') inQty[r.lot]=(inQty[r.lot]||0)+(parseFloat(r.qty)||0);
+    if(r.type==='out'||r.type==='dispose') outQty[r.lot]=(outQty[r.lot]||0)+(parseFloat(r.qty)||0);
+  });
+  const seen=new Set();
+  const lots=[];
+  subRecs.filter(r=>(r.type==='in'||r.type==='init')&&r.name===itemName).forEach(r=>{
+    if(!r.lot||seen.has(r.lot)) return;
+    seen.add(r.lot);
+    const remaining=Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
+    lots.push({lot:r.lot,remaining,type:r.type,date:r.date||'',mfg:r.mfg||''});
+  });
+  lots.sort((a,b)=>{
+    if(a.remaining>0&&b.remaining<=0) return -1;
+    if(a.remaining<=0&&b.remaining>0) return 1;
+    return (a.date||'').localeCompare(b.date||'');
+  });
+  lotSel.innerHTML='<option value="">-- LOT 선택 --</option>'+lots.map(l=>{
+    const isOI=l.lot.includes('-OI-')||l.lot.includes('-OF-');
+    const stockLbl=l.remaining>0?` [재고:${l.remaining}${unit}]`:' [재고없음]';
+    const label=isOI?`${l.lot} (초기재고)${stockLbl}`:`${l.lot}${stockLbl}`;
+    const style=l.remaining<=0?'color:var(--text3);':'';
+    return `<option value="${l.lot}" style="${style}">${label}</option>`;
+  }).join('');
 }
 
 function calcFilmUsage(){
