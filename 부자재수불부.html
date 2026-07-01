@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>부자재수불부</title>
-<style>@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
 :root{--primary:#1a5fa8;--primary-light:#e8f0fb;--primary-dark:#0d3f75;--success:#1e9e6e;--success-light:#e6f5ef;--warning:#e07b1a;--warning-light:#fdf0e0;--danger:#d63031;--danger-light:#fff0f0;--border:#e0e4ea;--bg:#f4f6fa;--text:#1a1d23;--text2:#5a6070;--text3:#9aa0ad;--radius:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text);}
@@ -25,15 +26,8 @@ body{font-family:"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text
 .btn-success{background:var(--success);color:#fff;}
 .btn-danger{background:var(--danger-light);color:var(--danger);border:1px solid #fcc;}
 .btn-sm{padding:5px 10px;font-size:12px;}
-.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
-.stat-box{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 20px;}
-.stat-label{font-size:12px;color:var(--text3);margin-bottom:6px;font-weight:500;}
-.stat-value{font-size:26px;font-weight:700;}
-.stat-blue{color:var(--primary);}
-.stat-green{color:var(--success);}
-.stat-red{color:var(--danger);}
 .table-wrap{overflow-x:auto;}
-table{width:100%;min-width:600px;border-collapse:collapse;font-size:13px;}
+table{width:100%;min-width:900px;border-collapse:collapse;font-size:13px;}
 thead tr{background:var(--bg);}
 th{padding:10px 12px;text-align:left;font-weight:700;color:var(--text2);border-bottom:2px solid var(--border);white-space:nowrap;}
 td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
@@ -42,6 +36,8 @@ tr:hover td{background:var(--bg);}
 .badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;}
 .badge-blue{background:var(--primary-light);color:var(--primary);}
 .badge-green{background:var(--success-light);color:var(--success);}
+.badge-orange{background:var(--warning-light);color:var(--warning);}
+.badge-red{background:var(--danger-light);color:var(--danger);}
 .badge-gray{background:#f0f0f0;color:#666;}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
@@ -56,195 +52,255 @@ tr:hover td{background:var(--bg);}
 .form-input{border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;font-family:"Noto Sans KR",sans-serif;outline:none;width:100%;}
 .form-input:focus{border-color:var(--primary);}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.fl-tab{padding:8px;border:none;border-radius:7px;font-family:"Noto Sans KR",sans-serif;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all 0.15s;}
-.fl-tab.active{background:var(--primary);color:#fff;}
-.fl-panel{display:none;}
-.fl-panel.active{display:block;}
-.tc{text-align:center;}</style>
+.autocomplete-wrap{position:relative;}
+.autocomplete-list{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--primary);border-top:none;border-radius:0 0 8px 8px;max-height:180px;overflow-y:auto;z-index:999;display:none;}
+.autocomplete-list.open{display:block;}
+.autocomplete-item{padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);}
+.autocomplete-item:hover{background:var(--primary-light);color:var(--primary);}
+.ing-row{cursor:pointer;transition:background 0.15s;}
+.ing-row:hover td{background:#eef3fb;}
+.acc-arrow{display:inline-block;font-size:10px;color:var(--text3);margin-right:4px;transition:transform 0.2s;width:12px;text-align:center;}
+.acc-arrow.open{transform:rotate(90deg);color:var(--primary);}
+.accordion-detail{display:none;}
+.accordion-detail.open{display:table-row;}
+.accordion-detail>td{padding:0 12px 12px 12px;background:#f8faff;border-bottom:2px solid var(--primary-light);}
+.acc-inner{padding:12px;background:#fff;border-radius:8px;border:1px solid var(--border);}
+.acc-table{width:100%;border-collapse:collapse;font-size:12px;}
+.acc-table thead tr{background:var(--primary-light);}
+.acc-table th{padding:7px 10px;text-align:center;font-weight:700;color:var(--primary-dark);border-bottom:1.5px solid var(--primary);font-size:11px;white-space:nowrap;}
+.acc-table td{padding:6px 10px;border-bottom:1px solid var(--border);text-align:center;font-size:12px;}
+.acc-table tr:last-child td{border-bottom:none;}
+.acc-empty{padding:16px;text-align:center;color:var(--text3);font-size:13px;}
+.tc{text-align:center;}
+@media print{
+  .topbar,.filter-row,.btn,.accordion-detail,.acc-arrow{display:none!important;}
+  .card-hd .badge{display:none!important;}
+  body{background:#fff;}
+  .card{box-shadow:none;border:1px solid #ddd;}
+}
+</style>
 </head>
 <body>
 <div class="topbar">
   <button class="topbar-back" onclick="location.href='통합관리.html'">← 통합관리</button>
-  <div class="topbar-title">🏷 부자재수불부</div>
+  <div class="topbar-title">📦 부자재수불부</div>
   <div id="topbarDate" style="color:rgba(255,255,255,0.7);font-size:12px;"></div>
 </div>
 <div class="content">
   <div class="filter-row">
     <div>
       <label style="font-size:12px;font-weight:700;color:var(--text2);margin-right:6px">조회 날짜</label>
-      <input type="text" class="search-input" id="subLedgerDate" style="min-width:140px" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubLedgerDate(this)">
+      <input type="text" class="search-input" id="ledgerDate" style="min-width:140px" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtLedgerDate(this)">
     </div>
-    <input class="search-input" placeholder="품목명 검색..." id="subLedgerSearch" oninput="renderSubLedger()">
-    <select class="search-input" id="subLedgerCategory" onchange="renderSubLedger()" style="min-width:140px">
-      <option value="">전체 품목</option>
+    <input class="search-input" placeholder="품목명 검색..." id="ledgerSearch" oninput="renderLedger()">
+    <select class="search-input" id="ledgerCatFilter" onchange="renderLedger()" style="min-width:140px">
+      <option value="">전체 분류</option>
       <option value="필름포장지">필름포장지</option>
       <option value="비닐">벌크비닐</option>
       <option value="박스">박스</option>
       <option value="패키지박스">패키지박스</option>
       <option value="기타">기타</option>
     </select>
-    <button class="btn btn-primary btn-sm" onclick="renderSubLedger()">조회</button>
-    <button class="btn btn-outline btn-sm" onclick="printSubLedger()">🖨️ 출력</button>
-    <button class="btn btn-primary btn-sm" onclick="openNewSubItemModal()">+ 신규등록</button>
-    <button class="btn btn-sm" style="background:var(--warning-light);color:var(--warning);border:1px solid #f0c080" onclick="openSubInitStock()">📋 초기재고 등록</button>
-    <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="openDeleteSubCode()">🗑️ 코드 삭제</button>
+    <button class="btn btn-primary btn-sm" onclick="renderLedger()">조회</button>
+    <button class="btn btn-outline btn-sm" onclick="printLedger()">🖨️ 출력</button>
+    <button class="btn btn-sm btn-primary" onclick="openNewItemModal()">+ 신규 부자재 등록</button>
+    <button class="btn btn-sm" style="background:var(--warning-light);color:var(--warning);border:1px solid #f0c080" onclick="openInitStock()">📋 전일재고 등록</button>
+    <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="openDeleteCode()">🗑️ 코드 삭제</button>
+    <button class="btn btn-sm" style="background:#1a1a3d;color:#8888ff;border:1px solid #44f;" onclick="openDeleteByPackLot()">🗑️ 포장LOT 출고삭제</button>
+    <button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;" onclick="openDeleteAllLedger()">⚠️ 수불내역 전체삭제</button>
+    <button class="btn btn-sm" style="background:var(--success-light);color:var(--success);border:1px solid #8dc;" onclick="backupLedger()">💾 백업</button>
+    <button class="btn btn-sm" style="background:var(--primary-light);color:var(--primary);border:1px solid #acd;" onclick="restoreLedger()">🔄 복원</button>
+    <button class="btn btn-sm" style="background:#f0e6ff;color:#7c3aed;border:1px solid #c4b5fd;" onclick="findEmptyCodes()">🔍 빈 코드 조회</button>
   </div>
   <div class="card">
     <div class="card-hd">
       <div class="card-hd-title">수불 현황</div>
-      <span class="badge badge-blue" id="subLedgerDate-display"></span>
+      <span class="badge badge-blue" id="ledgerDateDisplay"></span>
     </div>
     <div class="card-bd" style="padding:0">
       <div class="table-wrap">
         <table>
-          <thead><tr><th>코드</th><th>품목명</th><th>거래처</th><th>규격</th><th>단위</th><th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th><th>관리</th></tr></thead>
-          <tbody id="subLedgerTbody"></tbody>
+          <thead><tr><th>코드</th><th>품목명</th><th>거래처</th><th>규격</th><th>단위</th><th>전일<br>재고</th><th>입고</th><th>출고</th><th>마감<br>재고</th><th>관리</th></tr></thead>
+          <tbody id="ledgerTbody"></tbody>
         </table>
       </div>
     </div>
   </div>
 </div>
 
-<!-- 수정 모달 -->
-<div class="modal-overlay" id="editSubItemModal" onclick="closeModalOutside(event,'editSubItemModal')">
-  <div class="modal" style="width:480px">
-    <div class="modal-hd"><div class="modal-title">✏️ 부자재 수정</div><button class="modal-close" onclick="closeModal('editSubItemModal')">×</button></div>
+<!-- 입고 등록 모달 -->
+<div class="modal-overlay" id="inModal">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title">+ 입고 등록</div><button class="modal-close" onclick="closeModal('inModal')">×</button></div>
     <div class="modal-bd">
-      <input type="hidden" id="editSubCode">
-      <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="editSubNameDisplay" disabled style="background:#f4f6fa;color:var(--text2)"></div>
+      <div class="form-row"><label class="form-label">품목</label><div class="autocomplete-wrap"><input class="form-input" id="inItemName" placeholder="품목명 입력/검색" autocomplete="off" oninput="showAC('inItemName')" onfocus="showAC('inItemName')" onblur="setTimeout(()=>hideAC('inItemName'),150)"><div class="autocomplete-list" id="ac-inItemName"></div></div></div>
       <div class="form-grid">
-        <div class="form-row"><label class="form-label">규격</label><input class="form-input" id="editSubSpec" placeholder="규격 입력"></div>
-        <div class="form-row"><label class="form-label">단위</label><select class="form-input" id="editSubUnit"><option value="EA">EA</option><option value="Rl">Rl</option><option value="개">개</option><option value="매">매</option></select></div>
-        <div class="form-row"><label class="form-label">거래처</label><input class="form-input" id="editSubSupplier" placeholder="거래처명"></div>
-      </div>
-      <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
-        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:12px;">초기재고 수정</div>
-        <div class="form-grid">
-          <div class="form-row"><label class="form-label">재고량</label><input class="form-input" id="editSubQty" type="number" placeholder="0"></div>
-          <div class="form-row"><label class="form-label">기준날짜 YYMMDD</label><input class="form-input" id="editSubDate" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubInitDate(this)"></div>
-          <div class="form-row"><label class="form-label">제조일자 YYMMDD <span style="color:var(--text3);font-weight:400">(선택)</span></label><input class="form-input" id="editSubMfg" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubInitDate(this)"></div>
-        </div>
+        <div class="form-row"><label class="form-label">날짜</label><input class="form-input" id="inDate" type="date"></div>
+        <div class="form-row"><label class="form-label">수량</label><input class="form-input" id="inQty" type="number" placeholder="0" step="1"></div>
+        <div class="form-row"><label class="form-label">LOT</label><input class="form-input" id="inLot" placeholder="LOT번호"></div>
+        <div class="form-row"><label class="form-label">제조일자</label><input class="form-input" id="inMfg" type="date"></div>
       </div>
     </div>
-    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('editSubItemModal')">취소</button><button class="btn btn-primary" onclick="saveEditSubItem()">저장</button></div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('inModal')">취소</button><button class="btn btn-primary" onclick="saveIn()">저장</button></div>
+  </div>
+</div>
+
+<!-- 출고 등록 모달 -->
+<div class="modal-overlay" id="outModal">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title">- 출고 등록</div><button class="modal-close" onclick="closeModal('outModal')">×</button></div>
+    <div class="modal-bd">
+      <div class="form-row"><label class="form-label">품목</label><div class="autocomplete-wrap"><input class="form-input" id="outItemName" placeholder="품목명 입력/검색" autocomplete="off" oninput="showAC('outItemName')" onfocus="showAC('outItemName')" onblur="setTimeout(()=>hideAC('outItemName'),150)"><div class="autocomplete-list" id="ac-outItemName"></div></div></div>
+      <div class="form-grid">
+        <div class="form-row"><label class="form-label">날짜</label><input class="form-input" id="outDate" type="date"></div>
+        <div class="form-row"><label class="form-label">수량</label><input class="form-input" id="outQty" type="number" placeholder="0" step="1"></div>
+        <div class="form-row"><label class="form-label">포장LOT</label><input class="form-input" id="outPackLot" placeholder="포장LOT번호"></div>
+        <div class="form-row"><label class="form-label">비고</label><input class="form-input" id="outNote" placeholder="비고"></div>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('outModal')">취소</button><button class="btn btn-danger" onclick="saveOut()">출고 저장</button></div>
+  </div>
+</div>
+
+<!-- 신규 부자재 등록 모달 -->
+<div class="modal-overlay" id="newItemModal">
+  <div class="modal" style="width:520px">
+    <div class="modal-hd"><div class="modal-title">➕ 신규 부자재 등록</div><button class="modal-close" onclick="closeModal('newItemModal')">×</button></div>
+    <div class="modal-bd">
+      <div class="form-grid">
+        <div class="form-row"><label class="form-label">분류</label><select class="form-input" id="newItemCat" onchange="updateNewItemCode()"><option value="필름포장지">필름포장지</option><option value="비닐">벌크비닐</option><option value="박스">박스</option><option value="패키지박스">패키지박스</option><option value="기타">기타</option></select></div>
+        <div class="form-row"><label class="form-label">코드 (자동)</label><input class="form-input" id="newItemCode" readonly style="background:#f8f9fb;color:var(--primary);font-weight:700"></div>
+        <div class="form-row"><label class="form-label">품목명 <span style="color:var(--danger)">*</span></label><input class="form-input" id="newItemName" placeholder="예: 고메버터소금빵"></div>
+        <div class="form-row"><label class="form-label">거래처</label><input class="form-input" id="newItemSupplier" placeholder="예: 포장나라"></div>
+        <div class="form-row"><label class="form-label">규격</label><input class="form-input" id="newItemSpec" placeholder="예: 280*220*1000m"></div>
+        <div class="form-row"><label class="form-label">단위</label><select class="form-input" id="newItemUnit"><option value="EA">EA</option><option value="Rl">Rl</option><option value="개">개</option><option value="매">매</option></select></div>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('newItemModal')">취소</button><button class="btn btn-primary" onclick="saveNewItem()">저장</button></div>
   </div>
 </div>
 
 <!-- 코드 삭제 모달 -->
-<div class="modal-overlay" id="deleteSubCodeModal" onclick="closeModalOutside(event,'deleteSubCodeModal')">
+<div class="modal-overlay" id="deleteCodeModal">
   <div class="modal" style="width:400px">
-    <div class="modal-hd"><div class="modal-title">🗑️ 코드 삭제</div><button class="modal-close" onclick="closeModal('deleteSubCodeModal')">×</button></div>
+    <div class="modal-hd"><div class="modal-title">🗑️ 코드 삭제</div><button class="modal-close" onclick="closeModal('deleteCodeModal')">×</button></div>
     <div class="modal-bd">
-      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">⚠️ 해당 품목 코드와 수불 내역이 모두 삭제됩니다.</div>
-      <div class="form-row"><label class="form-label">품목 선택</label>
-        <select class="form-input" id="deleteSubCodeSelect">
-          <option value="">-- 품목 선택 --</option>
-        </select>
-      </div>
+      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">⚠️ 삭제하면 해당 부자재 코드와 수불 내역이 모두 삭제됩니다.</div>
+      <div class="form-row"><label class="form-label">부자재 선택</label><select class="form-input" id="deleteCodeSelect"><option value="">-- 선택 --</option></select></div>
     </div>
-    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('deleteSubCodeModal')">취소</button><button class="btn btn-danger" onclick="confirmDeleteSubCode()">삭제</button></div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('deleteCodeModal')">취소</button><button class="btn btn-danger" onclick="confirmDeleteCode()">삭제</button></div>
   </div>
 </div>
 
-<!-- 신규등록 모달 -->
-<div class="modal-overlay" id="newSubItemModal" onclick="closeModalOutside(event,'newSubItemModal')">
+<!-- 부자재 수정 모달 -->
+<div class="modal-overlay" id="editItemModal">
   <div class="modal" style="width:480px">
-    <div class="modal-hd"><div class="modal-title">➕ 부자재 신규 등록</div><button class="modal-close" onclick="closeModal('newSubItemModal')">×</button></div>
+    <div class="modal-hd"><div class="modal-title">✏️ 부자재 수정</div><button class="modal-close" onclick="closeModal('editItemModal')">×</button></div>
     <div class="modal-bd">
+      <input type="hidden" id="editItemCode">
+      <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="editItemName" placeholder="품목명 입력"></div>
       <div class="form-grid">
-        <div class="form-row"><label class="form-label">품목 분류</label><select class="form-input" id="nsiCategory" onchange="updateNsiCode()"><option value="필름포장지">필름포장지</option><option value="비닐">벌크비닐</option><option value="박스">박스</option><option value="패키지박스">패키지박스</option><option value="기타">기타</option></select></div>
-        <div class="form-row"><label class="form-label">품목코드 (자동)</label><input class="form-input" id="nsiCode" readonly style="background:#f8f9fb;color:var(--primary);font-weight:700"></div>
-        <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="nsiName" placeholder="품목명 입력"></div>
-        <div class="form-row"><label class="form-label">규격</label><input class="form-input" id="nsiSpec" placeholder="규격 입력"></div>
-        <div class="form-row"><label class="form-label">단위</label><select class="form-input" id="nsiUnit"><option value="EA">EA</option><option value="Rl">Rl</option><option value="개">개</option><option value="매">매</option></select></div>
-        <div class="form-row"><label class="form-label">거래처</label><input class="form-input" id="nsiSupplier" placeholder="거래처명"></div>
+        <div class="form-row"><label class="form-label">거래처</label><input class="form-input" id="editItemSupplier" placeholder="거래처명"></div>
+        <div class="form-row"><label class="form-label">규격</label><input class="form-input" id="editItemSpec" placeholder="규격 입력"></div>
+        <div class="form-row"><label class="form-label">단위</label><select class="form-input" id="editItemUnit"><option value="EA">EA</option><option value="Rl">Rl</option><option value="개">개</option><option value="매">매</option></select></div>
+      </div>
+      <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:12px;">전일재고 수정</div>
+        <div class="form-grid">
+          <div class="form-row"><label class="form-label">재고량</label><input class="form-input" id="editItemQty" type="number" step="0.001" placeholder="0"></div>
+          <div class="form-row"><label class="form-label">제조일자 YYMMDD</label><input class="form-input" id="editItemMfg" placeholder="예: 260101" maxlength="6" inputmode="numeric" oninput="fmtYYMMDD(this)"></div>
+        </div>
       </div>
     </div>
-    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('newSubItemModal')">취소</button><button class="btn btn-primary" onclick="saveNewSubItem()">저장</button></div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('editItemModal')">취소</button><button class="btn btn-primary" onclick="saveEditItem()">저장</button></div>
+  </div>
+</div>
+
+<!-- 전일재고 등록 모달 -->
+<div class="modal-overlay" id="initStockModal">
+  <div class="modal" style="width:720px">
+    <div class="modal-hd"><div class="modal-title">📋 전일재고 등록</div><button class="modal-close" onclick="closeModal('initStockModal')">×</button></div>
+    <div class="modal-bd">
+      <div style="background:var(--warning-light);border:1px solid #f0c080;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--warning)">⚠️ 전일 마감재고를 전일재고로 입력하세요.</div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-row"><label class="form-label">기준날짜 YYMMDD</label><input class="form-input" id="initDate" placeholder="예: 260528" maxlength="6" inputmode="numeric" oninput="fmtYYMMDD(this)"></div>
+        <div class="form-row"><label class="form-label">품목 선택</label><div class="autocomplete-wrap"><input class="form-input" id="initItemName" placeholder="품목명 입력/검색" autocomplete="off" oninput="showAC('initItemName')" onfocus="showAC('initItemName')" onblur="setTimeout(()=>hideAC('initItemName'),150)"><div class="autocomplete-list" id="ac-initItemName"></div></div></div>
+        <div class="form-row"><label class="form-label">재고량</label><input class="form-input" id="initQty" type="number" placeholder="0" step="0.001"></div>
+        <div class="form-row"><label class="form-label">제조일자 YYMMDD</label><input class="form-input" id="initMfg" placeholder="예: 260101" maxlength="6" inputmode="numeric" oninput="fmtYYMMDD(this)"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="addInitRow()">+ 추가</button>
+      <div class="table-wrap"><table><thead><tr><th>품목명</th><th>코드</th><th>LOT</th><th>재고량</th><th>제조일자</th><th>기준일</th><th></th></tr></thead><tbody id="initStockTbody"></tbody></table></div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('initStockModal')">취소</button><button class="btn btn-primary" onclick="saveInitStock()">전체 저장</button></div>
+  </div>
+</div>
+
+<!-- 포장LOT 출고삭제 모달 -->
+<div class="modal-overlay" id="deleteByPackLotModal">
+  <div class="modal" style="width:480px">
+    <div class="modal-hd"><div class="modal-title">🗑️ 포장LOT 출고삭제</div><button class="modal-close" onclick="closeModal('deleteByPackLotModal')">×</button></div>
+    <div class="modal-bd">
+      <div class="form-row" style="margin-bottom:12px;">
+        <label class="form-label">포장LOT 번호</label>
+        <div style="display:flex;gap:8px;">
+          <input class="form-input" id="packLotSearchVal" placeholder="포장LOT 입력" style="flex:1;">
+          <button class="btn btn-primary" onclick="searchByPackLot()">조회</button>
+        </div>
+      </div>
+      <div id="packLotSearchResult" style="margin-top:8px;"></div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-outline" onclick="closeModal('deleteByPackLotModal')">닫기</button>
+      <button class="btn btn-danger" id="confirmDeletePackLotBtn" style="display:none;" onclick="confirmDeleteByPackLot()">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- 수불내역 전체삭제 모달 -->
+<div class="modal-overlay" id="deleteAllModal">
+  <div class="modal" style="width:400px">
+    <div class="modal-hd"><div class="modal-title">⚠️ 수불내역 전체삭제</div><button class="modal-close" onclick="closeModal('deleteAllModal')">×</button></div>
+    <div class="modal-bd">
+      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:var(--danger);line-height:1.6">
+        ⚠️ <strong>주의!</strong> 입고·출고·전일재고 내역이 <strong>모두 삭제</strong>됩니다.<br>이 작업은 <strong>되돌릴 수 없습니다.</strong>
+      </div>
+      <div class="form-row"><label class="form-label">비밀번호</label><input class="form-input" id="deleteAllPw" type="password" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')confirmDeleteAll()"></div>
+      <div id="deleteAllPwError" style="color:var(--danger);font-size:12px;margin-top:6px;display:none">❌ 비밀번호가 올바르지 않습니다.</div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('deleteAllModal')">취소</button><button class="btn" style="background:#c00;color:#fff;" onclick="confirmDeleteAll()">전체 삭제</button></div>
   </div>
 </div>
 
 <!-- 수불 등록 모달 -->
-<div class="modal-overlay" id="subLedgerRecordModal" onclick="closeModalOutside(event,'subLedgerRecordModal')">
-  <div class="modal" style="width:420px">
-    <div class="modal-hd"><div class="modal-title" id="subLedgerRecordTitle">수불 등록</div><button class="modal-close" onclick="closeModal('subLedgerRecordModal')">×</button></div>
-    <div class="modal-bd">
-      <input type="hidden" id="slrCode">
-      <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="slrName" readonly style="background:#f8f9fb;font-weight:700"></div>
-      <div class="form-grid">
-        <div class="form-row"><label class="form-label">구분</label><select class="form-input" id="slrType"><option value="in">입고</option><option value="out">출고</option></select></div>
-        <div class="form-row"><label class="form-label">수량</label><input class="form-input" id="slrQty" type="number" placeholder="0"></div>
-        <div class="form-row"><label class="form-label">날짜 YYMMDD</label><input class="form-input" id="slrDate" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubInitDate(this)"></div>
-        <div class="form-row"><label class="form-label">제조일자 YYMMDD <span style="color:var(--text3);font-weight:400">(선택)</span></label><input class="form-input" id="slrMfg" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubInitDate(this)"></div>
-      </div>
-      <div class="form-row"><label class="form-label">비고</label><input class="form-input" id="slrNote" placeholder="LOT번호, 비고 등"></div>
-    </div>
-    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('subLedgerRecordModal')">취소</button><button class="btn btn-primary" onclick="saveSubLedgerRecord()">저장</button></div>
-  </div>
-</div>
-
-<!-- 초기재고 모달 -->
-<div class="modal-overlay" id="subInitStockModal" onclick="closeModalOutside(event,'subInitStockModal')">
-  <div class="modal" style="width:680px">
-    <div class="modal-hd"><div class="modal-title">📋 부자재 초기재고 등록</div><button class="modal-close" onclick="closeModal('subInitStockModal')">×</button></div>
-    <div class="modal-bd">
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="form-row"><label class="form-label">기준 날짜 YYMMDD</label><input class="form-input" id="siDate" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubInitDate(this)"></div>
-        <div class="form-row"><label class="form-label">품목 선택</label><select class="form-input" id="siItem"><option value="">-- 품목 선택 --</option></select></div>
-        <div class="form-row"><label class="form-label">재고량</label><input class="form-input" id="siQty" type="number" placeholder="0"></div>
-        <div class="form-row"><label class="form-label">제조일자 YYMMDD <span style="color:var(--text3);font-weight:400">(선택)</span></label><input class="form-input" id="siMfg" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtSubInitDate(this)"></div>
-      </div>
-      <button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="addSubInitRow()">+ 추가</button>
-      <div class="table-wrap"><table><thead><tr><th>코드</th><th>품목명</th><th>재고량</th><th>제조일자</th><th>기준일</th><th></th></tr></thead><tbody id="subInitStockTbody"></tbody></table></div>
-    </div>
-    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('subInitStockModal')">취소</button><button class="btn btn-primary" onclick="saveSubInitStock()">전체 저장</button></div>
-  </div>
-</div>
-
-
-<!-- 부자재 전체삭제 모달 -->
-<div class="modal-overlay" id="deleteAllSubModal" onclick="closeModalOutside(event,'deleteAllSubModal')">
-  <div class="modal" style="width:400px">
-    <div class="modal-hd"><div class="modal-title">⚠️ 수불내역 전체삭제</div><button class="modal-close" onclick="closeModal('deleteAllSubModal')">×</button></div>
-    <div class="modal-bd">
-      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:var(--danger);line-height:1.6">⚠️ <strong>주의!</strong> 부자재 수불내역이 <strong>모두 삭제</strong>됩니다.</div>
-      <div class="form-row"><label class="form-label">비밀번호</label><input class="form-input" id="deleteAllSubPw" type="password" placeholder="비밀번호 입력"></div>
-      <div id="deleteAllSubPwErr" style="color:var(--danger);font-size:12px;margin-top:6px;display:none">❌ 비밀번호가 올바르지 않습니다.</div>
-    </div>
-    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('deleteAllSubModal')">취소</button><button class="btn" style="background:#c00;color:#fff;" onclick="confirmDeleteAllSub()">전체 삭제</button></div>
-  </div>
-</div>
-
-<!-- 부자재 폐기 모달 -->
-<div class="modal-overlay" id="subDisposeModal">
+<div class="modal-overlay" id="recordModal">
   <div class="modal" style="width:480px">
-    <div class="modal-hd"><div class="modal-title">🗑️ 부자재 폐기</div><button class="modal-close" onclick="closeModal('subDisposeModal')">×</button></div>
+    <div class="modal-hd"><div class="modal-title" id="recordModalTitle">수불 등록</div><button class="modal-close" onclick="closeModal('recordModal')">×</button></div>
     <div class="modal-bd">
-      <div style="background:var(--danger-light);border:1px solid #f5a0a0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--danger)">폐기 처리하면 재고에서 차감됩니다.</div>
-      <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="sdName" readonly style="background:#f4f6fa;font-weight:700"></div>
+      <input type="hidden" id="recName"><input type="hidden" id="recCode">
       <div class="form-grid">
-        <div class="form-row"><label class="form-label">폐기일자</label><input class="form-input" id="sdDate" type="date"></div>
-        <div class="form-row"><label class="form-label">폐기수량</label><input class="form-input" id="sdQty" type="number" step="1" placeholder="0"></div>
-      </div>
-      <div class="form-row"><label class="form-label">폐기사유</label>
-        <select class="form-input" id="sdReason"><option value="파손">파손</option><option value="불량">불량</option><option value="오염">오염</option><option value="기타">기타</option></select>
+        <div class="form-row"><label class="form-label">유형</label><select class="form-input" id="recType"><option value="in">입고</option><option value="out">출고</option><option value="dispose">폐기</option></select></div>
+        <div class="form-row"><label class="form-label">수량</label><input class="form-input" id="recQty" type="number" placeholder="0" step="0.001"></div>
+        <div class="form-row"><label class="form-label">날짜 YYMMDD</label><input class="form-input" id="recDate" placeholder="260701" maxlength="6" inputmode="numeric" oninput="fmtYYMMDD(this)"></div>
+        <div class="form-row"><label class="form-label">제조일자 YYMMDD</label><input class="form-input" id="recMfg" placeholder="260101" maxlength="6" inputmode="numeric" oninput="fmtYYMMDD(this)"></div>
+        <div class="form-row" style="grid-column:1/-1"><label class="form-label">비고</label><input class="form-input" id="recNote" placeholder="비고"></div>
       </div>
     </div>
-    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('subDisposeModal')">취소</button><button class="btn" style="background:var(--danger);color:#fff;" onclick="saveSubDispose()">폐기 처리</button></div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('recordModal')">취소</button><button class="btn btn-primary" onclick="saveRecord()">저장</button></div>
   </div>
 </div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
 firebase.initializeApp({
-    apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
-    authDomain:"bbang-ssaem-prod.firebaseapp.com",
-    projectId:"bbang-ssaem-prod",
-    storageBucket:"bbang-ssaem-prod.firebasestorage.app",
-    messagingSenderId:"685237617449",
-    appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
-  });
-window._db = firebase.firestore();
+  apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
+  authDomain:"bbang-ssaem-prod.firebaseapp.com",
+  projectId:"bbang-ssaem-prod",
+  storageBucket:"bbang-ssaem-prod.firebasestorage.app",
+  messagingSenderId:"685237617449",
+  appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
+});
+window._db=firebase.firestore();
 </script>
 <script>
 (function(){
@@ -255,7 +311,7 @@ window._db = firebase.firestore();
 function _hasEditPerm(){
   var s=window._mesSession;if(!s)return false;
   if(s.role==="superadmin")return true;
-  return (s.permissions||[]).includes("subsidiary");
+  return (s.permissions||[]).includes("sub-material-ledger");
 }
 function _hideEditBtns(){
   if(_hasEditPerm())return;
@@ -265,410 +321,629 @@ function _hideEditBtns(){
       && !oc.match(/filter|search|toggle|render|sort|print|load|show|close|fill|sync/i)){
       b.style.display="none";
     }
-    if(txt.match(/삭제|등록|추가|수정|편집|전체삭제/)){
-      b.style.display="none";
-    }
+    if(txt.match(/삭제|등록|추가|수정|편집|전체삭제/)){b.style.display="none";}
   });
 }
 window.addEventListener("DOMContentLoaded",function(){setTimeout(_hideEditBtns,500);});
 </script>
 <script>
+// ===== 유틸 =====
+function getTodayISO2(){return new Date().toISOString().slice(0,10);}
+function getToday(){const d=new Date();return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일';}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function closeAllModals(){document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));}
+function yymmddToISO(v){if(!v||v.length!==6)return getTodayISO2();return '20'+v.slice(0,2)+'-'+v.slice(2,4)+'-'+v.slice(4,6);}
+function isoToYYMMDD(iso){if(!iso||iso.length<10)return '';return iso.slice(2,4)+iso.slice(5,7)+iso.slice(8,10);}
+function fmtYYMMDD(input){
+  const v=input.value.replace(/\D/g,'').slice(0,6);input.value=v;
+  if(v.length===6){input.style.color='var(--primary)';input.style.fontWeight='700';}
+  else{input.style.color='';input.style.fontWeight='';}
+}
+function fmtMfgDisplay(mfg){
+  if(!mfg)return '-';
+  if(mfg.includes('-')&&mfg.length>=10)return mfg.slice(2,4)+'.'+mfg.slice(5,7)+'.'+mfg.slice(8,10);
+  if(/^\d{6}$/.test(mfg))return mfg.slice(0,2)+'.'+mfg.slice(2,4)+'.'+mfg.slice(4,6);
+  return mfg;
+}
 
-function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
-function getToday(){ const d=new Date(); return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
-function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-function closeModalOutside(e,id){ if(e.target.id===id) closeModal(id); }
-function closeAllModals(){ document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open')); }
-
-// ===== 부자재수불부 =====
+// ===== 카테고리 =====
 const SUB_CATEGORIES=['필름포장지','비닐','박스','패키지박스','기타'];
 const SUB_CAT_ICONS={'필름포장지':'🎞️','비닐':'🗂️','박스':'📦','패키지박스':'🎁','기타':'📋'};
-let SUB_ITEM_DB=[];
-let subLedgerRecords=[];
+const CAT_PREFIX={'필름포장지':'F','비닐':'G','박스':'H','패키지박스':'P','기타':'Z'};
 
-async function initSubLedger(){
-  // Firebase에서 로드
+// ===== 데이터 =====
+let SUB_ITEM_DB=[];
+let ledgerRecords=[];
+let initRows=[];
+
+function getItemByName(n){return SUB_ITEM_DB.find(i=>i.name===n||i.name.replace(/\n/g,' ')===n);}
+function getItemByCode(c){return SUB_ITEM_DB.find(i=>i.code===c);}
+function autoCode(cat){
+  const prefix=CAT_PREFIX[cat]||'Z';
+  const nums=SUB_ITEM_DB.filter(i=>i.category===cat).map(i=>parseInt((i.code||'').replace(prefix,''))||0);
+  return prefix+String((nums.length?Math.max(...nums):0)+1).padStart(3,'0');
+}
+
+// ===== 자동완성 (영→한 매핑 포함) =====
+const EN2KR={'q':'ㅂ','w':'ㅈ','e':'ㄷ','r':'ㄱ','t':'ㅅ','y':'ㅛ','u':'ㅕ','i':'ㅑ','o':'ㅐ','p':'ㅔ','a':'ㅁ','s':'ㄴ','d':'ㅇ','f':'ㄹ','g':'ㅎ','h':'ㅗ','j':'ㅓ','k':'ㅏ','l':'ㅣ','z':'ㅋ','x':'ㅌ','c':'ㅊ','v':'ㅍ','b':'ㅠ','n':'ㅜ','m':'ㅡ',
+'Q':'ㅃ','W':'ㅉ','E':'ㄸ','R':'ㄲ','T':'ㅆ'};
+function en2kr(str){return str.split('').map(c=>EN2KR[c]||c).join('');}
+
+function showAC(inputId){
+  const input=document.getElementById(inputId);
+  const list=document.getElementById('ac-'+inputId);
+  if(!input||!list)return;
+  const raw=input.value.trim().toLowerCase();
+  const kr=en2kr(raw);
+  if(!raw){list.classList.remove('open');return;}
+  const matches=SUB_ITEM_DB.filter(i=>{
+    const n=(i.name||'').toLowerCase();const c=(i.code||'').toLowerCase();
+    return n.includes(raw)||c.includes(raw)||n.includes(kr)||c.includes(kr);
+  }).slice(0,10);
+  if(!matches.length){list.classList.remove('open');return;}
+  list.innerHTML=matches.map(i=>`<div class="autocomplete-item" onmousedown="selectAC('${inputId}','${i.name.replace(/'/g,"\\'")}')">[${i.code}] ${i.name}</div>`).join('');
+  list.classList.add('open');
+}
+function hideAC(id){const l=document.getElementById('ac-'+id);if(l)l.classList.remove('open');}
+function selectAC(inputId,name){
+  document.getElementById(inputId).value=name;
+  hideAC(inputId);
+}
+
+// ===== 날짜 =====
+function fmtLedgerDate(input){
+  const v=input.value.replace(/\D/g,'').slice(0,6);input.value=v;
+  if(v.length===6){input.style.color='var(--primary)';input.style.fontWeight='700';}
+  else{input.style.color='';input.style.fontWeight='';}
+  renderLedger();
+}
+function getLedgerDateISO(){
+  const v=(document.getElementById('ledgerDate')?.value||'').replace(/\D/g,'');
+  if(v.length!==6)return getTodayISO2();
+  return '20'+v.slice(0,2)+'-'+v.slice(2,4)+'-'+v.slice(4,6);
+}
+
+// ===== 수불부 로드 (입고검사 자동반영) =====
+async function initLedger(){
   try{
     const subRecSnap=window._db?await window._db.collection('appData').doc('subIncomingRecords').get():null;
     const subRecs=(subRecSnap&&subRecSnap.exists&&subRecSnap.data().data)?JSON.parse(subRecSnap.data().data):[];
+    let added=false;
     subRecs.forEach(rec=>{
       (rec.rows||[]).forEach(row=>{
-        if(!row.item||!row.qty) return;
+        if(!row.item||!row.qty)return;
         const lot=row.lot||'';
-        const exists=subLedgerRecords.find(r=>r.lot===lot&&r.type==='in');
-        if(!exists){
-          const isoDate=rec.date||getTodayISO2();
-          const rawCat=row.category==='벌크비닐'?'비닐':row.category; const subCat=rawCat||Object.keys({'필름포장지':'필름포장지','비닐':'비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>row.item.includes(k))||'기타';
-          const subCode=autoSubCode(subCat);
-          subLedgerRecords.push({date:isoDate,name:row.item,code:subCode,qty:parseFloat(row.qty)||0,mfg:row.mfg||'',lot,supplier:row.supplier||'',type:'in'});
+        if(ledgerRecords.find(r=>r.lot===lot&&r.type==='in'))return;
+        const isoDate=rec.date||getTodayISO2();
+        const rawCat=row.category==='벌크비닐'?'비닐':row.category;
+        const subCat=rawCat||SUB_CATEGORIES.find(k=>row.item.includes(k))||'기타';
+        ledgerRecords.push({date:isoDate,name:row.item,qty:parseFloat(row.qty)||0,mfg:row.mfg||'',lot,supplier:row.supplier||'',type:'in'});
+        // SUB_ITEM_DB 자동등록
+        if(!SUB_ITEM_DB.find(i=>i.name===row.item)){
+          const code=autoCode(subCat);
+          SUB_ITEM_DB.push({code,name:row.item,category:subCat,spec:'',unit:'EA',supplier:row.supplier||''});
         }
+        added=true;
       });
     });
-    if(window._db) window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-  }catch(e){}
-  subLedgerRecords.forEach(r=>{
-    if(r.name&&!SUB_ITEM_DB.find(i=>i.name===r.name)){
-      const cat=Object.keys({'필름포장지':'필름포장지','비닐':'비닐','박스':'박스','패키지박스':'패키지박스'}).find(k=>r.name.includes(k)||r.category===k||r.category==='벌크비닐'&&k==='비닐')||'기타';
-      const newCode=autoSubCode(cat); SUB_ITEM_DB.push({code:newCode,name:r.name,category:cat,spec:'',unit:'EA',supplier:r.supplier||''});
+    if(added){
+      await saveItemDB();
+      await saveLedger();
     }
-  });
-  if(window._db) window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  }catch(e){console.warn('initLedger error',e);}
 }
 
-function autoSubCode(category){
-  const prefixMap={'필름포장지':'F','비닐':'G','박스':'H','패키지박스':'P','기타':'Z'};
-  const prefix=prefixMap[category]||'Z';
-  const nums=SUB_ITEM_DB.filter(i=>i.category===category).map(i=>parseInt((i.code||'').replace(prefix,''))||0);
-  const next=(nums.length?Math.max(...nums):0)+1;
-  return prefix+String(next).padStart(3,'0');
-}
+// ===== 렌더링 =====
+function renderLedger(){
+  const selDate=getLedgerDateISO();
+  const q=(document.getElementById('ledgerSearch')?.value||'').trim().toLowerCase();
+  const catFilter=document.getElementById('ledgerCatFilter')?.value||'';
+  const el=document.getElementById('ledgerDateDisplay');
+  if(el)el.textContent=selDate;
 
-function calcSubLedgerRow(item,monthStart,selDate){
-  // init = 전일재고, in = 입고, out = 출고
-  const initQty=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='init'&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
-  const prevIn=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='in'&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
-  const prevOut=subLedgerRecords.filter(r=>r.name===item.name&&(r.type==='out'||r.type==='dispose')&&r.date<monthStart).reduce((s,r)=>s+r.qty,0);
-  const prevStock=Math.max(0,initQty+prevIn-prevOut);
-  const monthIn=subLedgerRecords.filter(r=>r.name===item.name&&r.type==='in'&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
-  const monthOut=subLedgerRecords.filter(r=>r.name===item.name&&(r.type==='out'||r.type==='dispose')&&r.date>=monthStart&&r.date<=selDate).reduce((s,r)=>s+r.qty,0);
-  const closing=Math.max(0,prevStock+monthIn-monthOut);
-  return {prevStock,monthIn,monthOut,closing};
-}
-
-function fmtSubLedgerDate(input){
-  const v=input.value.replace(/\D/g,'').slice(0,6);
-  input.value=v;
-  if(v.length===6){ input.style.color='var(--primary)'; input.style.fontWeight='700'; }
-  else{ input.style.color=''; input.style.fontWeight=''; }
-  renderSubLedger();
-}
-function getSubLedgerDateISO(){
-  const v=document.getElementById('subLedgerDate').value.replace(/\D/g,'');
-  if(v.length!==6) return getTodayISO2();
-  return '20'+v.slice(0,2)+'-'+v.slice(2,4)+'-'+v.slice(4,6);
-}
-function renderSubLedger(){
-  const selDate=getSubLedgerDateISO();
-  const q=(document.getElementById('subLedgerSearch')?.value||'').trim().toLowerCase();
-  const catFilter=document.getElementById('subLedgerCategory')?.value||'';
-  const el=document.getElementById('subLedgerDate-display');
-  if(el) el.textContent=selDate;
-  const[sy,sm]=selDate.split('-').map(Number);
-  const monthStart=`${sy}-${String(sm).padStart(2,'0')}-01`;
-  const tbody=document.getElementById('subLedgerTbody');
   const cats=catFilter?[catFilter]:SUB_CATEGORIES;
-  let html='';let totalItems=0;
+  const tbody=document.getElementById('ledgerTbody');
+  let html='';let total=0;
+
   cats.forEach(cat=>{
     let items=SUB_ITEM_DB.filter(i=>i.category===cat&&(!q||i.name.toLowerCase().includes(q)||i.code.toLowerCase().includes(q)));
-    if(!items.length) return;
-    totalItems+=items.length;
+    if(!items.length)return;
+    total+=items.length;
     html+=`<tr><td colspan="10" style="background:#eef2f8;padding:8px 12px;font-size:12px;font-weight:700;color:var(--primary-dark);border-bottom:2px solid var(--border);">${SUB_CAT_ICONS[cat]||'📦'} ${cat}</td></tr>`;
     html+=items.map(item=>{
-      const{prevStock,monthIn,monthOut,closing}=calcSubLedgerRow(item,monthStart,selDate);
-      return `<tr><td><span class="badge badge-blue" style="font-size:10px">${item.code}</span></td><td style="font-weight:600">${item.name}</td><td style="font-size:12px;color:var(--text2)">${item.supplier||'-'}</td><td style="font-size:12px;color:var(--text2)">${item.spec||'-'}</td><td class="tc" style="font-size:12px">${item.unit||'EA'}</td><td class="tc" style="color:var(--text2)">${prevStock>0?prevStock:'-'}</td><td class="tc" style="color:var(--success);font-weight:${monthIn>0?700:400}">${monthIn>0?'+'+monthIn:'-'}</td><td class="tc" style="color:var(--danger);font-weight:${monthOut>0?700:400}">${monthOut>0?'-'+monthOut:'-'}</td><td class="tc" style="font-weight:700;color:${closing>0?'var(--primary)':'var(--text3)'}">${closing}</td><td style="white-space:nowrap;"><button class="btn btn-sm btn-primary" onclick="openSubLedgerRecord('${item.name}','${item.code}')">+ 등록</button><button class="btn btn-sm btn-outline" onclick="openEditSubItem('${item.code}')">수정</button><button class="btn btn-sm btn-danger" onclick="deleteSubItem('${item.code}')">삭제</button></td></tr>`;
+      const prevInit=ledgerRecords.filter(r=>r.name===item.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
+      const prevIn=ledgerRecords.filter(r=>r.name===item.name&&r.type==='in'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+      const prevOut=ledgerRecords.filter(r=>r.name===item.name&&(r.type==='out'||r.type==='dispose')&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+      const prevStock=prevInit+prevIn-prevOut;
+      const dayIn=ledgerRecords.filter(r=>r.name===item.name&&r.type==='in'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
+      const dayOut=ledgerRecords.filter(r=>r.name===item.name&&(r.type==='out'||r.type==='dispose')&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
+      const closing=prevStock+dayIn-dayOut;
+      const isRl=item.unit==='Rl';
+      const fmt=v=>isRl?v.toFixed(3):(Number.isInteger(v)?v:v.toFixed(1));
+      const safeName=item.name.replace(/'/g,"\\'").replace(/\n/g,' ');
+      const accHtml=buildAccordion(item,selDate);
+
+      return `<tr class="ing-row" onclick="toggleAcc('${item.code}')">
+        <td><span class="acc-arrow" id="arrow-${item.code}">▶</span><span class="badge badge-blue" style="font-size:10px">${item.code}</span></td>
+        <td style="font-weight:600">${item.name}</td>
+        <td style="font-size:12px;color:var(--text2)">${item.supplier||'-'}</td>
+        <td style="font-size:12px;color:var(--text2)">${item.spec||'-'}</td>
+        <td class="tc" style="font-size:12px">${item.unit||'EA'}</td>
+        <td class="tc" style="color:${prevStock<0?'var(--danger)':'var(--text2)'}">${prevStock!==0?fmt(prevStock):'-'}</td>
+        <td class="tc" style="color:var(--success);font-weight:${dayIn>0?700:400}">${dayIn>0?'+'+fmt(dayIn):'-'}</td>
+        <td class="tc" style="color:var(--danger);font-weight:${dayOut>0?700:400}">${dayOut>0?'-'+fmt(dayOut):'-'}</td>
+        <td class="tc" style="font-weight:700;color:${closing<0?'var(--danger)':closing>0?'var(--primary)':'var(--text3)'}">${fmt(closing)}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openAddRecord('${safeName}','${item.code}')">+ 등록</button>
+          <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();openEditItem('${item.code}')">수정</button>
+          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteLedgerByName('${safeName}')">삭제</button>
+        </td>
+      </tr>
+      <tr class="accordion-detail" id="acc-${item.code}"><td colspan="10">${accHtml}</td></tr>`;
     }).join('');
   });
-  if(!totalItems) html='<tr><td colspan="10" class="tc" style="padding:24px;color:var(--text3)">등록된 부자재가 없습니다</td></tr>';
-  if(tbody) tbody.innerHTML=html;
+  if(!total)html='<tr><td colspan="10" class="tc" style="padding:24px;color:var(--text3)">등록된 부자재가 없습니다</td></tr>';
+  if(tbody)tbody.innerHTML=html;
 }
 
-function fmtSubInitDate(input){
-  const v=input.value.replace(/\D/g,'').slice(0,6);
-  input.value=v;
-  if(v.length===6){ input.style.color='var(--primary)'; input.style.fontWeight='700'; }
-  else{ input.style.color=''; input.style.fontWeight=''; }
-}
-function subYYMMDDtoISO(v){
-  if(!v||v.length!==6) return getTodayISO2();
-  return '20'+v.slice(0,2)+'-'+v.slice(2,4)+'-'+v.slice(4,6);
-}
-function isoToYYMMDD(iso){
-  if(!iso||iso.length<10) return '';
-  return iso.slice(2,4)+iso.slice(5,7)+iso.slice(8,10);
-}
-function openDeleteSubCode(){
-  const sel = document.getElementById('deleteSubCodeSelect');
-  sel.innerHTML = '<option value="">-- 품목 선택 --</option>' +
-    SUB_ITEM_DB.map(i=>`<option value="${i.code}">[${i.code}] ${i.name}</option>`).join('');
-  document.getElementById('deleteSubCodeModal').classList.add('open');
-}
-function confirmDeleteSubCode(){
-  const code = document.getElementById('deleteSubCodeSelect').value;
-  if(!code){ alert('품목을 선택해주세요'); return; }
-  const item = SUB_ITEM_DB.find(i=>i.code===code);
-  if(!confirm(`'${item.name}' 코드와 수불 내역을 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
-  SUB_ITEM_DB = SUB_ITEM_DB.filter(i=>i.code!==code);
-  subLedgerRecords = subLedgerRecords.filter(r=>r.name!==item.name);
-  if(window._db){
-    window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-    window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-  }
-  closeModal('deleteSubCodeModal');
-  renderSubLedger();
-  alert('삭제 완료');
+// ===== 아코디언 =====
+function toggleAcc(code){
+  const row=document.getElementById('acc-'+code);
+  const arrow=document.getElementById('arrow-'+code);
+  if(!row)return;
+  const isOpen=row.classList.contains('open');
+  if(isOpen){row.classList.remove('open');if(arrow){arrow.textContent='▶';arrow.classList.remove('open');}}
+  else{row.classList.add('open');if(arrow){arrow.textContent='▶';arrow.classList.add('open');}}
 }
 
-function openEditSubItem(code){
-  const item = SUB_ITEM_DB.find(i=>i.code===code);
-  if(!item){ alert('품목 정보를 찾을 수 없습니다'); return; }
-  const initRec = subLedgerRecords.find(r=>r.name===item.name&&r.type==='init');
-  document.getElementById('editSubCode').value = code;
-  document.getElementById('editSubNameDisplay').value = item.name;
-  document.getElementById('editSubSpec').value = item.spec||'';
-  document.getElementById('editSubUnit').value = item.unit||'EA';
-  document.getElementById('editSubSupplier').value = item.supplier||'';
-  document.getElementById('editSubQty').value = initRec ? initRec.qty : '';
-  document.getElementById('editSubDate').value = initRec ? isoToYYMMDD(initRec.date) : '';
-  document.getElementById('editSubMfg').value = initRec ? isoToYYMMDD(initRec.mfg||'') : '';
-  document.getElementById('editSubItemModal').classList.add('open');
-}
-function saveEditSubItem(){
-  const code = document.getElementById('editSubCode').value;
-  const item = SUB_ITEM_DB.find(i=>i.code===code);
-  if(!item) return;
-  item.spec = document.getElementById('editSubSpec').value.trim();
-  item.unit = document.getElementById('editSubUnit').value;
-  item.supplier = document.getElementById('editSubSupplier').value.trim();
-  const qty = parseFloat(document.getElementById('editSubQty').value)||0;
-  const dateV = document.getElementById('editSubDate').value;
-  const mfgV = document.getElementById('editSubMfg').value;
-  if(qty>0){
-    subLedgerRecords = subLedgerRecords.filter(r=>!(r.name===item.name&&r.type==='init'));
-    subLedgerRecords.push({date:subYYMMDDtoISO(dateV), name:item.name, code:item.code, qty, mfg:subYYMMDDtoISO(mfgV)||'', type:'init'});
-    if(window._db) window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-  }
-  if(window._db) window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-  closeModal('editSubItemModal');
-  renderSubLedger();
-  alert('수정 완료');
-}
-
-function openSubLedgerRecord(name,code){
-  closeAllModals();
-  document.getElementById('slrName').value=name;
-  document.getElementById('slrCode').value=code;
-  document.getElementById('slrType').value='in';
-  document.getElementById('slrQty').value='';
-  const _td2=new Date(); document.getElementById('slrDate').value=String(_td2.getFullYear()).slice(2)+String(_td2.getMonth()+1).padStart(2,'0')+String(_td2.getDate()).padStart(2,'0');
-  document.getElementById('slrMfg').value='';
-  document.getElementById('slrNote').value='';
-  document.getElementById('subLedgerRecordTitle').textContent=`수불 등록 - ${name}`;
-  document.getElementById('subLedgerRecordModal').classList.add('open');
-}
-function saveSubLedgerRecord(){
-  const name=document.getElementById('slrName').value;
-  const code=document.getElementById('slrCode').value;
-  const type=document.getElementById('slrType').value;
-  const qty=parseInt(document.getElementById('slrQty').value)||0;
-  const date=subYYMMDDtoISO(document.getElementById('slrDate').value);
-  const mfg=subYYMMDDtoISO(document.getElementById('slrMfg').value)||'';
-  const note=document.getElementById('slrNote').value.trim();
-  if(!qty){alert('수량을 입력해주세요');return;}
-  subLedgerRecords.push({date,name,code,qty,mfg,note,type});
-  if(window._db) window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-  closeModal('subLedgerRecordModal');renderSubLedger();
-}
-function deleteSubItem(code){
-  if(!confirm('해당 품목의 수불 내역을 삭제하시겠습니까?'))return;
-  const item=SUB_ITEM_DB.find(i=>i.code===code);
-  if(item){
-    subLedgerRecords=subLedgerRecords.filter(r=>r.name!==item.name);
-    if(window._db) window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-  }
-  renderSubLedger();
-}
-function openNewSubItemModal(){
-  closeAllModals();
-  document.getElementById('nsiCategory').value='필름포장지';
-  document.getElementById('nsiName').value='';
-  document.getElementById('nsiSpec').value='';
-  document.getElementById('nsiUnit').value='EA';
-  document.getElementById('nsiSupplier').value='';
-  updateNsiCode();
-  document.getElementById('newSubItemModal').classList.add('open');
-}
-function updateNsiCode(){
-  const cat=document.getElementById('nsiCategory').value;
-  document.getElementById('nsiCode').value=autoSubCode(cat);
-}
-function saveNewSubItem(){
-  const category=document.getElementById('nsiCategory').value;
-  const code=document.getElementById('nsiCode').value;
-  const name=document.getElementById('nsiName').value.trim();
-  const spec=document.getElementById('nsiSpec').value.trim();
-  const unit=document.getElementById('nsiUnit').value;
-  const supplier=document.getElementById('nsiSupplier').value.trim();
-  if(!name){alert('품목명을 입력해주세요');return;}
-  if(SUB_ITEM_DB.find(i=>i.name===name)){alert('이미 등록된 품목명입니다');return;}
-  SUB_ITEM_DB.push({code,name,category,spec,unit,supplier});
-  if(window._db) window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-  closeModal('newSubItemModal');renderSubLedger();
-}
-function openSubInitStock(){
-  closeAllModals();
-  const sel=document.getElementById('siItem');
-  sel.innerHTML='<option value="">-- 품목 선택 --</option>'+SUB_ITEM_DB.map(i=>`<option value="${i.name}">[${i.code}] ${i.name}</option>`).join('');
-  document.getElementById('subInitStockTbody').innerHTML='';
-  const _td4=new Date(); const _yy4=String(_td4.getFullYear()).slice(2); const _mm4=String(_td4.getMonth()+1).padStart(2,'0'); const _dd4=String(_td4.getDate()).padStart(2,'0');
-  document.getElementById('siDate').value=_yy4+_mm4+_dd4;
-  document.getElementById('siMfg').value='';
-  document.getElementById('siQty').value='';
-  document.getElementById('subInitStockModal').classList.add('open');
-}
-function addSubInitRow(){
-  const name=document.getElementById('siItem').value;
-  const qty=parseInt(document.getElementById('siQty').value)||0;
-  const mfg=document.getElementById('siMfg').value||'';
-  const date=subYYMMDDtoISO(document.getElementById('siDate').value);
-  if(!name||!qty){alert('품목과 재고량을 입력해주세요');return;}
-  const item=SUB_ITEM_DB.find(i=>i.name===name);
-  const code=item?item.code:'';
-  // LOT 자동 생성: 코드-OI-제조일자 (초기재고)
-  const mfgKey=mfg.replace(/-/g,'').slice(2)||'000000';
-  const lot=code?`${code}-OF-${mfgKey}`:'';
-  subInitRows.push({date,name,code,qty,mfg:subYYMMDDtoISO(mfg)||'',lot,type:'init'});
-  renderSubInitRows();
-}
-let subInitRows=[];
-function renderSubInitRows(){
-  document.getElementById('subInitStockTbody').innerHTML=subInitRows.map((r,i)=>`<tr><td><span class="badge badge-blue" style="font-size:10px">${r.code}</span></td><td style="font-weight:600">${r.name}</td><td class="tc">${r.qty}</td><td class="tc">${r.mfg||'-'}</td><td class="tc">${r.date}</td><td><button class="btn btn-sm btn-danger" onclick="removeSubInitRow(${i})">삭제</button></td></tr>`).join('');
-}
-function removeSubInitRow(i){subInitRows.splice(i,1);renderSubInitRows();}
-function saveSubInitStock(){
-  if(!subInitRows.length){alert('등록할 재고가 없습니다');return;}
-  subLedgerRecords=subLedgerRecords.filter(r=>r.type!=='init');
-  subInitRows.forEach(r=>subLedgerRecords.push(r));
-  if(window._db) window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-  closeModal('subInitStockModal');renderSubLedger();
-}
-function printSubLedger(){
-  const selDate=getSubLedgerDateISO();
-  const[sy,sm]=selDate.split('-').map(Number);
-  const monthStart=`${sy}-${String(sm).padStart(2,'0')}-01`;
-  let bodyHtml='';
-  SUB_CATEGORIES.forEach(cat=>{
-    const items=SUB_ITEM_DB.filter(i=>i.category===cat);
-    if(!items.length) return;
-    bodyHtml+=`<tr><td colspan="9" class="cat-header">${cat}</td></tr>`;
-    bodyHtml+=items.map(item=>{
-      const{prevStock,monthIn,monthOut,closing}=calcSubLedgerRow(item,monthStart,selDate);
-      return `<tr><td><span class="badge">${item.code}</span></td><td class="left bold">${item.name}</td><td class="left">${item.supplier||'-'}</td><td class="left">${item.spec||'-'}</td><td>${item.unit||'EA'}</td><td>${prevStock>0?prevStock:'-'}</td><td>${monthIn>0?'+'+monthIn:'-'}</td><td>${monthOut>0?'-'+monthOut:'-'}</td><td class="bold">${closing}</td></tr>`;
-    }).join('');
-  });
-  const printWin=window.open('','_blank');
-  printWin.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>부자재수불부 ${selDate}</title><style>body{font-family:"Noto Sans KR",sans-serif;font-size:10px;padding:20px;}h2{font-size:16px;margin-bottom:4px;}.sub{font-size:12px;color:#666;margin-bottom:14px;}table{width:100%;border-collapse:collapse;}th{background:#f0f0f0;border:1px solid #999;padding:5px;text-align:center;font-weight:700;}td{border:1px solid #999;padding:5px;text-align:center;}td.left{text-align:left;}td.bold{font-weight:700;}td.cat-header{background:#dde4f0;font-size:11px;font-weight:700;text-align:left;padding:6px 10px;color:#0d3f75;}.badge{display:inline-block;padding:2px 6px;border-radius:10px;font-size:9px;font-weight:700;background:#e8f0fb;color:#1a5fa8;}@page{margin:10mm;size:A4 landscape;}</style></head><body><h2>부자재수불부</h2><div class="sub">조회일자: ${selDate} / 출력일시: ${new Date().toLocaleString('ko-KR')}</div><table><thead><tr><th>코드</th><th>품목명</th><th>거래처</th><th>규격</th><th>단위</th><th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th></tr></thead><tbody>${bodyHtml}</tbody></table></body></html>`);
-  printWin.document.close();
-  setTimeout(()=>printWin.print(),500);
-}
-function renderSubsidiary(){renderSubLedger();}
-function openAddSubsidiary(){openNewSubItemModal();}
-function saveSubsidiary(){}
-
-// ===== Firebase 자동 동기화 =====
-// ===== Firebase 직접 읽기 =====
-async function loadFromFirebase(){
-  if(!window._db) return;
-  try{
-    const [itemSnap, ledgerSnap] = await Promise.all([
-      window._db.collection('appData').doc('subItemDB').get(),
-      window._db.collection('appData').doc('subLedgerRecords').get()
-    ]);
-    if(itemSnap.exists && itemSnap.data().data) SUB_ITEM_DB = JSON.parse(itemSnap.data().data);
-    if(ledgerSnap.exists && ledgerSnap.data().data) subLedgerRecords = JSON.parse(ledgerSnap.data().data);
-    // 잘못 들어간 카테고리명(필름포장지 등) 항목 정리
-    const badNames=['필름포장지','비닐','벌크비닐','박스','패키지박스'];
-    const before=subLedgerRecords.length;
-    subLedgerRecords=subLedgerRecords.filter(r=>!badNames.includes(r.name));
-    if(subLedgerRecords.length!==before){
-      window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+function buildAccordion(item,selDate){
+  const recs=ledgerRecords.filter(r=>r.name===item.name);
+  const lotMap={};
+  recs.forEach(r=>{
+    if(r.type==='init'||(r.type==='in'&&r.date<=selDate)){
+      const key=r.lot||'_미지정';
+      if(!lotMap[key])lotMap[key]={lot:r.lot||'LOT 미지정',type:r.type==='init'?'초기':'입고',mfg:r.mfg||'',inQty:0,outQty:0,inDate:r.date||''};
+      lotMap[key].inQty+=r.qty;
+      if(r.mfg&&!lotMap[key].mfg)lotMap[key].mfg=r.mfg;
+      if(r.date&&(!lotMap[key].inDate||r.date<lotMap[key].inDate))lotMap[key].inDate=r.date;
     }
-  }catch(e){ console.warn('Firebase 로드 실패',e); }
-}
+  });
+  recs.forEach(r=>{
+    if((r.type==='out'||r.type==='dispose')&&r.date<=selDate){
+      const key=r.lot||'_미지정';
+      if(lotMap[key])lotMap[key].outQty+=r.qty;
+      else{
+        if(!lotMap['_미지정'])lotMap['_미지정']={lot:'LOT 미지정',type:'-',mfg:'',inQty:0,outQty:0};
+        lotMap['_미지정'].outQty+=r.qty;
+      }
+    }
+  });
+  const isRl=item.unit==='Rl';
+  const fmt=v=>isRl?v.toFixed(3):(Number.isInteger(v)?String(v):v.toFixed(1));
+  const lots=Object.values(lotMap).map(l=>({...l,remain:l.inQty-l.outQty})).filter(l=>l.remain>0.0005);
+  if(!lots.length)return '<div class="acc-inner"><div class="acc-empty">현재 잔여 재고가 없습니다</div></div>';
 
+  lots.sort((a,b)=>{
+    const ia=a.inDate||'',ib=b.inDate||'';
+    if(ia&&ib&&ia!==ib)return ia<ib?-1:1;
+    if(ia&&!ib)return -1;if(!ia&&ib)return 1;
+    return 0;
+  });
 
-// ===== 전체삭제/백업/복원/폐기 =====
-function saveSubLedger(){
-  if(window._db) window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-}
-function openDeleteAllSub(){
-  document.getElementById('deleteAllSubPw').value='';
-  document.getElementById('deleteAllSubPwErr').style.display='none';
-  document.getElementById('deleteAllSubModal').classList.add('open');
-}
-async function confirmDeleteAllSub(){
-  if(document.getElementById('deleteAllSubPw').value!=='8004'){
-    document.getElementById('deleteAllSubPwErr').style.display='block';
-    return;
+  let rows=lots.map(l=>`<tr>
+    <td style="text-align:left;font-family:monospace;font-size:11px;color:var(--primary-dark)">${l.lot}</td>
+    <td>${l.type}</td>
+    <td>${fmtMfgDisplay(l.mfg)}</td>
+    <td style="text-align:right;font-weight:600">${fmt(l.remain)}</td>
+  </tr>`).join('');
+
+  const totalRemain=lots.reduce((s,l)=>s+l.remain,0);
+
+  // 출고내역
+  const outRecs=recs.filter(r=>(r.type==='out'||r.type==='dispose')&&r.date<=selDate);
+  let outHtml='';
+  if(outRecs.length){
+    outHtml=`<div style="margin-top:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+        <div onclick="toggleOutRecs('out-${item.code}')" style="cursor:pointer;font-size:11px;font-weight:700;color:var(--warning);">▶ 출고내역 보기/정리 (${outRecs.length}건)</div>
+        <button class="btn btn-sm btn-danger" onclick="deleteMultiOut('${item.code}')" style="padding:4px 10px;font-size:11px;">선택 삭제</button>
+      </div>
+      <div id="out-${item.code}" style="display:none;margin-top:6px;">
+        <table class="acc-table" style="font-size:11px;">
+          <thead><tr>
+            <th style="width:30px;text-align:center;"><input type="checkbox" onchange="toggleAllChk(this,'${item.code}')"></th>
+            <th style="text-align:left">날짜</th><th style="text-align:left">LOT</th><th>포장LOT</th><th>유형</th><th style="text-align:right">수량</th><th></th>
+          </tr></thead>
+          <tbody>${outRecs.map((r,i)=>{
+            const idx=ledgerRecords.indexOf(r);
+            return `<tr>
+              <td style="text-align:center;"><input type="checkbox" class="chk-out-${item.code}" value="${idx}"></td>
+              <td style="font-size:10px;">${r.date||'-'}</td>
+              <td style="font-size:10px;font-family:monospace;">${r.lot||'-'}</td>
+              <td style="font-size:10px;">${r.packLot||r.batchLot||'-'}</td>
+              <td style="font-size:10px;color:${r.type==='dispose'?'var(--danger)':'var(--text2)'}">${r.type==='out'?'출고':'폐기'}</td>
+              <td style="text-align:right;font-size:10px;">${fmt(r.qty||0)}</td>
+              <td><button onclick="event.stopPropagation();deleteOutRecord(${idx})" style="background:#fff0f0;color:#d63031;border:1px solid #f5a0a0;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;">삭제</button></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
   }
-  if(!confirm('부자재 수불내역 전체를 삭제하시겠습니까?')) return;
-  subLedgerRecords=[];
-  saveSubLedger();
-  closeModal('deleteAllSubModal'); renderSubLedger();
-  alert('전체 삭제 완료');
+
+  return `<div class="acc-inner">
+    <table class="acc-table">
+      <thead><tr><th style="text-align:left">LOT번호</th><th>유형</th><th>제조일자</th><th style="text-align:right">잔여량(${item.unit||'EA'})</th></tr></thead>
+      <tbody>${rows}
+        <tr style="background:var(--bg);font-weight:700;">
+          <td colspan="3" style="text-align:right;color:var(--text2)">합계</td>
+          <td style="text-align:right;color:var(--primary)">${fmt(totalRemain)}</td>
+        </tr>
+      </tbody>
+    </table>
+    ${outHtml}
+  </div>`;
 }
-async function backupSubLedger(){
-  if(!window._db){ alert('Firebase 연결 확인'); return; }
-  if(!confirm('현재 부자재 수불내역을 백업하시겠습니까?')) return;
-  await window._db.collection('appData').doc('subLedgerRecords_backup').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString(),count:subLedgerRecords.length});
-  alert('백업 완료! ('+subLedgerRecords.length+'건)');
+
+function toggleOutRecs(id){const el=document.getElementById(id);if(el)el.style.display=el.style.display==='none'?'block':'none';}
+function toggleAllChk(src,code){document.querySelectorAll('.chk-out-'+code).forEach(cb=>cb.checked=src.checked);}
+
+// ===== 저장 =====
+async function saveLedger(){
+  if(!window._db)return;
+  try{await window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(ledgerRecords),updatedAt:new Date().toISOString()});}
+  catch(e){console.warn('저장 실패',e);alert('저장 실패: 네트워크를 확인해주세요');}
 }
-async function restoreSubLedger(){
-  if(!window._db){ alert('Firebase 연결 확인'); return; }
-  const snap=await window._db.collection('appData').doc('subLedgerRecords_backup').get();
-  if(!snap.exists||!snap.data().data){ alert('저장된 백업이 없습니다.'); return; }
-  const bd=JSON.parse(snap.data().data);
-  if(!confirm('백업으로 복원하시겠습니까? ('+bd.length+'건)\n현재 데이터는 사라집니다.')) return;
-  subLedgerRecords=bd;
-  saveSubLedger(); renderSubLedger();
-  alert('복원 완료!');
+function saveItemDB(){
+  if(!window._db)return Promise.resolve();
+  return window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
 }
-function openSubDispose(name){
-  document.getElementById('sdName').value=name;
-  document.getElementById('sdDate').value=new Date().toISOString().slice(0,10);
-  document.getElementById('sdQty').value='';
-  document.getElementById('sdReason').value='파손';
-  document.getElementById('subDisposeModal').classList.add('open');
+
+// ===== 출고 삭제 =====
+async function deleteOutRecord(idx){
+  if(idx<0||idx>=ledgerRecords.length)return;
+  const r=ledgerRecords[idx];
+  if(!confirm(`출고 기록을 삭제하시겠습니까?\n\n품목: ${r.name}\nLOT: ${r.lot||'-'}\n수량: ${r.qty}\n날짜: ${r.date||'-'}`))return;
+  ledgerRecords.splice(idx,1);
+  await saveLedger();renderLedger();alert('삭제 완료');
 }
-function saveSubDispose(){
-  const name=document.getElementById('sdName').value;
-  const date=document.getElementById('sdDate').value;
-  const qty=parseInt(document.getElementById('sdQty').value)||0;
-  const reason=document.getElementById('sdReason').value;
-  if(!qty){ alert('폐기수량을 입력해주세요'); return; }
-  subLedgerRecords.push({date,name,code:'',qty,reason,type:'dispose'});
-  saveSubLedger();
-  closeModal('subDisposeModal'); renderSubLedger();
-  alert(name+' '+qty+'EA 폐기 처리 완료');
+async function deleteMultiOut(code){
+  const cbs=document.querySelectorAll('.chk-out-'+code+':checked');
+  if(!cbs.length){alert('삭제할 내역을 먼저 체크해주세요.');return;}
+  if(!confirm(`선택한 ${cbs.length}건의 출고 기록을 정말 삭제하시겠습니까?`))return;
+  const indices=Array.from(cbs).map(cb=>parseInt(cb.value)).sort((a,b)=>b-a);
+  indices.forEach(idx=>ledgerRecords.splice(idx,1));
+  await saveLedger();renderLedger();
+  setTimeout(()=>{
+    const row=document.getElementById('acc-'+code);const arrow=document.getElementById('arrow-'+code);const outDiv=document.getElementById('out-'+code);
+    if(row)row.classList.add('open');if(arrow)arrow.classList.add('open');if(outDiv)outDiv.style.display='block';
+  },50);
+  alert(`${cbs.length}건 삭제 완료! 재고가 원상복귀 되었습니다.`);
+}
+
+// ===== 수불 등록 (+ 등록 버튼) =====
+function openAddRecord(name,code){
+  closeAllModals();
+  document.getElementById('recName').value=name;
+  document.getElementById('recCode').value=code;
+  document.getElementById('recType').value='in';
+  document.getElementById('recQty').value='';
+  document.getElementById('recMfg').value='';
+  document.getElementById('recNote').value='';
+  const d=new Date();document.getElementById('recDate').value=String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+  document.getElementById('recordModalTitle').textContent=`수불 등록 - ${name}`;
+  document.getElementById('recordModal').classList.add('open');
+}
+async function saveRecord(){
+  const name=document.getElementById('recName').value;
+  const code=document.getElementById('recCode').value;
+  const type=document.getElementById('recType').value;
+  const qty=parseFloat(document.getElementById('recQty').value)||0;
+  const date=yymmddToISO(document.getElementById('recDate').value);
+  const mfg=yymmddToISO(document.getElementById('recMfg').value)||'';
+  const note=document.getElementById('recNote').value.trim();
+  if(!qty){alert('수량을 입력해주세요');return;}
+  ledgerRecords.push({date,name,code,qty,mfg,note,type});
+  await saveLedger();closeModal('recordModal');renderLedger();
+}
+
+// ===== 부자재 수정 =====
+function openEditItem(code){
+  const item=getItemByCode(code);if(!item)return;
+  const initRec=ledgerRecords.find(r=>r.name===item.name&&r.type==='init');
+  document.getElementById('editItemCode').value=code;
+  document.getElementById('editItemName').value=item.name;
+  document.getElementById('editItemSupplier').value=item.supplier||'';
+  document.getElementById('editItemSpec').value=item.spec||'';
+  document.getElementById('editItemUnit').value=item.unit||'EA';
+  document.getElementById('editItemQty').value=initRec?initRec.qty:'';
+  document.getElementById('editItemMfg').value=initRec?isoToYYMMDD(initRec.mfg||''):'';
+  document.getElementById('editItemModal').classList.add('open');
+}
+async function saveEditItem(){
+  const code=document.getElementById('editItemCode').value;
+  const item=getItemByCode(code);if(!item)return;
+  const oldName=item.name;
+  const newName=document.getElementById('editItemName').value.trim();
+  if(!newName){alert('품목명을 입력해주세요');return;}
+  if(newName!==oldName&&SUB_ITEM_DB.find(i=>i.code!==code&&i.name===newName)){alert('이미 존재하는 품목명입니다');return;}
+  if(newName!==oldName){ledgerRecords.forEach(r=>{if(r.name===oldName)r.name=newName;});}
+  item.name=newName;
+  item.supplier=document.getElementById('editItemSupplier').value.trim();
+  item.spec=document.getElementById('editItemSpec').value.trim();
+  item.unit=document.getElementById('editItemUnit').value;
+  const qty=parseFloat(document.getElementById('editItemQty').value)||0;
+  const mfgV=document.getElementById('editItemMfg').value;
+  if(qty>0){
+    ledgerRecords=ledgerRecords.filter(r=>!(r.name===newName&&r.type==='init'));
+    const mfgISO=mfgV.length===6?yymmddToISO(mfgV):'';
+    const lot=code+'-OI-'+(mfgV||'000000');
+    ledgerRecords.push({date:getLedgerDateISO(),name:newName,code,qty,mfg:mfgISO,lot,type:'init'});
+  }
+  await saveLedger();await saveItemDB();
+  closeModal('editItemModal');renderLedger();alert('수정 완료');
+}
+
+// ===== 신규 등록 =====
+function openNewItemModal(){
+  closeAllModals();
+  document.getElementById('newItemCat').value='필름포장지';
+  updateNewItemCode();
+  document.getElementById('newItemName').value='';
+  document.getElementById('newItemSupplier').value='';
+  document.getElementById('newItemSpec').value='';
+  document.getElementById('newItemUnit').value='EA';
+  document.getElementById('newItemModal').classList.add('open');
+}
+function updateNewItemCode(){document.getElementById('newItemCode').value=autoCode(document.getElementById('newItemCat').value);}
+async function saveNewItem(){
+  const cat=document.getElementById('newItemCat').value;
+  const code=document.getElementById('newItemCode').value;
+  const name=document.getElementById('newItemName').value.trim();
+  const supplier=document.getElementById('newItemSupplier').value.trim();
+  const spec=document.getElementById('newItemSpec').value.trim();
+  const unit=document.getElementById('newItemUnit').value;
+  if(!name){alert('품목명을 입력해주세요');return;}
+  if(SUB_ITEM_DB.find(i=>i.name===name)){alert('이미 존재하는 품목명입니다');return;}
+  SUB_ITEM_DB.push({code,name,category:cat,spec,unit,supplier});
+  await saveItemDB();closeModal('newItemModal');renderLedger();
+  alert(`${name} (${code}) 등록 완료`);
+}
+
+// ===== 코드 삭제 =====
+function openDeleteCode(){
+  const sel=document.getElementById('deleteCodeSelect');
+  sel.innerHTML='<option value="">-- 선택 --</option>'+SUB_ITEM_DB.map(i=>`<option value="${i.code}">[${i.code}] ${i.name}</option>`).join('');
+  document.getElementById('deleteCodeModal').classList.add('open');
+}
+async function confirmDeleteCode(){
+  const code=document.getElementById('deleteCodeSelect').value;
+  if(!code){alert('품목을 선택해주세요');return;}
+  const item=getItemByCode(code);
+  if(!confirm(`'${item.name}' 코드와 관련 수불 내역을 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`))return;
+  SUB_ITEM_DB=SUB_ITEM_DB.filter(i=>i.code!==code);
+  ledgerRecords=ledgerRecords.filter(r=>r.name!==item.name);
+  await saveItemDB();await saveLedger();
+  closeModal('deleteCodeModal');renderLedger();alert('삭제 완료');
+}
+
+// ===== 수불 내역 삭제 =====
+function deleteLedgerByName(name){
+  if(!confirm(`'${name}' 수불 내역을 모두 삭제하시겠습니까?`))return;
+  ledgerRecords=ledgerRecords.filter(r=>r.name!==name);
+  saveLedger();renderLedger();alert('삭제 완료');
+}
+
+// ===== 전일재고 =====
+function openInitStock(){
+  closeAllModals();
+  initRows=ledgerRecords.filter(r=>r.type==='init').map(r=>({...r}));
+  renderInitRows();
+  const d=new Date();const el=document.getElementById('initDate');
+  if(el){
+    const existingDate=initRows.length?initRows[0].date:'';
+    if(existingDate&&existingDate.length===10)el.value=existingDate.slice(2,4)+existingDate.slice(5,7)+existingDate.slice(8,10);
+    else el.value=String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+    el.style.color='var(--primary)';el.style.fontWeight='700';
+  }
+  ['initItemName','initQty','initMfg'].forEach(id=>{const e=document.getElementById(id);if(e){e.value='';e.style.color='';e.style.fontWeight='';}});
+  document.getElementById('initStockModal').classList.add('open');
+}
+function addInitRow(){
+  const name=document.getElementById('initItemName').value.trim();
+  const qty=parseFloat(document.getElementById('initQty').value)||0;
+  const mfgRaw=document.getElementById('initMfg').value||'';
+  const dateRaw=document.getElementById('initDate').value||'';
+  const date=dateRaw.length===6?yymmddToISO(dateRaw):getTodayISO2();
+  if(!name||!qty){alert('품목명과 재고량을 입력해주세요');return;}
+  const item=getItemByName(name);
+  if(!item){alert('⚠️ 부자재DB에 등록되지 않은 품목입니다.\n품목명: '+name+'\n\n신규 부자재 등록 후 다시 시도해주세요.');return;}
+  const mfgKey=mfgRaw.replace(/\D/g,'')||'000000';
+  const lot=item.code+'-OI-'+mfgKey;
+  const mfg=mfgRaw.length===6?yymmddToISO(mfgRaw):'';
+  initRows.push({date,name,code:item.code,qty,mfg,lot,type:'init'});
+  renderInitRows();
+  document.getElementById('initItemName').value='';
+  document.getElementById('initQty').value='';
+  const m=document.getElementById('initMfg');if(m){m.value='';m.style.color='';m.style.fontWeight='';}
+  document.getElementById('initDate').readOnly=true;
+}
+function renderInitRows(){
+  document.getElementById('initStockTbody').innerHTML=initRows.map((r,i)=>`<tr>
+    <td style="font-weight:600">${r.name}</td>
+    <td><span class="badge badge-blue" style="font-size:10px">${r.code}</span></td>
+    <td style="font-size:11px;color:var(--primary);font-weight:600">${r.lot||'-'}</td>
+    <td class="tc">${r.qty}</td>
+    <td class="tc">${fmtMfgDisplay(r.mfg)}</td>
+    <td class="tc">${r.date}</td>
+    <td><button class="btn btn-sm btn-danger" onclick="removeInitRow(${i})">삭제</button></td>
+  </tr>`).join('');
+}
+function removeInitRow(i){initRows.splice(i,1);renderInitRows();}
+async function saveInitStock(){
+  if(!initRows.length){alert('등록할 재고가 없습니다');return;}
+  const newNames=initRows.map(r=>r.name);
+  ledgerRecords=ledgerRecords.filter(r=>!(r.type==='init'&&newNames.includes(r.name)));
+  initRows.forEach(r=>ledgerRecords.push(r));
+  await saveLedger();closeModal('initStockModal');renderLedger();
+  alert(`초기재고 ${initRows.length}건 저장 완료`);
+}
+
+// ===== 포장LOT 출고삭제 =====
+function openDeleteByPackLot(){
+  document.getElementById('packLotSearchVal').value='';
+  document.getElementById('packLotSearchResult').innerHTML='';
+  document.getElementById('confirmDeletePackLotBtn').style.display='none';
+  document.getElementById('deleteByPackLotModal').classList.add('open');
+}
+function searchByPackLot(){
+  const lot=document.getElementById('packLotSearchVal').value.trim();
+  if(!lot){alert('LOT 번호를 입력해주세요');return;}
+  const found=ledgerRecords.filter(r=>r.type==='out'&&r.packLot===lot);
+  const el=document.getElementById('packLotSearchResult');
+  if(!found.length){
+    el.innerHTML='<div style="color:var(--danger);padding:12px;background:#fff0f0;border-radius:8px;">해당 포장LOT의 출고 기록이 없습니다.</div>';
+    document.getElementById('confirmDeletePackLotBtn').style.display='none';return;
+  }
+  let html=`<div style="font-size:13px;margin-bottom:8px;color:var(--text2)">아래 <strong>${found.length}건</strong>의 출고 기록이 삭제됩니다:</div>`;
+  html+='<table style="width:100%;border-collapse:collapse;font-size:12px;"><tr style="background:var(--bg);"><th style="padding:6px;border:1px solid var(--border);text-align:left;">품목명</th><th style="padding:6px;border:1px solid var(--border);">날짜</th><th style="padding:6px;border:1px solid var(--border);">LOT</th><th style="padding:6px;border:1px solid var(--border);text-align:right;">수량</th></tr>';
+  found.forEach(r=>{html+=`<tr><td style="padding:6px;border:1px solid var(--border);">${r.name}</td><td style="padding:6px;border:1px solid var(--border);text-align:center;">${r.date}</td><td style="padding:6px;border:1px solid var(--border);text-align:center;">${r.lot||'-'}</td><td style="padding:6px;border:1px solid var(--border);text-align:right;">${r.qty}</td></tr>`;});
+  html+='</table>';el.innerHTML=html;
+  document.getElementById('confirmDeletePackLotBtn').style.display='';
+}
+async function confirmDeleteByPackLot(){
+  const lot=document.getElementById('packLotSearchVal').value.trim();
+  if(!lot)return;
+  if(!confirm(`포장LOT "${lot}" 출고 기록을 삭제하시겠습니까?`))return;
+  ledgerRecords=ledgerRecords.filter(r=>!(r.type==='out'&&r.packLot===lot));
+  await saveLedger();renderLedger();closeModal('deleteByPackLotModal');
+  alert('삭제 완료! 재고가 원상복귀되었습니다.');
+}
+
+// ===== 전체삭제 =====
+function openDeleteAllLedger(){
+  document.getElementById('deleteAllPw').value='';
+  document.getElementById('deleteAllPwError').style.display='none';
+  document.getElementById('deleteAllModal').classList.add('open');
+  setTimeout(()=>document.getElementById('deleteAllPw').focus(),100);
+}
+async function confirmDeleteAll(){
+  const pw=document.getElementById('deleteAllPw').value;
+  if(pw!=='8004'){document.getElementById('deleteAllPwError').style.display='block';document.getElementById('deleteAllPw').value='';document.getElementById('deleteAllPw').focus();return;}
+  if(!confirm('수불내역 전체를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.'))return;
+  ledgerRecords=[];
+  if(window._db){
+    await window._db.collection('appData').doc('subLedgerRecords').set({data:'[]',updatedAt:new Date().toISOString()}).catch(e=>alert('삭제 실패: '+e.message));
+  }
+  closeModal('deleteAllModal');renderLedger();alert('수불내역 전체 삭제 완료');
+}
+
+// ===== 백업/복원 =====
+async function backupLedger(){
+  if(!window._db){alert('Firebase 연결을 확인해주세요');return;}
+  if(!ledgerRecords.length){alert('백업할 데이터가 없습니다');return;}
+  if(!confirm('현재 수불내역을 백업하시겠습니까?\n(기존 백업은 덮어씌워집니다)'))return;
+  try{
+    await window._db.collection('appData').doc('subLedgerRecords_backup').set({data:JSON.stringify(ledgerRecords),updatedAt:new Date().toISOString(),count:ledgerRecords.length});
+    alert('✅ 백업 완료! ('+ledgerRecords.length+'건)');
+  }catch(e){alert('백업 실패: '+e.message);}
+}
+async function restoreLedger(){
+  if(!window._db){alert('Firebase 연결을 확인해주세요');return;}
+  try{
+    const snap=await window._db.collection('appData').doc('subLedgerRecords_backup').get();
+    if(!snap.exists||!snap.data().data){alert('저장된 백업이 없습니다.');return;}
+    const backupData=JSON.parse(snap.data().data);
+    if(!confirm('백업 시점으로 복원하시겠습니까?\n\n백업일시: '+(snap.data().updatedAt||'')+'\n백업건수: '+backupData.length+'건\n현재건수: '+ledgerRecords.length+'건'))return;
+    ledgerRecords=backupData;
+    await saveLedger();renderLedger();alert('✅ 복원 완료! ('+backupData.length+'건)');
+  }catch(e){alert('복원 실패: '+e.message);}
+}
+
+// ===== 빈 코드 조회 =====
+function findEmptyCodes(){
+  let msg='';
+  SUB_CATEGORIES.forEach(cat=>{
+    const prefix=CAT_PREFIX[cat];
+    const nums=SUB_ITEM_DB.filter(i=>i.category===cat).map(i=>parseInt((i.code||'').replace(prefix,''))||0).sort((a,b)=>a-b);
+    if(!nums.length)return;
+    const max=Math.max(...nums);
+    const empty=[];
+    for(let n=1;n<=max;n++){if(!nums.includes(n))empty.push(prefix+String(n).padStart(3,'0'));}
+    if(empty.length)msg+=`[${cat}] ${empty.join(', ')}\n`;
+  });
+  alert(msg||'빈 코드가 없습니다.');
+}
+
+// ===== 출력 =====
+function printLedger(){
+  const selDate=getLedgerDateISO();
+  const q=(document.getElementById('ledgerSearch')?.value||'').trim().toLowerCase();
+  const catFilter=document.getElementById('ledgerCatFilter')?.value||'';
+  const cats=catFilter?[catFilter]:SUB_CATEGORIES;
+  let bodyHtml='';
+  cats.forEach(cat=>{
+    let items=SUB_ITEM_DB.filter(i=>i.category===cat&&(!q||i.name.toLowerCase().includes(q)));
+    if(!items.length)return;
+    bodyHtml+=`<tr><td colspan="9" style="background:#eef2f8;font-weight:700;text-align:left;">${SUB_CAT_ICONS[cat]||''} ${cat}</td></tr>`;
+    items.forEach(item=>{
+      const prevInit=ledgerRecords.filter(r=>r.name===item.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
+      const prevIn=ledgerRecords.filter(r=>r.name===item.name&&r.type==='in'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+      const prevOut=ledgerRecords.filter(r=>r.name===item.name&&(r.type==='out'||r.type==='dispose')&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+      const prevStock=prevInit+prevIn-prevOut;
+      const dayIn=ledgerRecords.filter(r=>r.name===item.name&&r.type==='in'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
+      const dayOut=ledgerRecords.filter(r=>r.name===item.name&&(r.type==='out'||r.type==='dispose')&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
+      const closing=prevStock+dayIn-dayOut;
+      bodyHtml+=`<tr>
+        <td>${item.code}</td><td style="text-align:left;font-weight:600">${item.name}</td>
+        <td>${item.supplier||'-'}</td><td>${item.spec||'-'}</td><td>${item.unit||'EA'}</td>
+        <td class="num">${prevStock}</td><td class="num">${dayIn>0?dayIn:0}</td>
+        <td class="num">${dayOut>0?dayOut:0}</td><td class="num" style="font-weight:700;${closing<0?'color:red;':''}">${closing}</td>
+      </tr>`;
+    });
+  });
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>부자재수불부 ${selDate}</title>
+  <style>body{font-family:"Noto Sans KR",sans-serif;font-size:10px;padding:20px;}h2{font-size:16px;margin-bottom:4px;}.sub{font-size:12px;color:#666;margin-bottom:14px;}table{width:100%;border-collapse:collapse;}th{background:#f0f0f0;border:1px solid #999;padding:5px;text-align:center;font-weight:700;}td{border:1px solid #999;padding:5px;text-align:center;}td.num{font-family:monospace;text-align:right;padding-right:6px;}@page{margin:10mm;size:A4 portrait;}</style></head><body>
+  <h2>부자재수불부</h2><div class="sub">조회일자: ${selDate} / 출력일시: ${new Date().toLocaleString('ko-KR')}</div>
+  <table><thead><tr><th>코드</th><th>품목명</th><th>거래처</th><th>규격</th><th>단위</th><th>전일재고</th><th>입고</th><th>출고</th><th>마감재고</th></tr></thead><tbody>${bodyHtml}</tbody></table></body></html>`);
+  w.document.close();setTimeout(()=>w.print(),500);
+}
+
+// ===== Firebase 로드 =====
+async function loadFromFirebase(){
+  if(!window._db)return;
+  try{
+    const [ledgerSnap,itemSnap]=await Promise.all([
+      window._db.collection('appData').doc('subLedgerRecords').get(),
+      window._db.collection('appData').doc('subItemDB').get()
+    ]);
+    if(ledgerSnap.exists&&ledgerSnap.data().data)ledgerRecords=JSON.parse(ledgerSnap.data().data);
+    if(itemSnap.exists&&itemSnap.data().data)SUB_ITEM_DB=JSON.parse(itemSnap.data().data);
+    else await saveItemDB();
+  }catch(e){console.warn('Firebase 로드 실패',e);}
 }
 
 // ===== 초기화 =====
-(async ()=>{
+(async()=>{
   await loadFromFirebase();
-  await initSubLedger();
-  // 기존 category '벌크비닐' → '비닐' 자동 변환
-  let catFixed=false;
-  subLedgerRecords.forEach(r=>{ if(r.category==='벌크비닐'){r.category='비닐';catFixed=true;} });
-  SUB_ITEM_DB.forEach(i=>{ if(i.category==='벌크비닐'){i.category='비닐';catFixed=true;} });
-  if(catFixed){
-    if(window._db){
-      window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subLedgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-      window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
-    }
-  }
-  // OF LOT 자동 보정
-  let ofFixed=false;
-  subLedgerRecords.forEach(r=>{
+  await initLedger();
+  // LOT 없는 init 레코드 자동 보정
+  let lotFixed=false;
+  ledgerRecords.forEach(r=>{
     if(r.type==='init'&&!r.lot){
-      const code=r.code||'';
-      const datepart=(r.mfg||'').replace(/\./g,'');
-      if(code&&datepart){ r.lot=code+'-OF-'+datepart; ofFixed=true; }
+      let code=r.code||'';
+      if(!code){const item=getItemByName(r.name);if(item){code=item.code;r.code=code;}}
+      const mfgKey=(r.mfg||'').replace(/[-\.]/g,'').slice(2)||'000000';
+      r.lot=code?code+'-OI-'+mfgKey:'OI-'+mfgKey;
+      lotFixed=true;
     }
   });
-  if(ofFixed) saveSubLedger();
+  if(lotFixed)await saveLedger();
   document.getElementById('topbarDate').textContent=getToday();
-  const _td=new Date(); const _yy=String(_td.getFullYear()).slice(2); const _mm=String(_td.getMonth()+1).padStart(2,'0'); const _dd=String(_td.getDate()).padStart(2,'0');
-  const _sldEl=document.getElementById('subLedgerDate'); if(_sldEl){_sldEl.value=_yy+_mm+_dd; _sldEl.style.color='var(--primary)'; _sldEl.style.fontWeight='700';}
-  renderSubLedger();
+  const d=new Date();const yy=String(d.getFullYear()).slice(2);const mm=String(d.getMonth()+1).padStart(2,'0');const dd=String(d.getDate()).padStart(2,'0');
+  const ldEl=document.getElementById('ledgerDate');if(ldEl){ldEl.value=yy+mm+dd;ldEl.style.color='var(--primary)';ldEl.style.fontWeight='700';}
+  renderLedger();
 })();
 </script>
 </body>

@@ -324,29 +324,20 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
           </div>
         </div>
 
-        <!-- 필름LOT / 필름사용량 -->
-        <div class="row">
-          <div>
-            <div class="field-label">필름LOT</div>
-            <select class="field-input" id="filmLot">
-              <option value="">-- 선택 --</option>
-            </select>
+        <!-- 필름포장지 -->
+        <div style="margin-bottom:10px;">
+          <div class="field-label">🎞️ 필름포장지</div>
+          <div id="filmSummary" style="border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;background:var(--bg);display:flex;align-items:center;justify-content:space-between;min-height:48px;">
+            <span style="font-size:13px;color:var(--text3);">미입력</span>
           </div>
-          <div>
-            <div class="field-label">필름사용량</div>
-            <div style="display:flex;gap:6px;align-items:center;">
-              <input class="field-input" type="number" id="filmQtyInt" placeholder="0" min="0" style="flex:1;margin-bottom:0;" oninput="updateFilmDisplay()">
-              <select class="field-input" id="filmQtyFrac" style="flex:1;margin-bottom:0;" onchange="updateFilmDisplay()">
-                <option value="">없음</option>
-                <option value="1/2">1/2</option>
-                <option value="1/3">1/3</option>
-                <option value="1/4">1/4</option>
-                <option value="2/3">2/3</option>
-                <option value="3/4">3/4</option>
-              </select>
-            </div>
-            <div id="filmQtyDisplay" style="font-size:12px;color:var(--primary);font-weight:700;margin-top:4px;min-height:18px;"></div>
-          </div>
+          <button type="button" onclick="openFilmPopup()" style="margin-top:6px;width:100%;padding:12px;border:1.5px solid var(--primary);background:var(--primary-light);color:var(--primary);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🎞️ 필름 입력 / 수정</button>
+          <input type="hidden" id="filmLot" value="">
+          <input type="hidden" id="filmQty" value="0">
+          <input type="hidden" id="filmWaste" value="0">
+          <input type="hidden" id="filmItemCode" value="">
+          <input type="hidden" id="filmUnitLen" value="">
+          <input type="hidden" id="filmRollLen" value="">
+          <input type="hidden" id="filmWastePcs" value="0">
         </div>
 
         <!-- 벌크비닐LOT / 벌크비닐사용량 -->
@@ -1023,7 +1014,7 @@ function renderTodayList(){
           <tr><td>잔량</td><td>${r.remaining}개</td></tr>
           <tr><td>작업인원</td><td>${r.workers}명</td></tr>
           <tr><td>작업시간</td><td>${r.startTime}~${r.endTime}</td></tr>
-          <tr><td>필름포장지</td><td>${r.filmQty} (입고일: ${r.filmDate})</td></tr>
+          <tr><td>필름포장지</td><td>${fmtFilmQty(getFilmQtyFromRecord(r))}${r.filmWaste?' (폐기: '+fmtFilmQty(r.filmWaste)+')':''}</td></tr>
           <tr><td>벌크비닐</td><td>${r.bulkQty} (입고일: ${r.bulkDate})</td></tr>
           <tr><td>박스</td><td>${r.boxQty}개</td></tr>
         </table>
@@ -1063,11 +1054,16 @@ function selectProduct(code){
   document.querySelectorAll('.month-btn').forEach(b=>b.classList.remove('active'));
 
   // 입력 초기화
-  ['workers','perBox','itemWeight','startTime','endTime','qtyPcs','remaining','filmQty','filmDate','bulkQty','bulkDate','boxQty'].forEach(id=>{
+  ['workers','perBox','itemWeight','startTime','endTime','qtyPcs','remaining','bulkQty','bulkDate','boxQty'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.value='';
   });
   document.getElementById('qtyBoxes').value='';
+  // 필름 hidden 필드 초기화
+  ['filmLot','filmQty','filmWaste','filmItemCode','filmUnitLen','filmRollLen','filmWastePcs'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value=id==='filmQty'||id==='filmWaste'||id==='filmWastePcs'?'0':'';
+  });
+  document.getElementById('filmSummary').innerHTML='<span style="font-size:13px;color:var(--text3);">미입력</span>';
   document.getElementById('startTime').value=getNow();
 
   showPage('form');
@@ -1089,20 +1085,178 @@ function setExpiry(months){
   document.getElementById('expiryDate').value=`${ey}.${em}.${ed}`;
 }
 
-// 필름사용량 분수 표시
-function fmtFilmQty(intVal, fracVal){
-  const i=parseInt(intVal)||0;
-  const f=fracVal||'';
-  if(!i&&!f) return '-';
-  if(i&&f) return `${i}롤 + ${f}`;
-  if(i&&!f) return `${i}롤`;
-  return f;
+// 필름사용량 표시 (신규: filmQty / 레거시: filmQtyInt+filmQtyFrac 호환)
+function fmtFilmQty(val){
+  const v=parseFloat(val)||0;
+  if(!v) return '-';
+  return v%1===0 ? v+'Rl' : v.toFixed(1)+'Rl';
 }
-function updateFilmDisplay(){
-  const i=document.getElementById('filmQtyInt').value;
-  const f=document.getElementById('filmQtyFrac').value;
-  const el=document.getElementById('filmQtyDisplay');
-  if(el) el.textContent=fmtFilmQty(i,f);
+function getFilmQtyFromRecord(r){
+  // 신규 형식
+  if(r.filmQty!==undefined && r.filmQty!==null && r.filmQty!=='') return parseFloat(r.filmQty)||0;
+  // 레거시 형식 변환
+  const fracMap={'1/2':0.5,'1/3':0.3,'1/4':0.3,'2/3':0.7,'3/4':0.8};
+  const intV=parseInt(r.filmQtyInt)||0;
+  const fracV=fracMap[r.filmQtyFrac]||0;
+  return intV+fracV;
+}
+
+// ===== 필름포장지 팝업 =====
+function parseFilmSpec(spec){
+  // 규격 파싱: "280*220*1000m" → {parts:[280,220], rollLen:1000}
+  // "260*1000m" → {parts:[260], rollLen:1000}
+  if(!spec) return null;
+  const clean=spec.replace(/m$/i,'').trim();
+  const nums=clean.split('*').map(s=>parseFloat(s)).filter(n=>!isNaN(n)&&n>0);
+  if(nums.length<2) return null;
+  const rollLen=nums[nums.length-1]; // 마지막이 롤 전체 길이
+  const parts=nums.slice(0,-1); // 나머지가 가로(×세로)
+  return {parts, rollLen, unitLen: parts.length>=2 ? parts[1] : null};
+}
+
+function openFilmPopup(){
+  // 필름 품목 목록 채우기
+  const sel=document.getElementById('fpItem');
+  const filmItems=(window._subItemDB||[]).filter(i=>i.category==='필름포장지');
+  sel.innerHTML='<option value="">-- 품목 선택 --</option>'+filmItems.map(i=>
+    `<option value="${i.code}" data-spec="${i.spec||''}">[${i.code}] ${i.name} (${i.spec||'규격없음'})</option>`
+  ).join('');
+  // 기존 선택값 복원
+  const prevCode=document.getElementById('filmItemCode').value;
+  if(prevCode) sel.value=prevCode;
+  onFilmItemChange();
+  // 생산수량 가져오기
+  const prodQty=parseInt(document.getElementById('qtyPcs')?.value)||0;
+  document.getElementById('fpProdQty').value=prodQty;
+  // 기존 폐기수량 복원
+  document.getElementById('fpWastePcs').value=document.getElementById('filmWastePcs').value||'0';
+  // LOT 채우기
+  populateFilmLots();
+  const prevLot=document.getElementById('filmLot').value;
+  if(prevLot) document.getElementById('fpLot').value=prevLot;
+  calcFilmUsage();
+  document.getElementById('filmPopup').style.display='flex';
+}
+
+function closeFilmPopup(){
+  document.getElementById('filmPopup').style.display='none';
+}
+
+function onFilmItemChange(){
+  const sel=document.getElementById('fpItem');
+  const opt=sel.options[sel.selectedIndex];
+  const spec=opt?.dataset?.spec||'';
+  const infoDiv=document.getElementById('fpSpecInfo');
+  const manualDiv=document.getElementById('fpManualLenWrap');
+  if(!spec||!sel.value){
+    infoDiv.style.display='none';
+    manualDiv.style.display='none';
+    return;
+  }
+  const parsed=parseFilmSpec(spec);
+  infoDiv.style.display='block';
+  document.getElementById('fpSpecText').textContent='규격: '+spec;
+  if(parsed && parsed.unitLen){
+    document.getElementById('fpSpecParsed').textContent=`1개당 길이: ${parsed.unitLen}mm / 롤 전체: ${parsed.rollLen}m`;
+    manualDiv.style.display='none';
+    document.getElementById('fpManualLen').value='';
+  } else if(parsed){
+    document.getElementById('fpSpecParsed').textContent=`가로: ${parsed.parts[0]}mm / 롤 전체: ${parsed.rollLen}m (1개당 길이 직접 입력 필요)`;
+    manualDiv.style.display='block';
+  } else {
+    document.getElementById('fpSpecParsed').textContent='규격 파싱 불가';
+    manualDiv.style.display='block';
+  }
+  populateFilmLots();
+  calcFilmUsage();
+}
+
+function populateFilmLots(){
+  const sel=document.getElementById('fpItem');
+  const itemName=sel.options[sel.selectedIndex]?.text?.replace(/^\[.*?\]\s*/,'').replace(/\s*\(.*\)$/,'')||'';
+  const lotSel=document.getElementById('fpLot');
+  const subRecs=window._subLedgerRecords||[];
+  const lots=[...new Set(subRecs.filter(r=>(r.type==='in'||r.type==='init')&&r.name===itemName).map(r=>r.lot))];
+  lotSel.innerHTML='<option value="">-- LOT 선택 --</option>'+lots.map(l=>`<option value="${l}">${l}</option>`).join('');
+}
+
+function calcFilmUsage(){
+  const sel=document.getElementById('fpItem');
+  const opt=sel.options[sel.selectedIndex];
+  const spec=opt?.dataset?.spec||'';
+  const parsed=parseFilmSpec(spec);
+  const prodQty=parseInt(document.getElementById('fpProdQty').value)||0;
+  const wastePcs=parseInt(document.getElementById('fpWastePcs').value)||0;
+  // 1개당 길이 결정
+  let unitLen=0;
+  let rollLen=0;
+  if(parsed){
+    rollLen=parsed.rollLen;
+    unitLen=parsed.unitLen || (parseFloat(document.getElementById('fpManualLen').value)||0);
+  }
+  const usageEl=document.getElementById('fpUsageRl');
+  const usageMEl=document.getElementById('fpUsageM');
+  const wasteEl=document.getElementById('fpWasteRl');
+  const wasteMEl=document.getElementById('fpWasteM');
+  const totalEl=document.getElementById('fpTotalRl');
+  if(!unitLen||!rollLen||!prodQty){
+    usageEl.textContent='-';
+    usageMEl.textContent='';
+    wasteEl.textContent='-';
+    wasteMEl.textContent='';
+    totalEl.textContent='-';
+    return;
+  }
+  const rollLenMm=rollLen*1000;
+  const usageM=prodQty*unitLen;
+  const usageRl=usageM/rollLenMm;
+  const wasteM=wastePcs*unitLen;
+  const wasteRl=wasteM/rollLenMm;
+  const totalRl=usageRl+wasteRl;
+  usageEl.textContent=usageRl.toFixed(3)+'Rl';
+  usageMEl.textContent=`${prodQty}개 × ${unitLen}mm = ${(usageM/1000).toFixed(1)}m`;
+  wasteEl.textContent=wasteRl ? wasteRl.toFixed(3)+'Rl' : '-';
+  wasteMEl.textContent=wastePcs ? `${wastePcs}개 × ${unitLen}mm = ${(wasteM/1000).toFixed(1)}m` : '';
+  totalEl.textContent=totalRl.toFixed(3)+'Rl';
+}
+
+function applyFilmPopup(){
+  const sel=document.getElementById('fpItem');
+  const lot=document.getElementById('fpLot').value;
+  const spec=sel.options[sel.selectedIndex]?.dataset?.spec||'';
+  const parsed=parseFilmSpec(spec);
+  const prodQty=parseInt(document.getElementById('fpProdQty').value)||0;
+  const wastePcs=parseInt(document.getElementById('fpWastePcs').value)||0;
+  let unitLen=0, rollLen=0;
+  if(parsed){
+    rollLen=parsed.rollLen;
+    unitLen=parsed.unitLen || (parseFloat(document.getElementById('fpManualLen').value)||0);
+  }
+  const rollLenMm=rollLen*1000||1;
+  const usageRl=(prodQty*unitLen)/rollLenMm;
+  const wasteRl=(wastePcs*unitLen)/rollLenMm;
+  const totalQty=usageRl+wasteRl;
+  // hidden 필드에 저장
+  document.getElementById('filmLot').value=lot;
+  document.getElementById('filmQty').value=parseFloat(usageRl.toFixed(4));
+  document.getElementById('filmWaste').value=parseFloat(wasteRl.toFixed(4));
+  document.getElementById('filmItemCode').value=sel.value;
+  document.getElementById('filmUnitLen').value=unitLen;
+  document.getElementById('filmRollLen').value=rollLen;
+  document.getElementById('filmWastePcs').value=wastePcs;
+  // 요약 표시 업데이트
+  const itemText=sel.options[sel.selectedIndex]?.text||'';
+  document.getElementById('filmSummary').innerHTML=`
+    <div style="flex:1;">
+      <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:2px;">${itemText}</div>
+      <div style="font-size:11px;color:var(--text2);">LOT: ${lot||'-'}</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px;">
+        사용: ${usageRl.toFixed(3)}Rl
+        ${wasteRl?' / 폐기: '+wasteRl.toFixed(3)+'Rl':''}
+        / <span style="color:var(--primary);">총: ${totalQty.toFixed(3)}Rl</span>
+      </div>
+    </div>`;
+  closeFilmPopup();
 }
 
 // 박스 자동계산
@@ -1119,7 +1273,7 @@ function calcBoxes(){
 function genPrint(r){
   const s=loadSettings();
   const approvalHtml=`<table style="border-collapse:collapse;border:1px solid #bbb;table-layout:fixed;width:auto;"><tr><th rowspan="2" style="width:38px;border:1px solid #bbb;background:#f0f0f0;font-size:10px;font-weight:700;writing-mode:vertical-rl;letter-spacing:3px;text-align:center;vertical-align:middle;padding:6px 4px;">결재</th><th style="width:113px;border:1px solid #bbb;background:#f0f0f0;font-size:10px;font-weight:700;text-align:center;padding:3px;">작성</th><th style="width:113px;border:1px solid #bbb;background:#f0f0f0;font-size:10px;font-weight:700;text-align:center;padding:3px;">승인</th></tr><tr><td style="border:1px solid #bbb;padding:0;width:113px;"><div style="height:55px;position:relative;">${r.signImg?`<img src="${r.signImg}" style="width:100%;height:100%;object-fit:contain;">`:''}</div></td><td style="border:1px solid #bbb;padding:0;width:113px;"><div style="height:55px;position:relative;"></div></td></tr></table>`;
-  const filmQtyStr=r.filmQtyDisplay||fmtFilmQty(r.filmQtyInt||0,r.filmQtyFrac||'');
+  const filmQtyStr=fmtFilmQty(getFilmQtyFromRecord(r))+(r.filmWaste?' (폐기: '+fmtFilmQty(r.filmWaste)+')':'');
   document.getElementById('printArea').innerHTML=`<div style="padding:16px;font-size:11px;font-family:'Noto Sans KR',sans-serif;max-width:100%;">
     <div style="position:relative;margin-bottom:8px;min-height:80px;"><div style="font-size:18px;font-weight:900;letter-spacing:1px;padding-top:8px;">포장일지</div><div style="position:absolute;top:0;right:0;">${approvalHtml}</div></div>
     <!-- 기본정보 -->
@@ -1370,9 +1524,12 @@ function completePackaging(signImg=''){
     sealerTemp:document.getElementById('sealerTemp').value||0,
     // 부자재 LOT
     filmLot:document.getElementById('filmLot')?.value||'-',
-    filmQtyInt:parseInt(document.getElementById('filmQtyInt')?.value)||0,
-    filmQtyFrac:document.getElementById('filmQtyFrac')?.value||'',
-    filmQtyDisplay:fmtFilmQty(document.getElementById('filmQtyInt')?.value||0, document.getElementById('filmQtyFrac')?.value||''),
+    filmQty:parseFloat(document.getElementById('filmQty')?.value)||0,
+    filmWaste:parseFloat(document.getElementById('filmWaste')?.value)||0,
+    filmItemCode:document.getElementById('filmItemCode')?.value||'',
+    filmUnitLen:parseFloat(document.getElementById('filmUnitLen')?.value)||0,
+    filmRollLen:parseFloat(document.getElementById('filmRollLen')?.value)||0,
+    filmWastePcs:parseInt(document.getElementById('filmWastePcs')?.value)||0,
     bulkLot:document.getElementById('bulkLot')?.value||'-',
     bulkQty:document.getElementById('bulkQty').value||0,
     boxLot:document.getElementById('boxLot')?.value||'-',
@@ -1489,16 +1646,28 @@ async function syncToServer(){
       const filmLot=rec.filmLot||''; const bulkLot=rec.bulkLot||''; const boxLot=rec.boxLot||''; const pkgBoxLot=rec.pkgBoxLot||'';
       const rawDate=rec.date||'';
       const isoDate=rawDate.length===6?'20'+rawDate.slice(0,2)+'-'+rawDate.slice(2,4)+'-'+rawDate.slice(4,6):(rawDate||new Date().toISOString().slice(0,10));
-      [{lot:filmLot,cat:'필름포장지'},{lot:bulkLot,cat:'비닐'},{lot:boxLot,cat:'박스'},{lot:pkgBoxLot,cat:'패키지박스'}]
-        .filter(x=>x.lot)
+      [{lot:filmLot,cat:'필름포장지',qty:getFilmQtyFromRecord(rec)},
+       {lot:bulkLot,cat:'비닐',qty:parseFloat(rec.bulkQty)||0},
+       {lot:boxLot,cat:'박스',qty:parseFloat(rec.boxQty)||0},
+       {lot:pkgBoxLot,cat:'패키지박스',qty:parseFloat(rec.pkgBoxQty)||0}]
+        .filter(x=>x.lot&&x.qty>0)
         .forEach(x=>{
           const exists = subRecs.find(r=>r.type==='out'&&r.lot===x.lot&&r.packLot===rec.lot);
           if(!exists){
             const matched=subRecs.find(r=>r.lot===x.lot&&(r.type==='in'||r.type==='init'));
             const itemName=matched?matched.name:x.cat;
-            subRecs.push({date:isoDate,name:itemName,lot:x.lot,qty:1,packLot:rec.lot,type:'out'});
+            subRecs.push({date:isoDate,name:itemName,lot:x.lot,qty:x.qty,packLot:rec.lot,type:'out'});
           }
         });
+      // 필름 폐기량 반영
+      if(filmLot && parseFloat(rec.filmWaste)>0){
+        const wasteExists=subRecs.find(r=>r.type==='dispose'&&r.lot===filmLot&&r.packLot===rec.lot);
+        if(!wasteExists){
+          const matched=subRecs.find(r=>r.lot===filmLot&&(r.type==='in'||r.type==='init'));
+          const itemName=matched?matched.name:'필름포장지';
+          subRecs.push({date:isoDate,name:itemName,lot:filmLot,qty:parseFloat(rec.filmWaste),packLot:rec.lot,type:'dispose',reason:'초기접합확인'});
+        }
+      }
     });
     await db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subRecs),updatedAt:new Date().toISOString()});
 
@@ -1547,16 +1716,28 @@ async function syncSinglePack(idx){
     let subSnap=await db.collection('appData').doc('subLedgerRecords').get();
     let subRecs=(subSnap.exists&&subSnap.data().data)?JSON.parse(subSnap.data().data):[];
     const filmLot=rec.filmLot||''; const bulkLot=rec.bulkLot||''; const boxLot=rec.boxLot||''; const pkgBoxLot=rec.pkgBoxLot||'';
-    [{lot:filmLot,cat:'필름포장지'},{lot:bulkLot,cat:'비닐'},{lot:boxLot,cat:'박스'},{lot:pkgBoxLot,cat:'패키지박스'}]
-      .filter(x=>x.lot)
+    [{lot:filmLot,cat:'필름포장지',qty:getFilmQtyFromRecord(rec)},
+     {lot:bulkLot,cat:'비닐',qty:parseFloat(rec.bulkQty)||0},
+     {lot:boxLot,cat:'박스',qty:parseFloat(rec.boxQty)||0},
+     {lot:pkgBoxLot,cat:'패키지박스',qty:parseFloat(rec.pkgBoxQty)||0}]
+      .filter(x=>x.lot&&x.qty>0)
       .forEach(x=>{
         const exists=subRecs.find(r=>r.type==='out'&&r.lot===x.lot&&r.packLot===rec.lot);
         if(!exists){
           const matched=subRecs.find(r=>r.lot===x.lot&&(r.type==='in'||r.type==='init'));
           const itemName=matched?matched.name:x.cat;
-          subRecs.push({date:isoDate,name:itemName,lot:x.lot,qty:1,packLot:rec.lot,type:'out'});
+          subRecs.push({date:isoDate,name:itemName,lot:x.lot,qty:x.qty,packLot:rec.lot,type:'out'});
         }
       });
+    // 필름 폐기량 반영
+    if(filmLot && parseFloat(rec.filmWaste)>0){
+      const wasteExists=subRecs.find(r=>r.type==='dispose'&&r.lot===filmLot&&r.packLot===rec.lot);
+      if(!wasteExists){
+        const matched=subRecs.find(r=>r.lot===filmLot&&(r.type==='in'||r.type==='init'));
+        const itemName=matched?matched.name:'필름포장지';
+        subRecs.push({date:isoDate,name:itemName,lot:filmLot,qty:parseFloat(rec.filmWaste),packLot:rec.lot,type:'dispose',reason:'초기접합확인'});
+      }
+    }
     await db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(subRecs),updatedAt:new Date().toISOString()});
 
     // 2. 포장기록 Firebase 업로드
@@ -1633,6 +1814,81 @@ async function verifyTestMode(){
     <div class="test-auth-ft">
       <button class="test-auth-btn test-auth-cancel" onclick="document.getElementById('testAuthModal').classList.remove('open')">취소</button>
       <button class="test-auth-btn test-auth-ok" onclick="verifyTestMode()">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 필름포장지 입력 팝업 -->
+<div id="filmPopup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;width:400px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1;">
+      <div style="font-size:15px;font-weight:700;">🎞️ 필름포장지 입력</div>
+      <button onclick="closeFilmPopup()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text3);padding:0 4px;">✕</button>
+    </div>
+    <div style="padding:20px;">
+
+      <!-- 1. 필름 품목 선택 -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">필름 품목 선택</div>
+        <select class="field-input" id="fpItem" onchange="onFilmItemChange()">
+          <option value="">-- 품목 선택 --</option>
+        </select>
+      </div>
+
+      <!-- 2. 규격 표시 + 파싱 결과 -->
+      <div id="fpSpecInfo" style="display:none;background:var(--primary-light);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+        <div style="font-size:12px;color:var(--primary-dark);font-weight:700;margin-bottom:4px;">📐 규격 정보</div>
+        <div id="fpSpecText" style="font-size:13px;color:var(--primary);font-weight:700;"></div>
+        <div id="fpSpecParsed" style="font-size:11px;color:var(--text2);margin-top:4px;"></div>
+      </div>
+
+      <!-- 3. 1개당 길이 수동입력 (규격 2자리일때만 표시) -->
+      <div id="fpManualLenWrap" style="display:none;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--warning);margin-bottom:6px;">⚠️ 1개당 길이를 입력해주세요 (mm)</div>
+        <input class="field-input" type="number" id="fpManualLen" placeholder="예: 220" min="0" step="1" oninput="calcFilmUsage()">
+      </div>
+
+      <!-- 4. LOT 선택 -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">필름 LOT</div>
+        <select class="field-input" id="fpLot">
+          <option value="">-- LOT 선택 --</option>
+        </select>
+      </div>
+
+      <!-- 5. 생산수량 (자동) -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">생산수량 (포장일지에서 가져옴)</div>
+        <input class="field-input" type="number" id="fpProdQty" readonly style="background:var(--bg);font-weight:700;">
+      </div>
+
+      <!-- 7. 폐기수량 (개) -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">폐기수량 (개) - 초기접합 확인 등</div>
+        <input class="field-input" type="number" id="fpWastePcs" placeholder="폐기 개수 입력" min="0" step="1" value="0" oninput="calcFilmUsage()">
+      </div>
+
+      <!-- 8. 계산 결과 -->
+      <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:16px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+          <div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">사용량</div>
+            <div id="fpUsageRl" style="font-size:18px;font-weight:700;color:var(--primary);">-</div>
+            <div id="fpUsageM" style="font-size:10px;color:var(--text3);"></div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">폐기량</div>
+            <div id="fpWasteRl" style="font-size:18px;font-weight:700;color:var(--warning);">-</div>
+            <div id="fpWasteM" style="font-size:10px;color:var(--text3);"></div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">총사용량</div>
+            <div id="fpTotalRl" style="font-size:18px;font-weight:700;color:var(--text);">-</div>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="applyFilmPopup()" style="width:100%;padding:14px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">✅ 적용</button>
     </div>
   </div>
 </div>
