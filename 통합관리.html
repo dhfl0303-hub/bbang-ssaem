@@ -2248,10 +2248,10 @@ function setTraceTab(mode){
   document.getElementById('trace-tab-reverse').className = mode==='reverse' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
   const hint = document.getElementById('trace-hint');
   if(mode==='forward'){
-    hint.textContent='📌 순방향: 원료LOT → 배합LOT / 투입LOT → 포장LOT → 완제품LOT';
-    document.getElementById('traceInput').placeholder='원료LOT 입력 (예: M001-260526-270920)';
+    hint.textContent='📌 순방향: 원료LOT / 부자재LOT → 배합LOT / 투입LOT → 포장LOT → 완제품LOT';
+    document.getElementById('traceInput').placeholder='원료LOT 또는 부자재LOT 입력 (예: M001-260526-270920, F010-260615-260620)';
   } else {
-    hint.textContent='📌 역방향: 완제품LOT → 포장LOT → 배합LOT / 투입LOT → 원료LOT';
+    hint.textContent='📌 역방향: 완제품LOT → 포장LOT → 부자재LOT + 배합LOT / 투입LOT → 원료LOT';
     document.getElementById('traceInput').placeholder='완제품LOT 입력 (예: B1-260526-01)';
   }
   document.getElementById('traceResult').innerHTML='<div style="text-align:center;padding:40px;color:var(--text3);"><div style="font-size:36px;margin-bottom:10px;">🔍</div><div>LOT번호를 입력하고 추적 버튼을 눌러주세요</div></div>';
@@ -2284,7 +2284,6 @@ function searchTraceForward(input, result){
       }
     }));
     if(!topRows.length){
-      // 원료LOT 직접 입력 시 배합+투입 모두 검색
       const batchItems = findBatchByIngredientData(input);
       const inputItems = findInputByIngredientLot(input);
       if(batchItems.length||inputItems.length){
@@ -2294,6 +2293,25 @@ function searchTraceForward(input, result){
           getChildren: ()=>buildForwardChildren(batchItems, inputItems)
         }];
       }
+    }
+  } else if(input.startsWith('F')||input.startsWith('G')||input.startsWith('H')||input.startsWith('P')&&!input.startsWith('P0')){
+    // 부자재LOT 순방향 추적
+    const packItems = findPackBySubLotData(input);
+    if(packItems.length){
+      topRows = [{
+        cols: [input, '부자재LOT', packItems.length+'건 포장사용', '-'],
+        title: '부자재LOT',
+        getChildren: ()=>{
+          let html = `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 6px;">↓ 포장 공정 (이 부자재를 사용한 포장기록)</div>`;
+          html += buildInnerTable(['포장LOT','품명','소비기한','수량'], packItems.map(p=>[p.lot,p.product,p.expiry||'-',(p.qtyPcs||0)+'개']), '#e8f5ef', '#1e9e6e');
+          const finItems = packItems.flatMap(p=>findFinishedByPackLotData(p.lot));
+          if(finItems.length){
+            html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 6px;">↓ 완제품</div>`;
+            html += buildInnerTable(['완제품LOT','품명','소비기한','잔량'], finItems.map(f=>[f.lot_number,f.name,f.exp_date||'-',f.remain_box+'BOX']), '#e8f0fb', '#1a5fa8');
+          }
+          return html;
+        }
+      }];
     }
   } else if(input.startsWith('투입-')){
     const inputItems = findInputByLotData(input);
@@ -2330,6 +2348,12 @@ function buildForwardChildren(batchItems, inputItems){
   if(packItems.length){
     html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 6px;">↓ 포장 공정</div>`;
     html += buildInnerTable(['포장LOT','품명','소비기한','수량'], packItems.map(p=>[p.lot,p.product,p.expiry||'-',(p.qtyPcs||0)+'개']), '#e8f5ef', '#1e9e6e');
+    // 부자재LOT 표시
+    const subLots=extractSubLotsFromPack(packItems);
+    if(subLots.length){
+      html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 6px;">↓ 부자재 (포장자재)</div>`;
+      html += buildInnerTable(['분류','부자재LOT','포장LOT','품명'], subLots.map(s=>[s.type,s.lot,s.packLot,s.product]), '#f0e6ff', '#7c3aed');
+    }
     const finItems = packItems.flatMap(p=>findFinishedByPackLotData(p.lot));
     if(finItems.length){
       html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 6px;">↓ 완제품</div>`;
@@ -2401,12 +2425,18 @@ function buildReverseChildren(finLot, matchedMapping, input){
     const pCode=matchedMapping.pLot, datePart=input.split('-')[1];
     Object.keys(window._fbCache||{}).filter(k=>k.startsWith('packRecords_')).forEach(k=>{
       const recs=(window._fbCache&&window._fbCache[k])||[];
-      recs.forEach(r=>{ const keyDate=k.replace('packRecords_',''); if(r.productCode===pCode&&(!datePart||keyDate===datePart)&&!packItems.find(x=>x.lot===r.lot)) packItems.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot}); });
+      recs.forEach(r=>{ const keyDate=k.replace('packRecords_',''); if(r.productCode===pCode&&(!datePart||keyDate===datePart)&&!packItems.find(x=>x.lot===r.lot)) packItems.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot,filmLot:r.filmLot||'',bulkLot:r.bulkLot||'',boxLot:r.boxLot||'',pkgBoxLot:r.pkgBoxLot||''}); });
     });
   }
   if(packItems.length){
     html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 6px;">↑ 포장 공정</div>`;
     html += buildInnerTable(['포장LOT','품명','소비기한','수량(개)'], packItems.map(p=>[p.lot||'-',p.product||'-',p.expiry||'-',(p.qtyPcs||0)+'개']), '#e8f5ef', '#1e9e6e');
+    // 부자재LOT 표시
+    const subLots=extractSubLotsFromPack(packItems);
+    if(subLots.length){
+      html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 6px;">↑ 부자재 (포장자재)</div>`;
+      html += buildInnerTable(['분류','부자재LOT','포장LOT','품명'], subLots.map(s=>[s.type,s.lot,s.packLot,s.product]), '#f0e6ff', '#7c3aed');
+    }
     const batchLots=[...new Set(packItems.map(p=>p.batchLot).filter(Boolean))];
     const batchItems=batchLots.flatMap(bl=>findBatchByLotData(bl));
     if(batchItems.length){
@@ -2614,7 +2644,7 @@ function findPackByBatchLotData(batchLot){
     const found=[];
     keys.forEach(k=>{
       const recs=(window._fbCache&&window._fbCache[k])||[];
-      recs.forEach(r=>{ if(r.batchLot===batchLot) found.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot}); });
+      recs.forEach(r=>{ if(r.batchLot===batchLot) found.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot,filmLot:r.filmLot||'',bulkLot:r.bulkLot||'',boxLot:r.boxLot||'',pkgBoxLot:r.pkgBoxLot||''}); });
     });
     return found;
   }catch(e){ return []; }
@@ -2625,7 +2655,7 @@ function findPackRecordData(packLot){
     const found=[];
     keys.forEach(k=>{
       const recs=(window._fbCache&&window._fbCache[k])||[];
-      recs.forEach(r=>{ if(r.lot===packLot) found.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot}); });
+      recs.forEach(r=>{ if(r.lot===packLot) found.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot,filmLot:r.filmLot||'',bulkLot:r.bulkLot||'',boxLot:r.boxLot||'',pkgBoxLot:r.pkgBoxLot||''}); });
     });
     return found;
   }catch(e){ return []; }
@@ -2634,6 +2664,35 @@ function findFinishedByPackLotData(packLot){
   try{
     return ((window._fbCache&&window._fbCache['완제품_lots'])||[]).filter(r=>r.pkg_lot===packLot);
   }catch(e){ return []; }
+}
+// 부자재LOT으로 포장기록 찾기
+function findPackBySubLotData(subLot){
+  try{
+    const keys=Object.keys(window._fbCache||{}).filter(k=>k.startsWith('packRecords_'));
+    const found=[];
+    keys.forEach(k=>{
+      const recs=(window._fbCache&&window._fbCache[k])||[];
+      recs.forEach(r=>{
+        if(r.filmLot===subLot||r.bulkLot===subLot||r.boxLot===subLot||r.pkgBoxLot===subLot){
+          if(!found.find(x=>x.lot===r.lot)){
+            found.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot,filmLot:r.filmLot||'',bulkLot:r.bulkLot||'',boxLot:r.boxLot||'',pkgBoxLot:r.pkgBoxLot||''});
+          }
+        }
+      });
+    });
+    return found;
+  }catch(e){ return []; }
+}
+// 포장기록에서 부자재LOT 목록 추출
+function extractSubLotsFromPack(packItems){
+  const subs=[];
+  packItems.forEach(p=>{
+    if(p.filmLot&&p.filmLot!=='-') subs.push({type:'필름포장지',lot:p.filmLot,packLot:p.lot,product:p.product});
+    if(p.bulkLot&&p.bulkLot!=='-') subs.push({type:'벌크비닐',lot:p.bulkLot,packLot:p.lot,product:p.product});
+    if(p.boxLot&&p.boxLot!=='-') subs.push({type:'박스',lot:p.boxLot,packLot:p.lot,product:p.product});
+    if(p.pkgBoxLot&&p.pkgBoxLot!=='-') subs.push({type:'패키지박스',lot:p.pkgBoxLot,packLot:p.lot,product:p.product});
+  });
+  return subs;
 }
 function findFinishedByLotData(finLot){
   try{
