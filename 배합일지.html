@@ -253,18 +253,8 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
       <div class="card-bd"><div class="machine-grid" id="machineGrid"></div></div>
     </div>
     <div class="card">
-      <div class="card-hd">배합수</div>
       <div class="card-bd">
-        <div class="count-row">
-          <input class="count-input" type="number" id="countInput" value="1" min="1" max="30" oninput="onCountInput()">
-          <div class="count-btns">
-            <button class="count-btn" onclick="changeCount(1)">＋</button>
-            <button class="count-btn" onclick="changeCount(-1)">－</button>
-          </div>
-        </div>
-        <div class="summary-box">
-          <div><div class="sum-lbl">기준 반죽량</div><div class="sum-val" id="sumBase">-</div></div>
-          <div><div class="sum-lbl">배합수</div><div class="sum-val" id="sumCount">-</div></div>
+        <div class="summary-box" style="grid-template-columns:1fr;">
           <div><div class="sum-lbl">총 반죽량</div><div class="sum-val" id="sumTotal">-</div></div>
         </div>
         <button class="btn btn-success" onclick="startBatching()">배합 시작 →</button>
@@ -414,6 +404,7 @@ let S = {
   page:'main', history:[],
   product:null, machine:null,
   totalBatches:1, currentBatch:1, lotOffset:0,
+  batchCounts:{"1":0,"2":0,"3":0,"4":0}, batchQueue:[],
   batchRecords:[], prevData:{},
   todayRecords:[], editCode:null,
   inputIngredients:[], // 기타사용원재료 입력값
@@ -570,7 +561,7 @@ function goBack(){
   document.getElementById('tbBatch').style.display=prev==='batch'?'flex':'none';
 }
 function goHome(){
-  S.history=[]; S.product=null; S.machine=null; S.batchRecords=[]; S.prevData={}; S.lotOffset=0;
+  S.history=[]; S.product=null; S.machine=null; S.batchRecords=[]; S.prevData={}; S.lotOffset=0; S.batchCounts={"1":0,"2":0,"3":0,"4":0}; S.batchQueue=[];
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-main').classList.add('active');
   S.page='main';
@@ -815,44 +806,72 @@ function printSingleRecord(idx){
 // 제품 선택
 function selectProduct(code){
   S.product=code; S.machine=null;
+  S.batchCounts={"1":0,"2":0,"3":0,"4":0};
   const p=DB[code];
   document.getElementById('machineGrid').innerHTML=['1','2','3','4'].map(m=>{
     const md=p.batches[m];
     const off=!md?'off':'';
-    let flour='';
-    if(md){ const fi=md.ingredients.find(i=>FLOUR_NAMES.includes(i.name)); flour=fi?Number(fi.amount).toLocaleString()+'g':''; }
+    const ingSum = md ? md.ingredients.reduce((s,i)=>s+i.amount,0) : 0;
     const ingList = md ? md.ingredients.map(i=>
       '<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid #f0f0f0;">' +
       '<span style="color:#333;">'+i.name+'</span>' +
       '<span style="color:#666;font-weight:600;">'+Number(i.amount).toLocaleString()+'g</span></div>'
     ).join('') : '';
-    const fn1 = md ? "selectMachine('"+m+"')" : '';
-    return '<div class="machine-btn '+off+'" onclick="'+fn1+'" style="text-align:left;padding:14px;">' +
+    const sumLine = md ? '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding:6px 0 2px;border-top:2px solid #333;margin-top:4px;">' +
+      '<span>합계</span><span>'+Number(ingSum).toLocaleString()+'g</span></div>' : '';
+    const countCtrl = md ? '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #eee;">' +
+      '<button onclick="event.stopPropagation();changeBatchCount(\''+m+'\',-1)" style="width:28px;height:28px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;font-size:16px;cursor:pointer;">－</button>' +
+      '<span id="bcnt'+m+'" style="font-size:18px;font-weight:700;min-width:24px;text-align:center;">0</span>' +
+      '<button onclick="event.stopPropagation();changeBatchCount(\''+m+'\',1)" style="width:28px;height:28px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;font-size:16px;cursor:pointer;">＋</button>' +
+      '</div>' +
+      '<div id="bsub'+m+'" style="text-align:center;font-size:12px;color:#888;margin-top:4px;">-</div>' : '';
+    return '<div class="machine-btn '+off+'" style="text-align:left;padding:14px;">' +
       '<div class="machine-btn-name" style="text-align:center;margin-bottom:4px;">배합'+m+'</div>' +
-      '<div class="machine-btn-flour" style="text-align:center;margin-bottom:8px;">'+flour+'</div>' +
       '<div style="max-height:200px;overflow-y:auto;">'+ingList+'</div>' +
+      sumLine + countCtrl +
       '</div>';
   }).join('');
-  document.getElementById('countInput').value=1;
-  S.totalBatches=1;
   updateSummary();
   showPage('setup');
 }
-function selectMachine(m){
-  S.machine=m;
-  document.querySelectorAll('.machine-btn').forEach((el,i)=>el.classList.toggle('active',['1','2','3','4'][i]===m));
+function changeBatchCount(m,d){
+  const v=(S.batchCounts[m]||0)+d;
+  if(v<0||v>30)return;
+  S.batchCounts[m]=v;
+  const el=document.getElementById('bcnt'+m);
+  if(el) el.textContent=v;
+  const p=DB[S.product]; const md=p.batches[m];
+  const subEl=document.getElementById('bsub'+m);
+  if(subEl && md){
+    const ingSum=md.ingredients.reduce((s,i)=>s+i.amount,0);
+    subEl.textContent=v>0?Number(ingSum*v).toLocaleString()+'g':'-';
+  }
+  // highlight active cards
+  document.querySelectorAll('.machine-btn').forEach((el,i)=>{
+    const key=['1','2','3','4'][i];
+    el.classList.toggle('active',(S.batchCounts[key]||0)>0);
+  });
   updateSummary();
 }
-function changeCount(d){ const v=parseInt(document.getElementById('countInput').value||1)+d; if(v<1||v>30)return; document.getElementById('countInput').value=v; S.totalBatches=v; updateSummary(); }
-function onCountInput(){ S.totalBatches=Math.max(1,Math.min(30,parseInt(document.getElementById('countInput').value)||1)); updateSummary(); }
 function updateSummary(){
-  const p=DB[S.product]; const m=S.machine;
-  document.getElementById('sumCount').textContent=S.totalBatches+'회';
-  if(m&&p.batches[m]){ const w=p.batches[m].weight; document.getElementById('sumBase').textContent=Number(w).toLocaleString()+'g'; document.getElementById('sumTotal').textContent=Number(w*S.totalBatches).toLocaleString()+'g'; }
-  else{ document.getElementById('sumBase').textContent='-'; document.getElementById('sumTotal').textContent='-'; }
+  const p=DB[S.product];
+  let total=0;
+  ['1','2','3','4'].forEach(m=>{
+    const md=p.batches[m]; const cnt=S.batchCounts[m]||0;
+    if(md && cnt>0) total+=md.ingredients.reduce((s,i)=>s+i.amount,0)*cnt;
+  });
+  document.getElementById('sumTotal').textContent=total>0?Number(total).toLocaleString()+'g':'-';
 }
 function startBatching(){
-  if(!S.machine){ alert('배합을 선택해주세요'); return; }
+  // batchQueue 빌드: 배합수가 1 이상인 배합들을 순서대로
+  S.batchQueue=[];
+  ['1','2','3','4'].forEach(m=>{
+    const cnt=S.batchCounts[m]||0;
+    for(let i=0;i<cnt;i++) S.batchQueue.push(m);
+  });
+  if(!S.batchQueue.length){ alert('배합수를 1 이상 설정해주세요'); return; }
+  S.totalBatches=S.batchQueue.length;
+  S.machine=S.batchQueue[0];
   // 같은 제품+날짜 기존 기록 확인 → LOT 번호 이어서 생성
   const sessionKey = S.product+'-'+getWorkDateKey();
   const existing = S.todayRecords.find(r=>r.sessionKey===sessionKey);
@@ -864,6 +883,7 @@ function startBatching(){
 // 배합 입력
 function renderBatchPage(){
   const n=S.currentBatch, total=S.totalBatches;
+  S.machine=S.batchQueue[n-1];
   const p=DB[S.product]; const m=S.machine; const md=p.batches[m];
   const lotNum=n+(S.lotOffset||0);
   const lot=`배합-${S.product}-${getWorkDateKey()}-${String(lotNum).padStart(3,'0')}`;
@@ -881,7 +901,7 @@ function renderBatchPage(){
   // 기계 미니
   document.getElementById('machineMini').innerHTML=['1','2','3','4'].map(mc=>{
     const md2=p.batches[mc]; const off=!md2?'off':'';
-    const w=md2?Number(md2.weight).toLocaleString()+'g':'-';
+    const w=md2?Number(md2.ingredients.reduce((s,i)=>s+i.amount,0)).toLocaleString()+'g':'-';
     const fn2 = md2 ? "changeMachine('"+mc+"')" : '';
     return '<div class="mm-btn '+(mc===m?'active ':'')+off+'" onclick="'+fn2+'">배합'+mc+' ('+w+')</div>';
   }).join('');
