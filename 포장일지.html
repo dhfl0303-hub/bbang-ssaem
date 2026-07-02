@@ -15,6 +15,10 @@
   --danger:#d63031;--radius:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+/* number input 스피너(위아래 화살표) 제거 */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+input[type=number]{-moz-appearance:textfield;}
 html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text);}
 
 /* 상단바 */
@@ -325,12 +329,12 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         </div>
 
         <!-- 필름포장지 -->
-        <div style="margin-bottom:10px;">
+        <div id="filmWrap" style="margin-bottom:10px;position:relative;">
           <div class="field-label">🎞️ 필름포장지</div>
           <div id="filmSummary" style="border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;background:var(--bg);display:flex;align-items:center;justify-content:space-between;min-height:48px;">
             <span style="font-size:13px;color:var(--text3);">미입력</span>
           </div>
-          <button type="button" onclick="openFilmPopup()" style="margin-top:6px;width:100%;padding:12px;border:1.5px solid var(--primary);background:var(--primary-light);color:var(--primary);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🎞️ 필름 입력 / 수정</button>
+          <button type="button" id="filmOpenBtn" onclick="openFilmPopup()" style="margin-top:6px;width:100%;padding:12px;border:1.5px solid var(--primary);background:var(--primary-light);color:var(--primary);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🎞️ 필름 입력 / 수정</button>
           <input type="hidden" id="filmLot" value="">
           <input type="hidden" id="filmQty" value="0">
           <input type="hidden" id="filmWaste" value="0">
@@ -338,13 +342,14 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
           <input type="hidden" id="filmUnitLen" value="">
           <input type="hidden" id="filmRollLen" value="">
           <input type="hidden" id="filmWastePcs" value="0">
+          <div id="filmDisabledOverlay" style="display:none;position:absolute;inset:0;background:rgba(200,200,210,0.4);border-radius:var(--radius);z-index:10;cursor:not-allowed;"></div>
         </div>
 
         <!-- 벌크비닐LOT / 벌크비닐사용량 -->
-        <div class="row" style="margin-top:10px;">
+        <div id="bulkWrap" class="row" style="margin-top:10px;position:relative;">
           <div>
             <div class="field-label">벌크비닐LOT</div>
-            <select class="field-input" id="bulkLot">
+            <select class="field-input" id="bulkLot" onchange="checkPackTypeConflict('bulk')">
               <option value="">-- 선택 --</option>
             </select>
           </div>
@@ -352,6 +357,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
             <div class="field-label">벌크비닐사용량</div>
             <input class="field-input" type="number" id="bulkQty" placeholder="개">
           </div>
+          <div id="bulkDisabledOverlay" style="display:none;position:absolute;inset:0;background:rgba(200,200,210,0.4);border-radius:var(--radius);z-index:10;cursor:not-allowed;"></div>
         </div>
 
         <!-- 소비기한 -->
@@ -1082,6 +1088,8 @@ function selectProduct(code){
   });
   document.getElementById('filmSummary').innerHTML='<span style="font-size:13px;color:var(--text3);">미입력</span>';
   document.getElementById('startTime').value=getNow();
+  // 필름/비닐 상호 비활성화 해제
+  checkPackTypeConflict('reset');
 
   showPage('form');
 }
@@ -1302,6 +1310,33 @@ function applyFilmPopup(){
       </div>
     </div>`;
   closeFilmPopup();
+  checkPackTypeConflict('film');
+}
+
+// ===== 필름/비닐 상호 비활성화 =====
+function checkPackTypeConflict(src){
+  const filmQty=parseFloat(document.getElementById('filmQty').value)||0;
+  const filmCode=document.getElementById('filmItemCode').value||'';
+  const bulkLot=document.getElementById('bulkLot').value||'';
+  const filmOverlay=document.getElementById('filmDisabledOverlay');
+  const bulkOverlay=document.getElementById('bulkDisabledOverlay');
+  const filmBtn=document.getElementById('filmOpenBtn');
+  if(filmCode && filmQty>0){
+    // 필름 입력됨 → 비닐 비활성화
+    bulkOverlay.style.display='block';
+    filmOverlay.style.display='none';
+    if(filmBtn)filmBtn.disabled=false;
+  } else if(bulkLot){
+    // 비닐 선택됨 → 필름 비활성화
+    filmOverlay.style.display='block';
+    bulkOverlay.style.display='none';
+    if(filmBtn)filmBtn.disabled=true;
+  } else {
+    // 둘 다 미입력 → 둘 다 활성화
+    filmOverlay.style.display='none';
+    bulkOverlay.style.display='none';
+    if(filmBtn)filmBtn.disabled=false;
+  }
 }
 
 // 박스 자동계산
