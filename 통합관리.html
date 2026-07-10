@@ -179,6 +179,11 @@ tr:hover td{background:var(--bg);}
 .autocomplete-item:hover,.autocomplete-item.selected{background:var(--primary-light);color:var(--primary);}
 .tc{text-align:center;}
 .mt-12{margin-top:12px;}
+/* 보관기준 토글 버튼 */
+.stor-toggle{cursor:pointer;user-select:none;}
+.stor-toggle input{display:none;}
+.stor-toggle span{display:inline-block;padding:7px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12.5px;color:var(--text2);background:#fff;transition:all .15s;}
+.stor-toggle input:checked+span{border-color:var(--primary);background:var(--primary);color:#fff;font-weight:600;}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -359,6 +364,7 @@ tr:hover td{background:var(--bg);}
 <!-- 메인 -->
 <div class="main">
   <!-- 로딩 오버레이 -->
+  <div id="offlineBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10000;background:#b45309;color:#fff;text-align:center;font-size:13px;font-weight:600;padding:8px 12px;">⚠️ 서버 연결 실패 — 오프라인 데이터 표시 중입니다. 레시피 저장이 제한됩니다. 네트워크 확인 후 새로고침해 주세요.</div>
   <div class="loading-overlay" id="dataLoadingOverlay">
     <div class="loading-spinner"></div>
     <div class="loading-text">데이터를 불러오는 중...</div>
@@ -704,7 +710,7 @@ tr:hover td{background:var(--bg);}
             <button class="btn btn-sm btn-outline" id="sortCodeBtn" onclick="setIngSort('code')" style="background:var(--primary);color:#fff;border-color:var(--primary)">코드순</button>
             <button class="btn btn-sm btn-outline" id="sortNameBtn" onclick="setIngSort('name')">원료명순</button>
             <button class="btn btn-primary btn-sm" onclick="openAddIngStock()">+ 원료 등록</button>
-            <button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;" onclick="openDeleteAllIngStock()">⚠️ 전체삭제</button>
+            <button class="btn btn-sm btn-outline" onclick="openNewIngredientModal()">➕ 원료DB등록</button>
           </div>
         </div>
         <div class="card-bd" style="padding:0">
@@ -927,61 +933,6 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
-<!-- 부자재 신규등록 모달 -->
-<div class="modal-overlay" id="newSubItemModal" onclick="closeModalOutside(event,'newSubItemModal')">
-  <div class="modal" style="width:480px">
-    <div class="modal-hd"><div class="modal-title">➕ 부자재 신규 등록</div><button class="modal-close" onclick="closeModal('newSubItemModal')">×</button></div>
-    <div class="modal-bd">
-      <div class="form-grid">
-        <div class="form-row"><label class="form-label">품목 분류</label><select class="form-input" id="nsiCategory" onchange="updateNsiCode()"><option value="필름포장지">필름포장지</option><option value="벌크비닐">벌크비닐</option><option value="박스">박스</option><option value="패키지박스">패키지박스</option></select></div>
-        <div class="form-row"><label class="form-label">품목코드 (자동)</label><input class="form-input" id="nsiCode" readonly style="background:#f8f9fb;color:var(--primary);font-weight:700"></div>
-        <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="nsiName" placeholder="품목명 입력"></div>
-        <div class="form-row"><label class="form-label">규격</label><input class="form-input" id="nsiSpec" placeholder="규격 입력"></div>
-        <div class="form-row"><label class="form-label">단위</label><select class="form-input" id="nsiUnit"><option value="EA">EA</option><option value="Rl">Rl</option><option value="개">개</option><option value="매">매</option></select></div>
-        <div class="form-row"><label class="form-label">거래처</label><input class="form-input" id="nsiSupplier" placeholder="거래처명"></div>
-      </div>
-    </div>
-    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('newSubItemModal')">취소</button><button class="btn btn-primary" onclick="saveNewSubItem()">저장</button></div>
-  </div>
-</div>
-
-<!-- 부자재 수불 등록 모달 -->
-<div class="modal-overlay" id="subLedgerRecordModal" onclick="closeModalOutside(event,'subLedgerRecordModal')">
-  <div class="modal" style="width:420px">
-    <div class="modal-hd"><div class="modal-title" id="subLedgerRecordTitle">수불 등록</div><button class="modal-close" onclick="closeModal('subLedgerRecordModal')">×</button></div>
-    <div class="modal-bd">
-      <input type="hidden" id="slrCode">
-      <div class="form-row"><label class="form-label">품목명</label><input class="form-input" id="slrName" readonly style="background:#f8f9fb;font-weight:700"></div>
-      <div class="form-grid">
-        <div class="form-row"><label class="form-label">구분</label><select class="form-input" id="slrType"><option value="in">입고</option><option value="out">출고</option></select></div>
-        <div class="form-row"><label class="form-label">수량</label><input class="form-input" id="slrQty" type="number" placeholder="0" step="1"></div>
-        <div class="form-row"><label class="form-label">날짜 YYMMDD</label><input class="form-input" id="slrDate" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtMgmtDate(this)"></div>
-        <div class="form-row"><label class="form-label">제조일자 YYMMDD</label><input class="form-input" id="slrMfg" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtMgmtDate(this)"></div>
-      </div>
-      <div class="form-row"><label class="form-label">비고</label><input class="form-input" id="slrNote" placeholder="LOT번호, 비고 등"></div>
-    </div>
-    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('subLedgerRecordModal')">취소</button><button class="btn btn-primary" onclick="saveSubLedgerRecord()">저장</button></div>
-  </div>
-</div>
-
-<!-- 부자재 초기재고 등록 모달 -->
-<div class="modal-overlay" id="subInitStockModal" onclick="closeModalOutside(event,'subInitStockModal')">
-  <div class="modal" style="width:680px">
-    <div class="modal-hd"><div class="modal-title">📋 부자재 초기재고 등록</div><button class="modal-close" onclick="closeModal('subInitStockModal')">×</button></div>
-    <div class="modal-bd">
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="form-row"><label class="form-label">기준 날짜 YYMMDD</label><input class="form-input" id="siDate" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtMgmtDate(this)"></div>
-        <div class="form-row"><label class="form-label">품목 선택</label><select class="form-input" id="siItem"><option value="">-- 품목 선택 --</option></select></div>
-        <div class="form-row"><label class="form-label">재고량</label><input class="form-input" id="siQty" type="number" placeholder="0" step="1"></div>
-        <div class="form-row"><label class="form-label">제조일자 YYMMDD</label><input class="form-input" id="siMfg" type="text" placeholder="000000" maxlength="6" inputmode="numeric" oninput="fmtMgmtDate(this)"></div>
-      </div>
-      <button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="addSubInitRow()">+ 추가</button>
-      <div class="table-wrap"><table><thead><tr><th>코드</th><th>품목명</th><th>재고량</th><th>제조일자</th><th>기준일</th><th></th></tr></thead><tbody id="subInitStockTbody"></tbody></table></div>
-    </div>
-    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('subInitStockModal')">취소</button><button class="btn btn-primary" onclick="saveSubInitStock()">전체 저장</button></div>
-  </div>
-</div>
-
 <!-- 배합비 편집 모달 -->
 <!-- 투입비 편집 모달 -->
 <div class="modal-overlay" id="inputRecipeModal" onclick="closeModalOutside(event,'inputRecipeModal')">
@@ -1125,6 +1076,69 @@ tr:hover td{background:var(--bg);}
       <input type="hidden" id="mEditWIdx" value="-1">
     </div>
     <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('mappingModal')">취소</button><button class="btn btn-primary" onclick="saveMapping()">저장</button></div>
+  </div>
+</div>
+
+<!-- 원료 수정 모달 -->
+<div class="modal-overlay" id="editIngredientModal" onclick="closeModalOutside(event,'editIngredientModal')">
+  <div class="modal" style="width:480px">
+    <div class="modal-hd"><div class="modal-title">✏️ 원료 정보 수정</div><button class="modal-close" onclick="closeModal('editIngredientModal')">×</button></div>
+    <div class="modal-bd">
+      <input type="hidden" id="ei-code">
+      <div class="form-row"><label class="form-label">원료코드</label><input class="form-input" id="ei-code-display" readonly style="background:var(--bg2,#f5f5f5);color:var(--text2);font-weight:700"></div>
+      <div class="form-row"><label class="form-label">원료명 *</label><input class="form-input" id="ei-name" placeholder="원료명 입력"></div>
+      <div class="form-row"><label class="form-label">원산지</label><input class="form-input" id="ei-origin" placeholder="예: 국내제조, 미국"></div>
+      <div class="form-row">
+        <label class="form-label">보관기준 * <span style="font-size:11px;color:var(--text3);font-weight:400">(복수 선택 가능)</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+          <label class="stor-toggle"><input type="checkbox" id="ei-stor-1" value="1~35℃ 실온보관"><span>실온 (1~35℃)</span></label>
+          <label class="stor-toggle"><input type="checkbox" id="ei-stor-2" value="0~5℃ 냉장보관"><span>냉장 (0~5℃)</span></label>
+          <label class="stor-toggle"><input type="checkbox" id="ei-stor-3" value="0~10℃ 냉장보관"><span>냉장 (0~10℃)</span></label>
+          <label class="stor-toggle"><input type="checkbox" id="ei-stor-4" value="-18℃이하 냉동보관"><span>냉동 (-18℃)</span></label>
+        </div>
+      </div>
+      <div class="form-row"><label class="form-label">단위</label>
+        <select class="form-input" id="ei-unit">
+          <option value="kg">kg</option>
+          <option value="g">g</option>
+          <option value="EA">EA</option>
+          <option value="L">L</option>
+          <option value="mL">mL</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('editIngredientModal')">취소</button><button class="btn btn-primary" onclick="saveEditIngredient()">저장</button></div>
+  </div>
+</div>
+
+<!-- 원료 신규등록 모달 -->
+<div class="modal-overlay" id="newIngredientModal" onclick="closeModalOutside(event,'newIngredientModal')">
+  <div class="modal" style="width:480px">
+    <div class="modal-hd"><div class="modal-title">➕ 원료 신규 등록</div><button class="modal-close" onclick="closeModal('newIngredientModal')">×</button></div>
+    <div class="modal-bd">
+      <div class="form-row"><label class="form-label">원료코드 *</label><input class="form-input" id="ni-code" placeholder="예: M127" style="font-weight:700;color:var(--primary)"></div>
+      <div class="form-row"><label class="form-label">원료명 *</label><input class="form-input" id="ni-name" placeholder="원료명 입력"></div>
+      <div class="form-row"><label class="form-label">원산지</label><input class="form-input" id="ni-origin" placeholder="예: 국내제조, 미국"></div>
+      <div class="form-row">
+        <label class="form-label">보관기준 * <span style="font-size:11px;color:var(--text3);font-weight:400">(복수 선택 가능)</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+          <label class="stor-toggle"><input type="checkbox" id="ni-stor-1" value="1~35℃ 실온보관"><span>실온 (1~35℃)</span></label>
+          <label class="stor-toggle"><input type="checkbox" id="ni-stor-2" value="0~5℃ 냉장보관"><span>냉장 (0~5℃)</span></label>
+          <label class="stor-toggle"><input type="checkbox" id="ni-stor-3" value="0~10℃ 냉장보관"><span>냉장 (0~10℃)</span></label>
+          <label class="stor-toggle"><input type="checkbox" id="ni-stor-4" value="-18℃이하 냉동보관"><span>냉동 (-18℃)</span></label>
+        </div>
+      </div>
+      <div class="form-row"><label class="form-label">단위</label>
+        <select class="form-input" id="ni-unit">
+          <option value="kg">kg</option>
+          <option value="g">g</option>
+          <option value="EA">EA</option>
+          <option value="L">L</option>
+          <option value="mL">mL</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('newIngredientModal')">취소</button><button class="btn btn-primary" onclick="saveNewIngredient()">저장</button></div>
   </div>
 </div>
 
@@ -1570,6 +1584,11 @@ function initData(){
   if(!subsidiaryStock) subsidiaryStock = [];
 }
 function saveData(key, data){
+  // ⑤ 저장 가드: 서버 미연결 상태에서 레시피 저장 차단 (P050 이상 최신 레시피 유실 방지)
+  if(key==='recipeDB' && window._fbLoadFailed){
+    alert('⚠️ 서버 연결 실패 상태입니다.\n지금 저장하면 서버에 있는 최신 레시피가 이전 데이터로 덮어써질 수 있어 저장을 차단했습니다.\n네트워크 확인 후 새로고침해 주세요.');
+    return;
+  }
   // localStorage 이중 백업 (Firebase 실패 시 복구용)
   try { localStorage.setItem('backup_'+key, JSON.stringify(data)); } catch(e){}
   if(window._db) window._db.collection('appData').doc(key).set({data:JSON.stringify(data),updatedAt:new Date().toISOString()}).catch(e=>console.warn('저장 실패:',key,e));
@@ -1627,7 +1646,13 @@ async function loadFromFirebase(){
     });
     // 완제품_lots도 캐시에
     if(window._fbCache['완제품_lots']) window._fbCache['완제품_lots'] = window._fbCache['완제품_lots'];
-  }catch(e){ console.warn('Firebase 로드 실패',e); }
+    window._fbLoadOk = true;
+  }catch(e){
+    console.warn('Firebase 로드 실패',e);
+    window._fbLoadOk = false;
+    window._fbLoadFailed = true;
+    if(typeof updateOfflineBanner==='function') updateOfflineBanner();
+  }
 }
 
 
@@ -1797,13 +1822,14 @@ function saveNewIngredient(){
   const unit=document.getElementById('ni-unit').value;
   if(!code||!name){ alert('원료코드와 원료명을 입력해주세요'); return; }
   if(INGREDIENT_DB.find(i=>i.code===code)){ alert('이미 존재하는 코드입니다'); return; }
-  INGREDIENT_DB.push({code,name,origin,storage,unit:'kg'});
-  // localStorage에도 저장 (커스텀 원료 목록)
+  INGREDIENT_DB.push({code,name,origin,storage,unit});
+  // Firebase에도 저장 (커스텀 원료 목록)
   const custom=window._customIngredients||[];
   custom.push({code,name,origin,storage,unit});
   window._customIngredients=custom; if(window._db) window._db.collection('appData').doc('customIngredients').set({data:JSON.stringify(custom),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
   closeModal('newIngredientModal');
   renderLedger();
+  renderIngStock();
   alert(`✅ '${name}' 원료 등록 완료!`);
 }
 
@@ -3906,30 +3932,6 @@ function renderReturnLog(){
     </tr>`).join('');
 }
 
-function openDeleteAllIngStock(){
-  document.getElementById('deleteAllIngStockPw').value='';
-  document.getElementById('deleteAllIngStockPwError').style.display='none';
-  document.getElementById('deleteAllIngStockModal').classList.add('open');
-  setTimeout(()=>document.getElementById('deleteAllIngStockPw').focus(),100);
-}
-async function confirmDeleteAllIngStock(){
-  const pw = document.getElementById('deleteAllIngStockPw').value;
-  if(pw!=='8004'){
-    document.getElementById('deleteAllIngStockPwError').style.display='block';
-    document.getElementById('deleteAllIngStockPw').value='';
-    document.getElementById('deleteAllIngStockPw').focus();
-    return;
-  }
-  document.getElementById('deleteAllIngStockPwError').style.display='none';
-  if(!confirm('원료재고 전체를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
-  ingStock = [];
-  saveData('ingStock', ingStock);
-  closeModal('deleteAllIngStockModal');
-  renderIngStock();
-  renderDisposeLog();
-  alert('원료재고 전체 삭제 완료');
-}
-
 function openEditIncoming(i){
   const r = [...incomingRecords].sort((a,b)=>b.date.localeCompare(a.date))[i];
   if(!r) return;
@@ -4041,32 +4043,6 @@ function renderDevice(){
     </tr>`).join(''):
     '<tr><td colspan="5" class="tc" style="padding:24px;color:var(--text3)">포장일지 → 설정 → 설비세팅값에서 등록하세요</td></tr>';
 }
-function openAddDevice(e){
-  if(e){ e.preventDefault(); e.stopPropagation(); }
-  closeAllModals();
-  const sel=document.getElementById('dProduct');
-  if(sel) sel.innerHTML=Object.keys(DB).map(c=>`<option value="${c}">${DB[c].name} (${c})</option>`).join('');
-  ['dSealingC1','dSealingC2','dSealingK1','dSealingK2','dSealerTemp'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.value='';
-  });
-  document.getElementById('deviceModal').classList.add('open');
-}
-function saveDevice(){
-  const code=document.getElementById('dProduct').value;
-  const sealingC1=parseFloat(document.getElementById('dSealingC1').value)||0;
-  const sealingC2=parseFloat(document.getElementById('dSealingC2').value)||0;
-  const sealingK1=parseFloat(document.getElementById('dSealingK1').value)||0;
-  const sealingK2=parseFloat(document.getElementById('dSealingK2').value)||0;
-  const sealerTemp=parseFloat(document.getElementById('dSealerTemp').value)||0;
-  const setting={code,sealingC1,sealingC2,sealingK1,sealingK2,sealerTemp};
-  const idx=deviceSettings.findIndex(d=>d.code===code);
-  if(idx>=0) deviceSettings[idx]=setting;
-  else deviceSettings.push(setting);
-  saveData('deviceSettings',deviceSettings);
-  closeModal('deviceModal'); renderDevice(); alert('저장됐습니다');
-}
-
 
 function deleteDevice(i){ if(!confirm('삭제하시겠습니까?'))return; deviceSettings.splice(i,1); saveData('deviceSettings',deviceSettings); renderDevice(); }
 
@@ -4376,13 +4352,27 @@ const _dataReady = new Promise(r => { _dataReadyResolve = r; });
 function showLoadingOverlay(show){
   const el = document.getElementById('dataLoadingOverlay');
   if(el){ show ? el.classList.add('active') : el.classList.remove('active'); }
+  // 10초 강제 해제 안전망 (로딩이 영원히 안 끝나는 상황 방지)
+  clearTimeout(window._overlayForceTimer);
+  if(show){
+    window._overlayForceTimer = setTimeout(()=>{
+      if(el) el.classList.remove('active');
+      console.warn('[로딩] 10초 초과 → 오버레이 강제 해제');
+    }, 10000);
+  }
+}
+
+function updateOfflineBanner(){
+  const b = document.getElementById('offlineBanner');
+  if(b) b.style.display = window._fbLoadFailed ? 'block' : 'none';
 }
 
 (async ()=>{
-  try{
-    await loadFromFirebase();
+  // 로드 후 공통 초기화 (늦은 로드 복구 시 재사용)
+  async function _postLoadInit(){
     initData();
-    await cleanOrphanedBatchOut();
+    // 오프라인 상태에선 불완전한 데이터 기준으로 레코드를 지우는 정리 작업 건너뜀
+    if(!window._fbLoadFailed) await cleanOrphanedBatchOut();
     // LOT 없는 init 레코드 자동 보정
     let _lotFixed = false;
     ledgerRecords.forEach(r=>{
@@ -4394,7 +4384,7 @@ function showLoadingOverlay(show){
         _lotFixed = true;
       }
     });
-    if(_lotFixed) saveLedger();
+    if(_lotFixed && !window._fbLoadFailed) saveLedger();
     syncIncomingToLedger();
     syncIngStockFromLedger();
     document.getElementById('topbarDate').textContent=getToday();
@@ -4403,6 +4393,29 @@ function showLoadingOverlay(show){
     renderDisposeLog();
     renderReturnLog();
     renderIngStock();
+  }
+  try{
+    // Firestore 3초 타임아웃 — 초과 시 로컬 데이터로 우선 진행
+    const _loadP = loadFromFirebase();
+    const _timedOut = await Promise.race([
+      _loadP.then(()=>false),
+      new Promise(r=>setTimeout(()=>r(true), 3000))
+    ]);
+    if(_timedOut && !window._fbLoadOk){
+      window._fbLoadFailed = true;
+      updateOfflineBanner();
+      console.warn('[초기화] Firestore 응답 3초 초과 → 로컬 데이터로 진행');
+      // 늦게라도 로드가 완료되면 서버 데이터로 복구
+      _loadP.then(async ()=>{
+        if(window._fbLoadOk){
+          window._fbLoadFailed = false;
+          updateOfflineBanner();
+          console.log('[초기화] Firebase 지연 로드 완료 → 서버 데이터로 복구');
+          try{ await _postLoadInit(); }catch(e){ console.error('지연 복구 오류:', e); }
+        }
+      });
+    }
+    await _postLoadInit();
   } catch(e){ console.error('초기화 오류:', e); }
   _dataReadyResolve();
   showLoadingOverlay(false);
