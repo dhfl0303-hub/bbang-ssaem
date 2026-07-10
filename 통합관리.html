@@ -1538,33 +1538,40 @@ function initData(){
   }catch(e){}
   initLedger();
   // DB, lotMapping, ingStock, deviceSettings는 loadFromFirebase에서 전역변수에 이미 반영됨
-  // Firebase에서 못 받은 경우 기본값 사용
+  // 로드 우선순위: 1)Firebase(이미 반영됨) → 2)localStorage 백업 → 3)INIT(최초 1회만)
   if(!DB || !Object.keys(DB).length){
-    DB = JSON.parse(JSON.stringify(RECIPE_DB_INIT));
-  } else {
-    // Firebase 데이터 유지 + INIT에만 있는 신규 항목 추가 (기존 데이터 절대 덮어쓰지 않음)
-    const init = RECIPE_DB_INIT;
-    Object.keys(init).forEach(k=>{
-      if(!DB[k]) DB[k] = JSON.parse(JSON.stringify(init[k]));
-    });
+    // Firebase 실패 → localStorage 백업 시도
+    try {
+      const backup = localStorage.getItem('backup_recipeDB');
+      if(backup) { DB = JSON.parse(backup); console.log('[배합비] localStorage 백업에서 복구됨'); }
+    } catch(e){}
+    // localStorage도 없으면 최초 설치 → INIT 사용
+    if(!DB || !Object.keys(DB).length){
+      DB = JSON.parse(JSON.stringify(RECIPE_DB_INIT));
+      console.log('[배합비] 최초 설치 → INIT 데이터 사용');
+    }
   }
+  // INIT 병합은 하지 않음 — Firebase/localStorage에 저장된 데이터가 유일한 진실
   if(!inputDB) inputDB = {};
   if(!lotMapping || !lotMapping.length){
-    lotMapping = JSON.parse(JSON.stringify(LOT_MAPPING_INIT));
-  } else {
-    // Firebase 데이터 유지 + INIT에만 있는 신규 항목 추가
-    const initMap = LOT_MAPPING_INIT;
-    initMap.forEach(item=>{
-      if(!lotMapping.find(m=>m.pLot===item.pLot)){
-        lotMapping.push(JSON.parse(JSON.stringify(item)));
-      }
-    });
+    // Firebase 실패 → localStorage 백업 시도
+    try {
+      const backup = localStorage.getItem('backup_lotMapping');
+      if(backup) { lotMapping = JSON.parse(backup); console.log('[LOT매핑] localStorage 백업에서 복구됨'); }
+    } catch(e){}
+    // localStorage도 없으면 최초 설치 → INIT 사용
+    if(!lotMapping || !lotMapping.length){
+      lotMapping = JSON.parse(JSON.stringify(LOT_MAPPING_INIT));
+      console.log('[LOT매핑] 최초 설치 → INIT 데이터 사용');
+    }
   }
   if(!ingStock) ingStock = [];
   if(!deviceSettings) deviceSettings = [];
   if(!subsidiaryStock) subsidiaryStock = [];
 }
 function saveData(key, data){
+  // localStorage 이중 백업 (Firebase 실패 시 복구용)
+  try { localStorage.setItem('backup_'+key, JSON.stringify(data)); } catch(e){}
   if(window._db) window._db.collection('appData').doc(key).set({data:JSON.stringify(data),updatedAt:new Date().toISOString()}).catch(e=>console.warn('저장 실패:',key,e));
 }
 
