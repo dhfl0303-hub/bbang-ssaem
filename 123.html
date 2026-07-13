@@ -275,6 +275,103 @@
     font-weight:600;
   }
   .lock-overlay.show{display:flex;}
+
+  /* 직원명 옆 사이즈 배지 */
+  .size-badge{
+    display:inline-block;
+    font-size:10px;
+    font-weight:500;
+    color:var(--teal);
+    background:var(--teal-light);
+    border-radius:3px;
+    padding:1px 5px;
+    margin-left:4px;
+    vertical-align:middle;
+  }
+
+  /* 아코디언 행 */
+  .accordion-row td{
+    padding:0;
+    background:#f8fafb;
+    text-align:left;
+  }
+  .accordion-inner{
+    padding:14px 18px 16px;
+  }
+  .acc-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:8px;
+    padding-bottom:12px;
+    margin-bottom:12px;
+    border-bottom:1px solid var(--gray-border);
+  }
+  .acc-sizes{
+    font-size:12.5px;
+    color:var(--text);
+    display:flex;
+    gap:14px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .acc-sizes b{color:var(--navy);}
+  .acc-sizes .size-edit-row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .acc-sizes input[type=text]{
+    width:70px;
+    padding:5px 7px;
+    border:1px solid var(--gray-border);
+    border-radius:4px;
+    font-size:12.5px;
+  }
+  .acc-actions{
+    display:flex;
+    gap:6px;
+  }
+  .acc-actions button{
+    font-size:12px;
+    padding:6px 10px;
+  }
+  .acc-items{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(150px,1fr));
+    gap:12px;
+  }
+  .acc-item-block{
+    background:#fff;
+    border:1px solid var(--gray-border);
+    border-radius:6px;
+    padding:10px 12px;
+  }
+  .acc-item-block h5{
+    margin:0 0 8px;
+    font-size:12.5px;
+    color:var(--navy);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .acc-item-block h5 .size-badge{margin-left:0;}
+  .acc-item-block ul{
+    list-style:none;
+    margin:0;
+    padding:0;
+  }
+  .acc-item-block li{
+    font-size:12px;
+    color:var(--text-sub);
+    padding:2px 0;
+  }
+  .acc-item-block .none{
+    font-size:12px;
+    color:#b3b9bf;
+  }
 </style>
 </head>
 <body>
@@ -317,6 +414,10 @@
     <div class="modal-body">
       <label>직원 성명</label>
       <input type="text" id="newEmpName" placeholder="예: 홍길동">
+      <label>위생복 사이즈 (선택)</label>
+      <input type="text" id="newEmpUniformSize" placeholder="예: 95">
+      <label>위생화 사이즈 (선택)</label>
+      <input type="text" id="newEmpShoeSize" placeholder="예: 270">
       <div class="modal-actions">
         <button class="btn-gray" onclick="closeModal('addEmpOverlay')">취소</button>
         <button class="btn-primary" onclick="addEmployee()">등록</button>
@@ -346,22 +447,6 @@
   </div>
 </div>
 
-<!-- 직원 이름 클릭 -> 전체 이력 모달 -->
-<div class="overlay" id="empOverlay">
-  <div class="modal">
-    <div class="modal-head">
-      <span id="empModalTitle">직원 지급 이력</span>
-      <span class="x" onclick="closeModal('empOverlay')">&times;</span>
-    </div>
-    <div class="modal-body" id="empModalBody"></div>
-    <div class="modal-body" style="padding-top:0;">
-      <div class="modal-actions">
-        <button class="btn-danger" onclick="deleteEmployeeFromModal()">이 직원 삭제</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div class="lock-overlay" id="lockOverlay">저장 중...</div>
 
 <script>
@@ -387,7 +472,8 @@ let db = null;
 let fbLoadFailed = false;
 let appData = { employees: [], records: {} }; // records[empId][item] = [ '260713', ... ]
 let currentItemCtx = null; // {empId, item}
-let currentEmpCtx = null;  // empId
+let expandedEmpId = null;  // 아코디언으로 펼쳐진 직원 id
+let editingSizesEmpId = null; // 사이즈 수정 중인 직원 id
 
 /* =========================================================
    Firebase 초기화 및 로드 (기존 MES 파일 패턴: 3초 타임아웃, 백업 fallback)
@@ -495,7 +581,7 @@ function render(){
 
     const nameTd = document.createElement('td');
     nameTd.textContent = emp.name;
-    nameTd.onclick = ()=> openEmpHistoryModal(emp.id);
+    nameTd.onclick = ()=> toggleAccordion(emp.id);
     tr.appendChild(nameTd);
 
     ITEMS.forEach(item=>{
@@ -524,7 +610,163 @@ function render(){
     });
 
     tbody.appendChild(tr);
+
+    if(expandedEmpId === emp.id){
+      tbody.appendChild(buildAccordionRow(emp));
+    }
   });
+}
+
+function getSizes(emp){
+  return emp.sizes || { 위생복:'', 위생화:'' };
+}
+
+function buildAccordionRow(emp){
+  const tr = document.createElement('tr');
+  tr.className = 'accordion-row';
+
+  const td = document.createElement('td');
+  td.colSpan = 6;
+
+  const inner = document.createElement('div');
+  inner.className = 'accordion-inner';
+
+  /* ---- 상단: 사이즈 + 액션 ---- */
+  const head = document.createElement('div');
+  head.className = 'acc-head';
+
+  const sizesWrap = document.createElement('div');
+  sizesWrap.className = 'acc-sizes';
+
+  if(editingSizesEmpId === emp.id){
+    const sizes = getSizes(emp);
+    sizesWrap.innerHTML = `
+      <div class="size-edit-row">
+        <span>위생복 <input type="text" id="editUniformSize" value="${escapeHtml(sizes.위생복 || '')}" placeholder="예: 95"></span>
+        <span>위생화 <input type="text" id="editShoeSize" value="${escapeHtml(sizes.위생화 || '')}" placeholder="예: 270"></span>
+      </div>
+    `;
+  } else {
+    const sizes = getSizes(emp);
+    const uni = sizes.위생복 ? sizes.위생복 : '미등록';
+    const shoe = sizes.위생화 ? sizes.위생화 : '미등록';
+    sizesWrap.innerHTML = `<span><b>위생복</b> ${escapeHtml(uni)}</span><span><b>위생화</b> ${escapeHtml(shoe)}</span>`;
+  }
+  head.appendChild(sizesWrap);
+
+  const actions = document.createElement('div');
+  actions.className = 'acc-actions';
+
+  if(editingSizesEmpId === emp.id){
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn-teal';
+    saveBtn.textContent = '저장';
+    saveBtn.onclick = ()=> saveSizes(emp.id);
+    actions.appendChild(saveBtn);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn-gray';
+    cancelBtn.textContent = '취소';
+    cancelBtn.onclick = ()=> { editingSizesEmpId = null; render(); };
+    actions.appendChild(cancelBtn);
+  } else {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn-gray';
+    editBtn.textContent = '사이즈 수정';
+    editBtn.onclick = ()=> { editingSizesEmpId = emp.id; render(); };
+    actions.appendChild(editBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-danger';
+    delBtn.textContent = '이 직원 삭제';
+    delBtn.onclick = ()=> deleteEmployee(emp.id);
+    actions.appendChild(delBtn);
+  }
+  head.appendChild(actions);
+  inner.appendChild(head);
+
+  /* ---- 하단: 품목별 이력 ---- */
+  const itemsWrap = document.createElement('div');
+  itemsWrap.className = 'acc-items';
+
+  ITEMS.forEach(item=>{
+    const block = document.createElement('div');
+    block.className = 'acc-item-block';
+
+    const h5 = document.createElement('h5');
+    h5.textContent = item;
+    const sizes = getSizes(emp);
+    if(item === '위생복' && sizes.위생복){
+      const badge = document.createElement('span');
+      badge.className = 'size-badge';
+      badge.textContent = sizes.위생복;
+      h5.appendChild(badge);
+    } else if(item === '위생화' && sizes.위생화){
+      const badge = document.createElement('span');
+      badge.className = 'size-badge';
+      badge.textContent = sizes.위생화;
+      h5.appendChild(badge);
+    }
+    block.appendChild(h5);
+
+    const records = getRecords(emp.id, item);
+    if(records.length === 0){
+      const p = document.createElement('div');
+      p.className = 'none';
+      p.textContent = '지급 이력 없음';
+      block.appendChild(p);
+    } else {
+      const ul = document.createElement('ul');
+      records.slice().reverse().forEach(raw=>{
+        const li = document.createElement('li');
+        li.textContent = formatDisplayDate(raw);
+        ul.appendChild(li);
+      });
+      block.appendChild(ul);
+    }
+    itemsWrap.appendChild(block);
+  });
+
+  inner.appendChild(itemsWrap);
+  td.appendChild(inner);
+  tr.appendChild(td);
+  return tr;
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, ch=>({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[ch]));
+}
+
+function toggleAccordion(empId){
+  editingSizesEmpId = null;
+  expandedEmpId = (expandedEmpId === empId) ? null : empId;
+  render();
+}
+
+function saveSizes(empId){
+  const emp = appData.employees.find(e=> e.id === empId);
+  if(!emp) return;
+  const uniform = document.getElementById('editUniformSize').value.trim();
+  const shoe = document.getElementById('editShoeSize').value.trim();
+  emp.sizes = { 위생복: uniform, 위생화: shoe };
+  editingSizesEmpId = null;
+  render();
+  saveData();
+}
+
+function deleteEmployee(empId){
+  const emp = appData.employees.find(e=> e.id === empId);
+  if(!emp) return;
+  if(!confirm(`"${emp.name}" 직원을 삭제하시겠습니까?\n해당 직원의 모든 지급 이력이 함께 삭제됩니다.`)) return;
+
+  appData.employees = appData.employees.filter(e=> e.id !== empId);
+  delete appData.records[empId];
+  if(expandedEmpId === empId) expandedEmpId = null;
+
+  render();
+  saveData();
 }
 
 function getRecords(empId, item){
@@ -560,6 +802,8 @@ function isValidDate6(raw){
    ========================================================= */
 function openAddEmployeeModal(){
   document.getElementById('newEmpName').value = '';
+  document.getElementById('newEmpUniformSize').value = '';
+  document.getElementById('newEmpShoeSize').value = '';
   document.getElementById('addEmpOverlay').classList.add('show');
 }
 
@@ -568,25 +812,14 @@ function addEmployee(){
   const name = nameInput.value.trim();
   if(!name){ alert('직원 성명을 입력해주세요.'); return; }
 
+  const uniformSize = document.getElementById('newEmpUniformSize').value.trim();
+  const shoeSize = document.getElementById('newEmpShoeSize').value.trim();
+
   const id = 'emp_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-  appData.employees.push({ id, name });
+  appData.employees.push({ id, name, sizes: { 위생복: uniformSize, 위생화: shoeSize } });
   appData.records[id] = {};
 
   closeModal('addEmpOverlay');
-  render();
-  saveData();
-}
-
-function deleteEmployeeFromModal(){
-  if(!currentEmpCtx) return;
-  const emp = appData.employees.find(e=> e.id === currentEmpCtx);
-  if(!emp) return;
-  if(!confirm(`"${emp.name}" 직원을 삭제하시겠습니까?\n해당 직원의 모든 지급 이력이 함께 삭제됩니다.`)) return;
-
-  appData.employees = appData.employees.filter(e=> e.id !== currentEmpCtx);
-  delete appData.records[currentEmpCtx];
-
-  closeModal('empOverlay');
   render();
   saveData();
 }
@@ -662,56 +895,11 @@ function deleteRecord(raw){
 }
 
 /* =========================================================
-   직원 이름 클릭 -> 전체 품목 이력 모달
-   ========================================================= */
-function openEmpHistoryModal(empId){
-  currentEmpCtx = empId;
-  const emp = appData.employees.find(e=> e.id === empId);
-  if(!emp) return;
-
-  document.getElementById('empModalTitle').textContent = `${emp.name} · 지급 이력`;
-
-  const body = document.getElementById('empModalBody');
-  body.innerHTML = '';
-
-  ITEMS.forEach(item=>{
-    const records = getRecords(empId, item);
-    const block = document.createElement('div');
-    block.className = 'emp-history-block';
-
-    const h4 = document.createElement('h4');
-    h4.textContent = item;
-    block.appendChild(h4);
-
-    if(records.length === 0){
-      const p = document.createElement('div');
-      p.style.fontSize = '12.5px';
-      p.style.color = '#9aa3ac';
-      p.textContent = '지급 이력 없음';
-      block.appendChild(p);
-    } else {
-      const ul = document.createElement('ul');
-      ul.className = 'history-list';
-      records.slice().reverse().forEach(raw=>{
-        const li = document.createElement('li');
-        li.textContent = formatDisplayDate(raw);
-        ul.appendChild(li);
-      });
-      block.appendChild(ul);
-    }
-    body.appendChild(block);
-  });
-
-  document.getElementById('empOverlay').classList.add('show');
-}
-
-/* =========================================================
    공통 유틸
    ========================================================= */
 function closeModal(id){
   document.getElementById(id).classList.remove('show');
   if(id === 'itemOverlay') currentItemCtx = null;
-  if(id === 'empOverlay') currentEmpCtx = null;
 }
 
 document.querySelectorAll('.overlay').forEach(ov=>{
