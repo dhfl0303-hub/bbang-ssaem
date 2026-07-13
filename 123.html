@@ -866,6 +866,12 @@ function readSizeSelector(selectId, inputId){
   return select.value;
 }
 
+/* 위생화 사이즈: 드롭다운 없이 숫자만 직접 입력 */
+function numberSizeInputHtml(inputId, currentValue){
+  const val = currentValue || '';
+  return `<input type="text" id="${inputId}" inputmode="numeric" maxlength="4" placeholder="예: 270" value="${escapeHtml(val)}" oninput="this.value=this.value.replace(/[^0-9]/g,'')">`;
+}
+
 function buildAccordionRow(emp){
   const tr = document.createElement('tr');
   tr.className = 'accordion-row';
@@ -888,7 +894,7 @@ function buildAccordionRow(emp){
     sizesWrap.innerHTML = `
       <span>상의 ${sizeSelectorHtml('editTopSize','editTopSizeCustom', sizes.상의)}</span>
       <span>하의 ${sizeSelectorHtml('editBottomSize','editBottomSizeCustom', sizes.하의)}</span>
-      <span>위생화 ${sizeSelectorHtml('editShoeSize','editShoeSizeCustom', sizes.위생화)}</span>
+      <span>위생화 ${numberSizeInputHtml('editShoeSize', sizes.위생화)}</span>
     `;
   } else {
     const sizes = getSizes(emp);
@@ -1008,7 +1014,7 @@ function saveSizes(empId){
   if(!emp) return;
   const top = readSizeSelector('editTopSize','editTopSizeCustom');
   const bottom = readSizeSelector('editBottomSize','editBottomSizeCustom');
-  const shoe = readSizeSelector('editShoeSize','editShoeSizeCustom');
+  const shoe = document.getElementById('editShoeSize').value.trim();
   emp.sizes = { 상의: top, 하의: bottom, 위생화: shoe };
   editingSizesEmpId = null;
   render();
@@ -1063,7 +1069,7 @@ function openAddEmployeeModal(){
   document.getElementById('newEmpName').value = '';
   document.getElementById('newEmpTopSizeWrap').innerHTML = sizeSelectorHtml('newEmpTopSize','newEmpTopSizeCustom','');
   document.getElementById('newEmpBottomSizeWrap').innerHTML = sizeSelectorHtml('newEmpBottomSize','newEmpBottomSizeCustom','');
-  document.getElementById('newEmpShoeSizeWrap').innerHTML = sizeSelectorHtml('newEmpShoeSize','newEmpShoeSizeCustom','');
+  document.getElementById('newEmpShoeSizeWrap').innerHTML = numberSizeInputHtml('newEmpShoeSize','');
   document.getElementById('addEmpOverlay').classList.add('show');
 }
 
@@ -1074,7 +1080,7 @@ function addEmployee(){
 
   const top = readSizeSelector('newEmpTopSize','newEmpTopSizeCustom');
   const bottom = readSizeSelector('newEmpBottomSize','newEmpBottomSizeCustom');
-  const shoe = readSizeSelector('newEmpShoeSize','newEmpShoeSizeCustom');
+  const shoe = document.getElementById('newEmpShoeSize').value.trim();
 
   const id = 'emp_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
   appData.employees.push({ id, name, sizes: { 상의: top, 하의: bottom, 위생화: shoe } });
