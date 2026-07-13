@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>소모품 지급 관리표</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --navy:#1e3a5f;
+    --navy-dark:#152b47;
+    --teal:#2c7a7b;
+    --teal-light:#e6f4f4;
+    --gray-bg:#f5f6f8;
+    --gray-border:#dde1e6;
+    --text:#26313d;
+    --text-sub:#6b7684;
+    --danger:#c0392b;
+    --ok:#2c7a3f;
+    --warn:#b8860b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;
+    background:var(--gray-bg);
+    color:var(--text);
+    padding-bottom:60px;
+  }
+  header{
+    background:var(--navy);
+    color:#fff;
+    padding:18px 24px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  header h1{
+    font-size:19px;
+    margin:0;
+    font-weight:700;
+    letter-spacing:-0.3px;
+  }
+  header .status{
+    font-size:12px;
+    color:#cfe0f0;
+  }
+  .toolbar{
+    display:flex;
+    gap:8px;
+    padding:14px 24px;
+    background:#fff;
+    border-bottom:1px solid var(--gray-border);
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  button{
+    font-family:inherit;
+    cursor:pointer;
+    border:none;
+    border-radius:5px;
+    font-size:13px;
+    padding:8px 14px;
+    transition:opacity .15s;
+  }
+  button:hover{opacity:.85;}
+  button:active{opacity:.7;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-teal{background:var(--teal);color:#fff;}
+  .btn-danger{background:var(--danger);color:#fff;}
+  .btn-gray{background:#eceff2;color:var(--text);}
+  .table-wrap{
+    margin:16px 24px;
+    background:#fff;
+    border-radius:8px;
+    overflow-x:auto;
+    border:1px solid var(--gray-border);
+  }
+  table{
+    border-collapse:collapse;
+    width:100%;
+    min-width:760px;
+  }
+  th,td{
+    border:1px solid var(--gray-border);
+    text-align:center;
+    padding:0;
+    font-size:13px;
+  }
+  thead th{
+    background:var(--navy);
+    color:#fff;
+    padding:10px 6px;
+    font-weight:600;
+    position:sticky;
+    top:0;
+  }
+  thead th:first-child{
+    min-width:110px;
+  }
+  tbody td:first-child{
+    background:#fafbfc;
+    font-weight:600;
+    padding:10px 8px;
+    cursor:pointer;
+    color:var(--navy);
+    text-decoration:underline;
+    text-decoration-color:transparent;
+    transition:background .15s;
+  }
+  tbody td:first-child:hover{
+    background:var(--teal-light);
+    text-decoration-color:var(--teal);
+  }
+  .del-emp{
+    display:inline-block;
+    margin-left:6px;
+    color:var(--danger);
+    font-size:11px;
+    text-decoration:none;
+    cursor:pointer;
+  }
+  .cell-btn{
+    width:100%;
+    height:100%;
+    min-height:56px;
+    background:none;
+    border-radius:0;
+    padding:6px 4px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+  }
+  .cell-btn .mark{
+    font-size:15px;
+    color:#c7ccd1;
+  }
+  .cell-btn.issued .mark{
+    color:var(--ok);
+    font-weight:700;
+  }
+  .cell-btn .date{
+    font-size:10.5px;
+    color:var(--text-sub);
+  }
+  .cell-btn.issued .date{
+    color:var(--teal);
+    font-weight:600;
+  }
+  .cell-btn.issued{
+    background:#f4fbf8;
+  }
+  .cell-btn:hover{
+    background:#eef6f6;
+  }
+  .empty-row td{
+    padding:30px;
+    color:var(--text-sub);
+    font-size:13px;
+  }
+  /* modal */
+  .overlay{
+    position:fixed;inset:0;
+    background:rgba(20,30,40,0.45);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+    padding:16px;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:#fff;
+    border-radius:10px;
+    width:100%;
+    max-width:440px;
+    max-height:86vh;
+    overflow-y:auto;
+    padding:0;
+  }
+  .modal-head{
+    background:var(--navy);
+    color:#fff;
+    padding:14px 18px;
+    font-size:15px;
+    font-weight:700;
+    border-radius:10px 10px 0 0;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .modal-head .x{
+    cursor:pointer;
+    font-size:18px;
+    line-height:1;
+    opacity:.85;
+  }
+  .modal-body{
+    padding:18px;
+  }
+  .modal-body label{
+    display:block;
+    font-size:12px;
+    color:var(--text-sub);
+    margin-bottom:5px;
+  }
+  .modal-body input[type=text]{
+    width:100%;
+    padding:9px 10px;
+    border:1px solid var(--gray-border);
+    border-radius:5px;
+    font-size:14px;
+    margin-bottom:14px;
+  }
+  .modal-actions{
+    display:flex;
+    gap:8px;
+    justify-content:flex-end;
+  }
+  .history-list{
+    list-style:none;
+    margin:0 0 14px 0;
+    padding:0;
+    border-top:1px solid var(--gray-border);
+  }
+  .history-list li{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:8px 2px;
+    border-bottom:1px solid var(--gray-border);
+    font-size:13px;
+  }
+  .history-list li .del-record{
+    color:var(--danger);
+    cursor:pointer;
+    font-size:12px;
+  }
+  .history-list .none{
+    color:var(--text-sub);
+    padding:10px 2px;
+    text-align:center;
+    border-bottom:none;
+  }
+  .section-title{
+    font-size:13px;
+    font-weight:700;
+    color:var(--navy);
+    margin:16px 0 8px;
+  }
+  .emp-history-block{margin-bottom:14px;}
+  .emp-history-block h4{
+    margin:0 0 6px;
+    font-size:13px;
+    color:var(--teal);
+  }
+  .hint{
+    font-size:11px;
+    color:var(--text-sub);
+    margin:-8px 0 14px;
+  }
+  .lock-overlay{
+    position:fixed;inset:0;
+    background:rgba(255,255,255,0.6);
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:200;
+    font-size:13px;
+    color:var(--navy);
+    font-weight:600;
+  }
+  .lock-overlay.show{display:flex;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>소모품 지급 관리표</h1>
+  <div class="status" id="statusText">Firebase 연결 확인 중...</div>
+</header>
+
+<div class="toolbar">
+  <button class="btn-primary" onclick="openAddEmployeeModal()">+ 신규 직원 등록</button>
+  <button class="btn-gray" onclick="loadData()">새로고침</button>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>직원명</th>
+        <th>위생모</th>
+        <th>위생복</th>
+        <th>위생화</th>
+        <th>앞치마</th>
+        <th>토시</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr class="empty-row"><td colspan="6">불러오는 중...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 신규 직원 등록 모달 -->
+<div class="overlay" id="addEmpOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <span>신규 직원 등록</span>
+      <span class="x" onclick="closeModal('addEmpOverlay')">&times;</span>
+    </div>
+    <div class="modal-body">
+      <label>직원 성명</label>
+      <input type="text" id="newEmpName" placeholder="예: 홍길동">
+      <div class="modal-actions">
+        <button class="btn-gray" onclick="closeModal('addEmpOverlay')">취소</button>
+        <button class="btn-primary" onclick="addEmployee()">등록</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 품목별 지급 등록/이력 모달 -->
+<div class="overlay" id="itemOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <span id="itemModalTitle">지급 이력</span>
+      <span class="x" onclick="closeModal('itemOverlay')">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="section-title">신규 지급 등록</div>
+      <label>지급일자 (6자리 숫자, 예: 260713 → 26.07.13)</label>
+      <input type="text" id="newDateInput" maxlength="6" placeholder="260713" oninput="formatDateInput(this)">
+      <div class="hint">YY MM DD 순서로 6자리 입력 시 자동으로 00.00.00 형식 표시됩니다.</div>
+      <div class="modal-actions" style="margin-bottom:16px;">
+        <button class="btn-teal" onclick="addRecord()">지급 등록</button>
+      </div>
+      <div class="section-title">지급 이력</div>
+      <ul class="history-list" id="historyList"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- 직원 이름 클릭 -> 전체 이력 모달 -->
+<div class="overlay" id="empOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <span id="empModalTitle">직원 지급 이력</span>
+      <span class="x" onclick="closeModal('empOverlay')">&times;</span>
+    </div>
+    <div class="modal-body" id="empModalBody"></div>
+    <div class="modal-body" style="padding-top:0;">
+      <div class="modal-actions">
+        <button class="btn-danger" onclick="deleteEmployeeFromModal()">이 직원 삭제</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="lock-overlay" id="lockOverlay">저장 중...</div>
+
+<script>
+/* =========================================================
+   설정 및 기본 데이터 구조
+   ========================================================= */
+const ITEMS = ['위생모','위생복','위생화','앞치마','토시'];
+const DOC_PATH = { collection:'appData', doc:'consumableSupply' };
+const BACKUP_KEY = 'backup_consumableSupply';
+
+// TODO: 실제 프로젝트(bbang-ssaem-prod)의 firebaseConfig 값으로 교체하세요.
+// 기존 원료수불부.html / 통합관리.html 에서 사용 중인 설정과 동일한 값을 넣으면 됩니다.
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "bbang-ssaem-prod.firebaseapp.com",
+  projectId: "bbang-ssaem-prod",
+  storageBucket: "bbang-ssaem-prod.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+let db = null;
+let fbLoadFailed = false;
+let appData = { employees: [], records: {} }; // records[empId][item] = [ '260713', ... ]
+let currentItemCtx = null; // {empId, item}
+let currentEmpCtx = null;  // empId
+
+/* =========================================================
+   Firebase 초기화 및 로드 (기존 MES 파일 패턴: 3초 타임아웃, 백업 fallback)
+   ========================================================= */
+function initFirebase(){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+  }catch(e){
+    console.error('Firebase 초기화 실패', e);
+    fbLoadFailed = true;
+  }
+}
+
+function setStatus(text, ok){
+  const el = document.getElementById('statusText');
+  el.textContent = text;
+  el.style.color = ok === false ? '#ffb4b4' : (ok === true ? '#b6e6c9' : '#cfe0f0');
+}
+
+async function loadData(){
+  setStatus('데이터 불러오는 중...');
+  const forceUnlock = setTimeout(()=>{ hideLock(); }, 10000);
+  try{
+    if(!db) throw new Error('Firestore 미초기화');
+    const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
+    const snap = await Promise.race([
+      docRef.get(),
+      new Promise((_, reject)=> setTimeout(()=> reject(new Error('timeout')), 3000))
+    ]);
+    if(snap.exists){
+      const d = snap.data();
+      appData = {
+        employees: Array.isArray(d.employees) ? d.employees : [],
+        records: d.records && typeof d.records === 'object' ? d.records : {}
+      };
+    } else {
+      appData = { employees: [], records: {} };
+    }
+    fbLoadFailed = false;
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(appData));
+    setStatus('Firebase 연결됨 · 정상 동기화', true);
+  }catch(e){
+    console.error('Firebase 로드 실패, 로컬 백업 사용', e);
+    fbLoadFailed = true;
+    const backup = localStorage.getItem(BACKUP_KEY);
+    if(backup){
+      try{ appData = JSON.parse(backup); }
+      catch(_e){ appData = { employees: [], records: {} }; }
+      setStatus('⚠ Firebase 연결 실패 · 로컬 백업 데이터 표시 중 (저장 제한됨)', false);
+    } else {
+      appData = { employees: [], records: {} };
+      setStatus('⚠ Firebase 연결 실패 · 백업 데이터 없음', false);
+    }
+  }finally{
+    clearTimeout(forceUnlock);
+    render();
+  }
+}
+
+async function saveData(){
+  // 항상 로컬 백업 먼저 저장 (Firebase 실패 대비 가드)
+  localStorage.setItem(BACKUP_KEY, JSON.stringify(appData));
+
+  if(fbLoadFailed){
+    alert('Firebase 로드에 실패한 상태라 서버 저장이 제한됩니다.\n로컬에는 임시 저장되었습니다. 새로고침 후 다시 시도해주세요.');
+    return;
+  }
+  showLock();
+  const forceUnlock = setTimeout(()=>{ hideLock(); }, 10000);
+  try{
+    const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
+    await Promise.race([
+      docRef.set(appData),
+      new Promise((_, reject)=> setTimeout(()=> reject(new Error('timeout')), 3000))
+    ]);
+    setStatus('Firebase 연결됨 · 저장 완료', true);
+  }catch(e){
+    console.error('저장 실패', e);
+    alert('서버 저장에 실패했습니다. (로컬에는 백업됨)\n' + e.message);
+    setStatus('⚠ 저장 실패 · 로컬 백업만 유지 중', false);
+  }finally{
+    clearTimeout(forceUnlock);
+    hideLock();
+  }
+}
+
+function showLock(){ document.getElementById('lockOverlay').classList.add('show'); }
+function hideLock(){ document.getElementById('lockOverlay').classList.remove('show'); }
+
+/* =========================================================
+   렌더링
+   ========================================================= */
+function render(){
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+
+  if(!appData.employees || appData.employees.length === 0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">등록된 직원이 없습니다. 상단의 "신규 직원 등록" 버튼을 눌러주세요.</td></tr>';
+    return;
+  }
+
+  appData.employees.forEach(emp=>{
+    const tr = document.createElement('tr');
+
+    const nameTd = document.createElement('td');
+    nameTd.textContent = emp.name;
+    nameTd.onclick = ()=> openEmpHistoryModal(emp.id);
+    tr.appendChild(nameTd);
+
+    ITEMS.forEach(item=>{
+      const td = document.createElement('td');
+      const records = getRecords(emp.id, item);
+      const latest = records.length ? records[records.length-1] : null;
+
+      const btn = document.createElement('button');
+      btn.className = 'cell-btn' + (latest ? ' issued' : '');
+      btn.onclick = ()=> openItemModal(emp.id, item);
+
+      const mark = document.createElement('div');
+      mark.className = 'mark';
+      mark.textContent = latest ? '✔' : '☐';
+      btn.appendChild(mark);
+
+      if(latest){
+        const dateDiv = document.createElement('div');
+        dateDiv.className = 'date';
+        dateDiv.textContent = formatDisplayDate(latest);
+        btn.appendChild(dateDiv);
+      }
+
+      td.appendChild(btn);
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+}
+
+function getRecords(empId, item){
+  if(!appData.records[empId]) return [];
+  if(!appData.records[empId][item]) return [];
+  return appData.records[empId][item].slice().sort();
+}
+
+/* =========================================================
+   날짜 입력 포맷 (6자리 숫자 -> 00.00.00)
+   ========================================================= */
+function formatDateInput(inputEl){
+  let v = inputEl.value.replace(/[^0-9]/g,'');
+  if(v.length > 6) v = v.slice(0,6);
+  inputEl.value = v;
+}
+
+function formatDisplayDate(raw){
+  // raw: 6자리 숫자 문자열 YYMMDD
+  if(!raw || raw.length !== 6) return raw || '';
+  return raw.slice(0,2) + '.' + raw.slice(2,4) + '.' + raw.slice(4,6);
+}
+
+function isValidDate6(raw){
+  if(!/^\d{6}$/.test(raw)) return false;
+  const mm = parseInt(raw.slice(2,4),10);
+  const dd = parseInt(raw.slice(4,6),10);
+  return mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31;
+}
+
+/* =========================================================
+   신규 직원 등록 / 삭제
+   ========================================================= */
+function openAddEmployeeModal(){
+  document.getElementById('newEmpName').value = '';
+  document.getElementById('addEmpOverlay').classList.add('show');
+}
+
+function addEmployee(){
+  const nameInput = document.getElementById('newEmpName');
+  const name = nameInput.value.trim();
+  if(!name){ alert('직원 성명을 입력해주세요.'); return; }
+
+  const id = 'emp_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+  appData.employees.push({ id, name });
+  appData.records[id] = {};
+
+  closeModal('addEmpOverlay');
+  render();
+  saveData();
+}
+
+function deleteEmployeeFromModal(){
+  if(!currentEmpCtx) return;
+  const emp = appData.employees.find(e=> e.id === currentEmpCtx);
+  if(!emp) return;
+  if(!confirm(`"${emp.name}" 직원을 삭제하시겠습니까?\n해당 직원의 모든 지급 이력이 함께 삭제됩니다.`)) return;
+
+  appData.employees = appData.employees.filter(e=> e.id !== currentEmpCtx);
+  delete appData.records[currentEmpCtx];
+
+  closeModal('empOverlay');
+  render();
+  saveData();
+}
+
+/* =========================================================
+   품목별 지급 등록 / 이력 모달
+   ========================================================= */
+function openItemModal(empId, item){
+  currentItemCtx = { empId, item };
+  const emp = appData.employees.find(e=> e.id === empId);
+  document.getElementById('itemModalTitle').textContent = `${emp ? emp.name : ''} · ${item}`;
+  document.getElementById('newDateInput').value = '';
+  renderHistoryList();
+  document.getElementById('itemOverlay').classList.add('show');
+}
+
+function renderHistoryList(){
+  const ul = document.getElementById('historyList');
+  ul.innerHTML = '';
+  if(!currentItemCtx) return;
+  const records = getRecords(currentItemCtx.empId, currentItemCtx.item);
+
+  if(records.length === 0){
+    ul.innerHTML = '<li class="none">지급 이력이 없습니다.</li>';
+    return;
+  }
+
+  records.slice().reverse().forEach(raw=>{
+    const li = document.createElement('li');
+    const dateSpan = document.createElement('span');
+    dateSpan.textContent = formatDisplayDate(raw);
+    const delSpan = document.createElement('span');
+    delSpan.className = 'del-record';
+    delSpan.textContent = '삭제';
+    delSpan.onclick = ()=> deleteRecord(raw);
+    li.appendChild(dateSpan);
+    li.appendChild(delSpan);
+    ul.appendChild(li);
+  });
+}
+
+function addRecord(){
+  if(!currentItemCtx) return;
+  const input = document.getElementById('newDateInput');
+  const raw = input.value.trim();
+
+  if(!isValidDate6(raw)){
+    alert('날짜는 6자리 숫자(YYMMDD)로 입력해주세요. 예: 260713');
+    return;
+  }
+
+  const { empId, item } = currentItemCtx;
+  if(!appData.records[empId]) appData.records[empId] = {};
+  if(!appData.records[empId][item]) appData.records[empId][item] = [];
+  appData.records[empId][item].push(raw);
+
+  input.value = '';
+  renderHistoryList();
+  render();
+  saveData();
+}
+
+function deleteRecord(raw){
+  if(!currentItemCtx) return;
+  const { empId, item } = currentItemCtx;
+  if(!confirm(`${formatDisplayDate(raw)} 지급 기록을 삭제하시겠습니까?`)) return;
+
+  appData.records[empId][item] = (appData.records[empId][item] || []).filter(d=> d !== raw);
+
+  renderHistoryList();
+  render();
+  saveData();
+}
+
+/* =========================================================
+   직원 이름 클릭 -> 전체 품목 이력 모달
+   ========================================================= */
+function openEmpHistoryModal(empId){
+  currentEmpCtx = empId;
+  const emp = appData.employees.find(e=> e.id === empId);
+  if(!emp) return;
+
+  document.getElementById('empModalTitle').textContent = `${emp.name} · 지급 이력`;
+
+  const body = document.getElementById('empModalBody');
+  body.innerHTML = '';
+
+  ITEMS.forEach(item=>{
+    const records = getRecords(empId, item);
+    const block = document.createElement('div');
+    block.className = 'emp-history-block';
+
+    const h4 = document.createElement('h4');
+    h4.textContent = item;
+    block.appendChild(h4);
+
+    if(records.length === 0){
+      const p = document.createElement('div');
+      p.style.fontSize = '12.5px';
+      p.style.color = '#9aa3ac';
+      p.textContent = '지급 이력 없음';
+      block.appendChild(p);
+    } else {
+      const ul = document.createElement('ul');
+      ul.className = 'history-list';
+      records.slice().reverse().forEach(raw=>{
+        const li = document.createElement('li');
+        li.textContent = formatDisplayDate(raw);
+        ul.appendChild(li);
+      });
+      block.appendChild(ul);
+    }
+    body.appendChild(block);
+  });
+
+  document.getElementById('empOverlay').classList.add('show');
+}
+
+/* =========================================================
+   공통 유틸
+   ========================================================= */
+function closeModal(id){
+  document.getElementById(id).classList.remove('show');
+  if(id === 'itemOverlay') currentItemCtx = null;
+  if(id === 'empOverlay') currentEmpCtx = null;
+}
+
+document.querySelectorAll('.overlay').forEach(ov=>{
+  ov.addEventListener('click', (e)=>{
+    if(e.target === ov) closeModal(ov.id);
+  });
+});
+
+/* =========================================================
+   시작
+   ========================================================= */
+initFirebase();
+loadData();
+</script>
+</body>
+</html>
