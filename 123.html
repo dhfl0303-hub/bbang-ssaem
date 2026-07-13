@@ -724,9 +724,9 @@ const BACKUP_KEY = 'backup_consumableSupply';
 const SIZE_PRESETS = ['S','M','L','XL','XXL','XXXL'];
 const SHOE_SIZES = ['220','230','240','250','260','270','280','290','300'];
 
-// 파일을 수정할 때마다 아래 두 값을 갱신하세요. (우측 상단 배지에 표시됨)
-const APP_VERSION = 'v1.5';
-const LAST_UPDATED = '2026-07-13 17:10';
+// 파일을 수정할 때마다 아래 두 값을 갱신하세요. (우측 상단 배지에 표시됨, 날짜만 기록)
+const APP_VERSION = 'v1.6';
+const LAST_UPDATED = '2026-07-13';
 
 // TODO: 실제 프로젝트(bbang-ssaem-prod)의 firebaseConfig 값으로 교체하세요.
 // 기존 원료수불부.html / 통합관리.html 에서 사용 중인 설정과 동일한 값을 넣으면 됩니다.
@@ -1268,7 +1268,7 @@ document.querySelectorAll('.overlay').forEach(ov=>{
 /* =========================================================
    시작
    ========================================================= */
-document.getElementById('versionBadge').innerHTML = `<b>${APP_VERSION}</b> · 수정 ${LAST_UPDATED}`;
+document.getElementById('versionBadge').innerHTML = `<b>${APP_VERSION}</b> · 수정일 ${LAST_UPDATED}`;
 initFirebase();
 loadData();
 </script>
