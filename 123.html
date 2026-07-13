@@ -103,6 +103,25 @@
     padding:5px 10px;
     border-radius:20px;
   }
+  .header-right{
+    position:relative;
+    z-index:1;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:5px;
+  }
+  .version-badge{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    color:#fff;
+    background:rgba(0,0,0,0.18);
+    border:1px solid rgba(255,255,255,0.25);
+    padding:3px 9px;
+    border-radius:20px;
+    letter-spacing:.2px;
+  }
+  .version-badge b{font-weight:700;}
   .toolbar{
     display:flex;
     gap:8px;
@@ -574,7 +593,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 3H8l1-3z"/><path d="M6 6h12l1.2 13.2a2 2 0 0 1-2 2.1H6.8a2 2 0 0 1-2-2.1L6 6z"/><path d="M9 11c1 1 5 1 6 0"/></svg>
     <h1>소모품 지급 관리표</h1>
   </div>
-  <div class="status" id="statusText">Firebase 연결 확인 중...</div>
+  <div class="header-right">
+    <div class="version-badge" id="versionBadge"></div>
+    <div class="status" id="statusText">Firebase 연결 확인 중...</div>
+  </div>
 </header>
 
 <div class="toolbar">
@@ -655,6 +677,10 @@ const ITEMS = ['위생모','위생복','위생화','앞치마','토시'];
 const DOC_PATH = { collection:'appData', doc:'consumableSupply' };
 const BACKUP_KEY = 'backup_consumableSupply';
 const SIZE_PRESETS = ['S','M','L','XL','XXL','XXXL'];
+
+// 파일을 수정할 때마다 아래 두 값을 갱신하세요. (우측 상단 배지에 표시됨)
+const APP_VERSION = 'v1.4';
+const LAST_UPDATED = '2026-07-13 16:20';
 
 // TODO: 실제 프로젝트(bbang-ssaem-prod)의 firebaseConfig 값으로 교체하세요.
 // 기존 원료수불부.html / 통합관리.html 에서 사용 중인 설정과 동일한 값을 넣으면 됩니다.
@@ -1178,6 +1204,7 @@ document.querySelectorAll('.overlay').forEach(ov=>{
 /* =========================================================
    시작
    ========================================================= */
+document.getElementById('versionBadge').innerHTML = `<b>${APP_VERSION}</b> · 수정 ${LAST_UPDATED}`;
 initFirebase();
 loadData();
 </script>
