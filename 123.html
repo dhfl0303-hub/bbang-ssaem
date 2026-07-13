@@ -151,6 +151,37 @@
   .btn-teal{background:var(--teal);color:#fff;box-shadow:0 3px 10px rgba(13,110,100,.25);}
   .btn-danger{background:var(--danger);color:#fff;box-shadow:0 3px 10px rgba(189,68,56,.22);}
   .btn-gray{background:#eef2f2;color:var(--ink);}
+
+  .search-box{
+    display:flex;
+    align-items:center;
+    gap:0;
+    border:1.4px solid var(--line);
+    border-radius:20px;
+    background:#fff;
+    overflow:hidden;
+  }
+  .search-box input[type=text]{
+    border:none;
+    outline:none;
+    padding:9px 4px 9px 14px;
+    font-family:var(--font-body);
+    font-size:13px;
+    width:160px;
+    background:transparent;
+  }
+  .search-box button{
+    border-radius:0;
+    background:var(--teal-tint);
+    color:var(--teal-deep);
+    box-shadow:none;
+    padding:9px 13px;
+  }
+  .search-box button:hover{transform:none;background:var(--teal);color:#fff;}
+  .toolbar-spacer{flex:1;}
+  .sort-btn{background:#eef2f2;color:var(--ink);}
+  .sort-btn svg{transition:transform .15s;}
+  .sort-btn.desc svg{transform:rotate(180deg);}
   .table-wrap{
     margin:18px 24px;
     background:var(--surface);
@@ -548,41 +579,46 @@
     color:#b3b9bf;
   }
 
-  /* 사이즈 드롭다운 + 직접입력 */
-  .size-select-row{
-    display:inline-flex;
+  /* 사이즈 토글 버튼 (나열형) */
+  .size-toggle{
+    display:flex;
+    flex-wrap:wrap;
     gap:6px;
-    align-items:center;
     margin-bottom:14px;
   }
-  .size-select-row select{
-    padding:8px 8px;
-    border:1px solid var(--line);
-    border-radius:6px;
-    font-size:13px;
-    font-family:var(--font-body);
+  .toggle-btn{
+    border:1.4px solid var(--line);
+    border-radius:7px;
     background:#fff;
-  }
-  .size-select-row input[type=text]{
-    width:80px;
-    padding:8px 8px;
-    border:1px solid var(--line);
-    border-radius:6px;
-    font-size:13px;
+    color:var(--ink-sub);
     font-family:var(--font-mono);
-    margin-bottom:0 !important;
+    font-size:12.5px;
+    font-weight:500;
+    padding:7px 12px;
+    cursor:pointer;
+    box-shadow:none;
+    transition:background .12s, border-color .12s, color .12s;
   }
-  .acc-sizes .size-select-row{
+  .toggle-btn:hover{
+    transform:none;
+    border-color:var(--teal);
+    color:var(--teal-deep);
+  }
+  .toggle-btn.active{
+    background:var(--teal);
+    border-color:var(--teal);
+    color:#fff;
+    font-weight:700;
+    box-shadow:0 2px 6px rgba(13,110,100,.3);
+  }
+  .acc-sizes .size-toggle{
     margin-bottom:0;
+    gap:5px;
   }
-  .acc-sizes .size-select-row select{
-    padding:5px 6px;
-    font-size:12px;
-  }
-  .acc-sizes .size-select-row input[type=text]{
-    width:60px;
-    padding:5px 6px;
-    font-size:12px;
+  .acc-sizes .toggle-btn{
+    padding:4px 9px;
+    font-size:11.5px;
+    border-radius:6px;
   }
 </style>
 </head>
@@ -602,6 +638,15 @@
 <div class="toolbar">
   <button class="btn-primary" onclick="openAddEmployeeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>신규 직원 등록</button>
   <button class="btn-gray" onclick="loadData()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg>새로고침</button>
+
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="직원명 검색" onkeydown="if(event.key==='Enter') applySearch()">
+    <button onclick="applySearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
+  </div>
+
+  <div class="toolbar-spacer"></div>
+
+  <button class="sort-btn" id="sortBtn" onclick="toggleSort()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h10M3 12h7M3 17h4"/><path d="m17 4 0 16M17 4l-3 3M17 4l3 3"/></svg><span id="sortBtnLabel">가나다순</span></button>
 </div>
 
 <div class="table-wrap">
@@ -677,10 +722,11 @@ const ITEMS = ['위생모','위생복','위생화','앞치마','토시'];
 const DOC_PATH = { collection:'appData', doc:'consumableSupply' };
 const BACKUP_KEY = 'backup_consumableSupply';
 const SIZE_PRESETS = ['S','M','L','XL','XXL','XXXL'];
+const SHOE_SIZES = ['220','230','240','250','260','270','280','290','300'];
 
 // 파일을 수정할 때마다 아래 두 값을 갱신하세요. (우측 상단 배지에 표시됨)
-const APP_VERSION = 'v1.4';
-const LAST_UPDATED = '2026-07-13 16:20';
+const APP_VERSION = 'v1.5';
+const LAST_UPDATED = '2026-07-13 17:10';
 
 // TODO: 실제 프로젝트(bbang-ssaem-prod)의 firebaseConfig 값으로 교체하세요.
 // 기존 원료수불부.html / 통합관리.html 에서 사용 중인 설정과 동일한 값을 넣으면 됩니다.
@@ -699,6 +745,8 @@ let appData = { employees: [], records: {} }; // records[empId][item] = [ '26071
 let currentItemCtx = null; // {empId, item}
 let expandedEmpId = null;  // 아코디언으로 펼쳐진 직원 id
 let editingSizesEmpId = null; // 사이즈 수정 중인 직원 id
+let searchTerm = '';       // 직원 검색어
+let sortDir = 'asc';       // 이름 정렬 방향 (asc: 가나다순, desc: 역순)
 
 /* =========================================================
    Firebase 초기화 및 로드 (기존 MES 파일 패턴: 3초 타임아웃, 백업 fallback)
@@ -801,7 +849,21 @@ function render(){
     return;
   }
 
-  appData.employees.forEach(emp=>{
+  let list = appData.employees.slice();
+
+  if(searchTerm){
+    list = list.filter(emp => emp.name.includes(searchTerm));
+  }
+
+  list.sort((a,b)=> a.name.localeCompare(b.name, 'ko'));
+  if(sortDir === 'desc') list.reverse();
+
+  if(list.length === 0){
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">"${escapeHtml(searchTerm)}" 검색 결과가 없습니다.</td></tr>`;
+    return;
+  }
+
+  list.forEach(emp=>{
     const tr = document.createElement('tr');
     if(expandedEmpId === emp.id) tr.className = 'expanded';
 
@@ -843,6 +905,25 @@ function render(){
   });
 }
 
+function applySearch(){
+  searchTerm = document.getElementById('searchInput').value.trim();
+  render();
+}
+
+function toggleSort(){
+  sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
+  const btn = document.getElementById('sortBtn');
+  const label = document.getElementById('sortBtnLabel');
+  if(sortDir === 'desc'){
+    btn.classList.add('desc');
+    label.textContent = '역순';
+  } else {
+    btn.classList.remove('desc');
+    label.textContent = '가나다순';
+  }
+  render();
+}
+
 function getSizes(emp){
   const s = emp.sizes || {};
   // 이전 버전(위생복 단일값) 데이터 호환: 위생복 값이 있으면 상의로 이관
@@ -853,49 +934,32 @@ function getSizes(emp){
   };
 }
 
-/* 사이즈 드롭다운(S~XXXL) + 직접입력 컴포넌트 */
-function sizeSelectorHtml(selectId, inputId, currentValue){
+/* 사이즈 나열형 토글 버튼 (S~XXXL, 위생화 220~300 공용) */
+function sizeToggleHtml(hiddenId, options, currentValue){
   const val = currentValue || '';
-  const isPreset = SIZE_PRESETS.includes(val);
-  const selectVal = isPreset ? val : (val ? '__custom__' : '');
-  const showInput = selectVal === '__custom__';
-
-  let options = '<option value="">선택 안함</option>';
-  SIZE_PRESETS.forEach(p=>{
-    options += `<option value="${p}" ${selectVal===p ? 'selected' : ''}>${p}</option>`;
-  });
-  options += `<option value="__custom__" ${selectVal==='__custom__' ? 'selected' : ''}>직접입력(숫자)</option>`;
-
-  return `<div class="size-select-row">
-      <select id="${selectId}" onchange="onSizeSelectChange('${selectId}','${inputId}')">${options}</select>
-      <input type="text" id="${inputId}" placeholder="예: 95" value="${escapeHtml(showInput ? val : '')}" style="display:${showInput ? 'inline-block' : 'none'}">
+  const btns = options.map(o=>
+    `<button type="button" class="toggle-btn${o===val ? ' active' : ''}" onclick="selectSizeToggle('${hiddenId}','${o}')">${o}</button>`
+  ).join('');
+  return `<div class="size-toggle" id="${hiddenId}_wrap">
+      <input type="hidden" id="${hiddenId}" value="${escapeHtml(val)}">
+      ${btns}
     </div>`;
 }
 
-function onSizeSelectChange(selectId, inputId){
-  const select = document.getElementById(selectId);
-  const input = document.getElementById(inputId);
-  if(select.value === '__custom__'){
-    input.style.display = 'inline-block';
-    input.focus();
-  } else {
-    input.style.display = 'none';
-    input.value = '';
-  }
+function selectSizeToggle(hiddenId, value){
+  const hidden = document.getElementById(hiddenId);
+  const wrap = document.getElementById(hiddenId + '_wrap');
+  // 같은 값을 다시 누르면 선택 해제, 다른 값이면 그 값으로 교체
+  const newVal = (hidden.value === value) ? '' : value;
+  hidden.value = newVal;
+  wrap.querySelectorAll('.toggle-btn').forEach(b=>{
+    b.classList.toggle('active', b.textContent === newVal);
+  });
 }
 
-function readSizeSelector(selectId, inputId){
-  const select = document.getElementById(selectId);
-  const input = document.getElementById(inputId);
-  if(!select) return '';
-  if(select.value === '__custom__') return input.value.trim();
-  return select.value;
-}
-
-/* 위생화 사이즈: 드롭다운 없이 숫자만 직접 입력 */
-function numberSizeInputHtml(inputId, currentValue){
-  const val = currentValue || '';
-  return `<input type="text" id="${inputId}" inputmode="numeric" maxlength="4" placeholder="예: 270" value="${escapeHtml(val)}" oninput="this.value=this.value.replace(/[^0-9]/g,'')">`;
+function readSizeToggle(hiddenId){
+  const hidden = document.getElementById(hiddenId);
+  return hidden ? hidden.value : '';
 }
 
 function buildAccordionRow(emp){
@@ -918,9 +982,9 @@ function buildAccordionRow(emp){
   if(editingSizesEmpId === emp.id){
     const sizes = getSizes(emp);
     sizesWrap.innerHTML = `
-      <span>상의 ${sizeSelectorHtml('editTopSize','editTopSizeCustom', sizes.상의)}</span>
-      <span>하의 ${sizeSelectorHtml('editBottomSize','editBottomSizeCustom', sizes.하의)}</span>
-      <span>위생화 ${numberSizeInputHtml('editShoeSize', sizes.위생화)}</span>
+      <span>상의 ${sizeToggleHtml('editTopSize', SIZE_PRESETS, sizes.상의)}</span>
+      <span>하의 ${sizeToggleHtml('editBottomSize', SIZE_PRESETS, sizes.하의)}</span>
+      <span>위생화 ${sizeToggleHtml('editShoeSize', SHOE_SIZES, sizes.위생화)}</span>
     `;
   } else {
     const sizes = getSizes(emp);
@@ -1038,9 +1102,9 @@ function toggleAccordion(empId){
 function saveSizes(empId){
   const emp = appData.employees.find(e=> e.id === empId);
   if(!emp) return;
-  const top = readSizeSelector('editTopSize','editTopSizeCustom');
-  const bottom = readSizeSelector('editBottomSize','editBottomSizeCustom');
-  const shoe = document.getElementById('editShoeSize').value.trim();
+  const top = readSizeToggle('editTopSize');
+  const bottom = readSizeToggle('editBottomSize');
+  const shoe = readSizeToggle('editShoeSize');
   emp.sizes = { 상의: top, 하의: bottom, 위생화: shoe };
   editingSizesEmpId = null;
   render();
@@ -1093,9 +1157,9 @@ function isValidDate6(raw){
    ========================================================= */
 function openAddEmployeeModal(){
   document.getElementById('newEmpName').value = '';
-  document.getElementById('newEmpTopSizeWrap').innerHTML = sizeSelectorHtml('newEmpTopSize','newEmpTopSizeCustom','');
-  document.getElementById('newEmpBottomSizeWrap').innerHTML = sizeSelectorHtml('newEmpBottomSize','newEmpBottomSizeCustom','');
-  document.getElementById('newEmpShoeSizeWrap').innerHTML = numberSizeInputHtml('newEmpShoeSize','');
+  document.getElementById('newEmpTopSizeWrap').innerHTML = sizeToggleHtml('newEmpTopSize', SIZE_PRESETS, '');
+  document.getElementById('newEmpBottomSizeWrap').innerHTML = sizeToggleHtml('newEmpBottomSize', SIZE_PRESETS, '');
+  document.getElementById('newEmpShoeSizeWrap').innerHTML = sizeToggleHtml('newEmpShoeSize', SHOE_SIZES, '');
   document.getElementById('addEmpOverlay').classList.add('show');
 }
 
@@ -1104,9 +1168,9 @@ function addEmployee(){
   const name = nameInput.value.trim();
   if(!name){ alert('직원 성명을 입력해주세요.'); return; }
 
-  const top = readSizeSelector('newEmpTopSize','newEmpTopSizeCustom');
-  const bottom = readSizeSelector('newEmpBottomSize','newEmpBottomSizeCustom');
-  const shoe = document.getElementById('newEmpShoeSize').value.trim();
+  const top = readSizeToggle('newEmpTopSize');
+  const bottom = readSizeToggle('newEmpBottomSize');
+  const shoe = readSizeToggle('newEmpShoeSize');
 
   const id = 'emp_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
   appData.employees.push({ id, name, sizes: { 상의: top, 하의: bottom, 위생화: shoe } });
