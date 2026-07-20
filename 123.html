@@ -3,1579 +3,1274 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BBANG SSAEM 배합비 계산</title>
+<title>소모품 지급 관리표</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+  :root{
+    --ink:#16232a;
+    --ink-sub:#64777c;
+    --paper:#f2f6f6;
+    --surface:#ffffff;
+    --line:#dbe6e5;
+    --teal:#0d6e64;
+    --teal-deep:#0a4a44;
+    --teal-tint:#e3f3ef;
+    --amber:#c9832f;
+    --amber-tint:#faf0e0;
+    --danger:#bd4438;
+    --danger-tint:#fbeae7;
+    --off:#c7d1d0;
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* 하위호환용 별칭 (기존 규칙에서 사용) */
+    --navy:var(--teal-deep);
+    --navy-dark:var(--teal-deep);
+    --teal-light:var(--teal-tint);
+    --gray-bg:var(--paper);
+    --gray-border:var(--line);
+    --text:var(--ink);
+    --text-sub:var(--ink-sub);
+    --ok:var(--teal);
+    --warn:var(--amber);
 
-  body {
-    font-family: 'Noto Sans KR', sans-serif;
-    background: #f0f2f5;
-    color: #1a1a1a;
-    min-height: 100vh;
+    --font-display:'IBM Plex Sans KR','Pretendard',sans-serif;
+    --font-body:'Pretendard','IBM Plex Sans KR',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:var(--font-body);
+    background:
+      radial-gradient(circle at 1px 1px, rgba(13,110,100,0.06) 1px, transparent 0) 0 0/16px 16px,
+      var(--paper);
+    color:var(--ink);
+    padding-bottom:60px;
+  }
+  header{
+    position:relative;
+    overflow:hidden;
+    background:linear-gradient(120deg, var(--teal-deep) 0%, var(--teal) 78%);
+    color:#fff;
+    padding:20px 24px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  header::after{
+    content:'';
+    position:absolute;
+    top:0; right:0; bottom:0;
+    width:130px;
+    background:repeating-linear-gradient(
+      -45deg,
+      rgba(255,255,255,0.09) 0 10px,
+      rgba(255,255,255,0) 10px 20px
+    );
+    pointer-events:none;
+  }
+  header .title-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    position:relative;
+    z-index:1;
+  }
+  header .title-row svg{
+    flex:none;
+    width:26px;height:26px;
+    stroke:#fff;
+  }
+  header h1{
+    font-family:var(--font-display);
+    font-size:19px;
+    margin:0;
+    font-weight:700;
+    letter-spacing:-0.2px;
+  }
+  header .status{
+    position:relative;
+    z-index:1;
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    color:#d3ede8;
+    background:rgba(255,255,255,0.12);
+    padding:5px 10px;
+    border-radius:20px;
+  }
+  .header-right{
+    position:relative;
+    z-index:1;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:5px;
+  }
+  .version-badge{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    color:#fff;
+    background:rgba(0,0,0,0.18);
+    border:1px solid rgba(255,255,255,0.25);
+    padding:3px 9px;
+    border-radius:20px;
+    letter-spacing:.2px;
+  }
+  .version-badge b{font-weight:700;}
+  .toolbar{
+    display:flex;
+    gap:8px;
+    padding:14px 24px;
+    background:var(--surface);
+    border-bottom:1px solid var(--line);
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  button{
+    font-family:var(--font-display);
+    cursor:pointer;
+    border:none;
+    border-radius:20px;
+    font-size:13px;
+    font-weight:600;
+    padding:9px 16px;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    transition:transform .12s ease, box-shadow .12s ease, opacity .12s ease;
+  }
+  button svg{width:14px;height:14px;flex:none;}
+  button:hover{transform:translateY(-1px);}
+  button:active{transform:translateY(0);opacity:.85;}
+  .btn-primary{background:linear-gradient(120deg, var(--teal-deep), var(--teal));color:#fff;box-shadow:0 3px 10px rgba(10,74,68,.28);}
+  .btn-teal{background:var(--teal);color:#fff;box-shadow:0 3px 10px rgba(13,110,100,.25);}
+  .btn-danger{background:var(--danger);color:#fff;box-shadow:0 3px 10px rgba(189,68,56,.22);}
+  .btn-gray{background:#eef2f2;color:var(--ink);}
+
+  .search-box{
+    display:flex;
+    align-items:center;
+    gap:0;
+    border:1.4px solid var(--line);
+    border-radius:20px;
+    background:#fff;
+    overflow:hidden;
+  }
+  .search-box input[type=text]{
+    border:none;
+    outline:none;
+    padding:9px 4px 9px 14px;
+    font-family:var(--font-body);
+    font-size:13px;
+    width:160px;
+    background:transparent;
+  }
+  .search-box button{
+    border-radius:0;
+    background:var(--teal-tint);
+    color:var(--teal-deep);
+    box-shadow:none;
+    padding:9px 13px;
+  }
+  .search-box button:hover{transform:none;background:var(--teal);color:#fff;}
+  .toolbar-spacer{flex:1;}
+  .sort-btn{background:#eef2f2;color:var(--ink);}
+  .sort-btn svg{transition:transform .15s;}
+  .sort-btn.desc svg{transform:rotate(180deg);}
+  .table-wrap{
+    margin:18px 24px;
+    background:var(--surface);
+    border-radius:14px;
+    overflow-x:auto;
+    border:1px solid var(--line);
+    box-shadow:0 10px 28px -18px rgba(10,50,46,.35);
+  }
+  table{
+    border-collapse:collapse;
+    width:100%;
+    min-width:780px;
+  }
+  th,td{
+    border:1px solid var(--line);
+    text-align:center;
+    padding:0;
+    font-size:13px;
+  }
+  thead th{
+    background:linear-gradient(180deg, var(--teal-deep), var(--teal));
+    color:#fff;
+    padding:12px 6px;
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:12.5px;
+    letter-spacing:.3px;
+    position:sticky;
+    top:0;
+  }
+  thead th .th-inner{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+  }
+  thead th svg{
+    width:17px;height:17px;
+    stroke:#e8f6f3;
+    opacity:.9;
+  }
+  thead th:first-child{
+    min-width:120px;
+    text-align:left;
+  }
+  thead th:first-child .th-inner{
+    align-items:flex-start;
+  }
+  tbody tr:nth-child(4n+1):not(.accordion-row) td{
+    background:#fafcfc;
+  }
+  tbody tr:not(.accordion-row):hover td{
+    background:var(--teal-tint);
+  }
+  tbody td:first-child{
+    font-family:var(--font-display);
+    font-weight:600;
+    padding:11px 12px;
+    cursor:pointer;
+    color:var(--teal-deep);
+    position:relative;
+    transition:background .15s;
+  }
+  tbody td:first-child::before{
+    content:'';
+    position:absolute;
+    left:0;top:0;bottom:0;
+    width:3px;
+    background:transparent;
+    transition:background .15s;
+  }
+  tbody tr:hover td:first-child::before,
+  tbody tr.expanded td:first-child::before{
+    background:var(--teal);
+  }
+  .del-emp{
+    display:inline-block;
+    margin-left:6px;
+    color:var(--danger);
+    font-size:11px;
+    text-decoration:none;
+    cursor:pointer;
+  }
+  .cell-btn{
+    width:100%;
+    height:100%;
+    min-height:60px;
+    background:none;
+    border-radius:0;
+    padding:8px 4px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:5px;
+    box-shadow:none;
+  }
+  .cell-btn:hover{transform:none;}
+  .cell-btn .mark{
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:11px;
+    line-height:1;
+    color:transparent;
+    border:1.6px dashed var(--off);
+    background:transparent;
+  }
+  .cell-btn.issued .mark{
+    color:#fff;
+    font-weight:700;
+    border:1.6px solid var(--teal);
+    background:var(--teal);
+    box-shadow:0 2px 6px rgba(13,110,100,.35);
+  }
+  .cell-btn .date{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    font-weight:500;
+    color:var(--ink-sub);
+  }
+  .cell-btn.issued .date{
+    color:var(--teal-deep);
+    font-weight:600;
+  }
+  .cell-btn.issued{
+    background:linear-gradient(180deg, var(--teal-tint), #ffffff);
+  }
+  .cell-btn:hover{
+    background:var(--teal-tint);
+  }
+  .empty-row td{
+    padding:36px;
+    color:var(--ink-sub);
+    font-size:13px;
+    font-family:var(--font-body);
+  }
+  /* modal */
+  .overlay{
+    position:fixed;inset:0;
+    background:rgba(10,28,26,0.5);
+    backdrop-filter:blur(2px);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+    padding:16px;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:var(--surface);
+    border-radius:16px;
+    width:100%;
+    max-width:440px;
+    max-height:86vh;
+    overflow-y:auto;
+    padding:0;
+    box-shadow:0 24px 60px -20px rgba(6,30,28,.45);
+    animation:modalPop .16s ease;
+  }
+  @keyframes modalPop{
+    from{opacity:0; transform:translateY(6px) scale(.98);}
+    to{opacity:1; transform:translateY(0) scale(1);}
+  }
+  .modal-head{
+    background:linear-gradient(120deg, var(--teal-deep), var(--teal));
+    color:#fff;
+    padding:16px 20px;
+    font-family:var(--font-display);
+    font-size:15px;
+    font-weight:700;
+    border-radius:16px 16px 0 0;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .modal-head .x{
+    cursor:pointer;
+    font-size:20px;
+    line-height:1;
+    opacity:.85;
+    transition:opacity .12s;
+  }
+  .modal-head .x:hover{opacity:1;}
+  .modal-body{
+    padding:20px;
+  }
+  .modal-body label{
+    display:block;
+    font-family:var(--font-display);
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--ink-sub);
+    margin-bottom:6px;
+    letter-spacing:.2px;
+  }
+  .modal-body input[type=text]{
+    width:100%;
+    padding:10px 12px;
+    border:1.4px solid var(--line);
+    border-radius:8px;
+    font-size:14px;
+    font-family:var(--font-mono);
+    margin-bottom:14px;
+    transition:border-color .12s;
+  }
+  .modal-body input[type=text]:focus{
+    outline:none;
+    border-color:var(--teal);
+  }
+  .modal-actions{
+    display:flex;
+    gap:8px;
+    justify-content:flex-end;
+  }
+  .history-list{
+    list-style:none;
+    margin:0 0 14px 0;
+    padding:0;
+    border-top:1px solid var(--line);
+  }
+  .history-list li{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:9px 2px;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+    font-family:var(--font-mono);
+  }
+  .history-list li .del-record{
+    color:var(--danger);
+    cursor:pointer;
+    font-size:12px;
+    font-family:var(--font-body);
+  }
+  .history-list .none{
+    color:var(--ink-sub);
+    padding:12px 2px;
+    text-align:center;
+    border-bottom:none;
+    font-family:var(--font-body);
+  }
+  .section-title{
+    font-family:var(--font-display);
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--teal-deep);
+    margin:16px 0 8px;
+    text-transform:uppercase;
+    letter-spacing:.4px;
+  }
+  .emp-history-block{margin-bottom:14px;}
+  .emp-history-block h4{
+    margin:0 0 6px;
+    font-size:13px;
+    color:var(--teal);
+  }
+  .hint{
+    font-size:11px;
+    color:var(--ink-sub);
+    margin:-8px 0 14px;
+  }
+  .lock-overlay{
+    position:fixed;inset:0;
+    background:rgba(255,255,255,0.6);
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:200;
+    font-size:13px;
+    color:var(--teal-deep);
+    font-weight:600;
+  }
+  .lock-overlay.show{display:flex;}
+
+  /* 직원명 옆 사이즈 배지 */
+  .size-badge{
+    display:inline-block;
+    font-family:var(--font-mono);
+    font-size:10px;
+    font-weight:600;
+    color:var(--teal-deep);
+    background:var(--teal-tint);
+    border-radius:4px;
+    padding:2px 6px;
+    margin-left:4px;
+    vertical-align:middle;
   }
 
-  .version-badge {
-    position: fixed;
-    top: 8px;
-    right: 12px;
-    background: rgba(30,41,59,0.85);
-    color: #cbd5e1;
-    font-size: 11px;
-    font-weight: 500;
-    padding: 4px 10px;
-    border-radius: 6px;
-    z-index: 3000;
-    pointer-events: none;
-    letter-spacing: 0.3px;
+  /* 아코디언 행 */
+  @keyframes accFadeIn{
+    from{opacity:0;}
+    to{opacity:1;}
+  }
+  .accordion-row td{
+    padding:0;
+    background:linear-gradient(180deg, var(--teal-tint) 0%, #f8fbfb 60px, #f8fbfb 100%);
+    text-align:left;
+    border-left:3px solid var(--teal);
+    animation:accFadeIn .18s ease;
+  }
+  .accordion-inner{
+    padding:16px 20px 18px;
+  }
+  .acc-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:10px;
+    padding-bottom:14px;
+    margin-bottom:14px;
+    border-bottom:1px dashed var(--line);
+  }
+  .acc-sizes{
+    font-size:12.5px;
+    color:var(--ink);
+    display:flex;
+    gap:16px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .acc-sizes b{
+    color:var(--teal-deep);
+    font-family:var(--font-display);
+    font-weight:600;
+    margin-right:3px;
+  }
+  .acc-sizes span{font-family:var(--font-mono);}
+  .acc-sizes .size-edit-row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .acc-sizes input[type=text]{
+    width:70px;
+    padding:5px 7px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    font-size:12.5px;
+  }
+  .acc-actions{
+    display:flex;
+    gap:6px;
+  }
+  .acc-actions button{
+    font-size:12px;
+    padding:6px 12px;
+  }
+  .acc-items{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(150px,1fr));
+    gap:12px;
+  }
+  .acc-item-block{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:11px 13px;
+    transition:box-shadow .12s, border-color .12s;
+  }
+  .acc-item-block:hover{
+    border-color:var(--teal);
+    box-shadow:0 4px 14px -8px rgba(13,110,100,.4);
+  }
+  .acc-item-block h5{
+    margin:0 0 8px;
+    font-family:var(--font-display);
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--teal-deep);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .acc-item-block h5 .size-badge{margin-left:0;}
+  .acc-item-block ul{
+    list-style:none;
+    margin:0;
+    padding:0;
+  }
+  .acc-item-block li{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--ink-sub);
+    padding:2px 0;
+  }
+  .acc-item-block .none{
+    font-size:12px;
+    font-family:var(--font-body);
+    color:#b3b9bf;
   }
 
-  .container {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 24px 16px;
+  /* 사이즈 토글 버튼 (나열형) */
+  .size-toggle{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:14px;
   }
-
-  .header {
-    background: #fff;
-    border-radius: 12px;
-    padding: 24px 28px;
-    margin-bottom: 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  .toggle-btn{
+    border:1.4px solid var(--line);
+    border-radius:7px;
+    background:#fff;
+    color:var(--ink-sub);
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    font-weight:500;
+    padding:7px 12px;
+    cursor:pointer;
+    box-shadow:none;
+    transition:background .12s, border-color .12s, color .12s;
   }
-
-  .header h1 {
-    font-size: 22px;
-    font-weight: 700;
-    color: #1a56db;
-    margin-bottom: 16px;
-    letter-spacing: -0.5px;
+  .toggle-btn:hover{
+    transform:none;
+    border-color:var(--teal);
+    color:var(--teal-deep);
   }
-
-  .header h1 span { font-weight: 800; letter-spacing: 1px; }
-
-  .btn-group {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
+  .toggle-btn.active{
+    background:var(--teal);
+    border-color:var(--teal);
+    color:#fff;
+    font-weight:700;
+    box-shadow:0 2px 6px rgba(13,110,100,.3);
   }
-
-  .btn {
-    padding: 9px 18px;
-    border: none;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all 0.15s;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
+  .acc-sizes .size-toggle{
+    margin-bottom:0;
+    gap:5px;
   }
-
-  .btn:active { transform: scale(0.97); }
-  .btn-save { background: #1a56db; color: #fff; }
-  .btn-save:hover { background: #1648b8; }
-
-  .btn-finalize { background: #059669; color: #fff; }
-  .btn-finalize:hover { background: #047857; }
-  .btn-finalize:disabled { background: #9ca3af; cursor: not-allowed; }
-  .btn-finalize:disabled:active { transform: none; }
-
-  .btn-delete { background: #dc2626; color: #fff; }
-  .btn-delete:hover { background: #b91c1c; }
-  .btn-reset { background: #6b7280; color: #fff; }
-  .btn-reset:hover { background: #4b5563; }
-  .btn-help { background: #8b5cf6; color: #fff; }
-  .btn-help:hover { background: #7c3aed; }
-  .btn-add { background: #2563eb; color: #fff; }
-  .btn-add:hover { background: #1d4ed8; }
-
-  .load-section {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    margin-top: 12px;
-    flex-wrap: wrap;
-  }
-
-  .load-section select {
-    flex: 1;
-    min-width: 200px;
-    padding: 9px 12px;
-    border: 1.5px solid #d1d5db;
-    border-radius: 8px;
-    font-size: 14px;
-    font-family: inherit;
-    background: #fff;
-  }
-
-  .load-section select:focus { outline: none; border-color: #1a56db; }
-
-  /* 버전 이력 바 */
-  .version-bar {
-    background: #fff;
-    border-radius: 12px;
-    padding: 16px 20px;
-    margin-bottom: 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-    display: none;
-  }
-
-  .version-bar.show { display: block; }
-
-  .version-section { margin-bottom: 12px; }
-  .version-section:last-child { margin-bottom: 0; }
-
-  .version-bar-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: #6b7280;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .version-bar-title .finalized-badge {
-    font-size: 11px;
-    background: #059669;
-    color: #fff;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-weight: 600;
-  }
-
-  .version-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
-
-  .version-tab {
-    padding: 8px 16px;
-    border: 1.5px solid #d1d5db;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    background: #fff;
-    color: #374151;
-    transition: all 0.15s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-  }
-
-  .version-tab:hover { border-color: #93c5fd; background: #eff6ff; }
-
-  .version-tab.active { background: #1a56db; color: #fff; border-color: #1a56db; }
-  .version-tab.active .version-date { color: #bfdbfe; }
-
-  .version-tab.initial-tab { border-color: #6ee7b7; }
-  .version-tab.initial-tab:hover { background: #ecfdf5; border-color: #34d399; }
-  .version-tab.initial-tab.active { background: #059669; color: #fff; border-color: #059669; }
-  .version-tab.initial-tab.active .version-date { color: #a7f3d0; }
-
-  .version-tab .version-label { font-weight: 700; font-size: 13px; }
-  .version-tab .version-date { font-size: 10px; color: #9ca3af; font-weight: 400; }
-
-  .version-divider {
-    border: none;
-    border-top: 1.5px dashed #e5e7eb;
-    margin: 8px 0;
-  }
-
-  .readonly-banner {
-    background: #fef3c7;
-    border: 1.5px solid #f59e0b;
-    border-radius: 8px;
-    padding: 10px 16px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #92400e;
-    margin-bottom: 12px;
-    display: none;
-    text-align: center;
-  }
-
-  .readonly-banner.show { display: block; }
-
-  /* 테이블 영역 */
-  .table-card {
-    background: #fff;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-    overflow-x: auto;
-  }
-
-  .product-row {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
-    padding-bottom: 16px;
-    border-bottom: 1.5px solid #e5e7eb;
-  }
-
-  .product-row label {
-    font-weight: 700;
-    font-size: 15px;
-    white-space: nowrap;
-    color: #374151;
-  }
-
-  .product-row input {
-    flex: 1;
-    min-width: 200px;
-    padding: 10px 14px;
-    border: 1.5px solid #d1d5db;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 600;
-    font-family: inherit;
-    transition: border-color 0.2s;
-  }
-
-  .product-row input:focus {
-    outline: none;
-    border-color: #1a56db;
-    box-shadow: 0 0 0 3px rgba(26,86,219,0.1);
-  }
-
-  .stage-indicator {
-    font-size: 12px;
-    font-weight: 700;
-    padding: 4px 12px;
-    border-radius: 6px;
-    white-space: nowrap;
-  }
-
-  .stage-initial { background: #ecfdf5; color: #059669; border: 1.5px solid #6ee7b7; }
-  .stage-change { background: #eff6ff; color: #1a56db; border: 1.5px solid #93c5fd; }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 820px;
-  }
-
-  thead th {
-    background: #1a56db;
-    color: #fff;
-    padding: 12px 10px;
-    font-size: 13px;
-    font-weight: 600;
-    text-align: center;
-    white-space: nowrap;
-    border: 1px solid #1648b8;
-  }
-
-  thead th:first-child { border-radius: 8px 0 0 0; }
-  thead th:last-child { border-radius: 0 8px 0 0; }
-  thead th.sortable { cursor: pointer; user-select: none; }
-  thead th.sortable:hover { background: #1648b8; }
-  .sort-arrow { margin-left: 4px; font-size: 11px; }
-
-  tbody td {
-    padding: 6px 6px;
-    border: 1px solid #e5e7eb;
-    text-align: center;
-    vertical-align: middle;
-    position: relative;
-  }
-
-  tbody tr:hover { background: #f8fafc; }
-
-  tbody td input {
-    width: 100%;
-    padding: 8px 8px;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    font-size: 13px;
-    font-family: inherit;
-    text-align: center;
-    background: transparent;
-    transition: all 0.15s;
-  }
-
-  tbody td input:focus {
-    outline: none;
-    border-color: #93c5fd;
-    background: #eff6ff;
-  }
-
-  tbody td input.amount-input { font-weight: 500; color: #1e40af; }
-  tbody td input[readonly] { color: #6b7280; cursor: default; }
-  tbody td input[readonly]:focus { border-color: transparent; background: transparent; }
-
-  .col-no { width: 45px; }
-  .col-type { width: 100px; }
-  .col-name { width: 130px; }
-  .col-desc { width: 200px; }
-  .col-amount { width: 110px; }
-  .col-ratio { width: 90px; }
-  .col-allergen { width: 80px; }
-  .col-del { width: 50px; }
-
-  .ratio-cell { font-weight: 600; color: #1a56db; font-size: 13px; }
-  .no-cell { font-weight: 600; color: #6b7280; font-size: 13px; }
-
-  .total-row td {
-    background: #f1f5f9;
-    font-weight: 700;
-    font-size: 14px;
-    padding: 12px 10px;
-    border: 1px solid #e5e7eb;
-  }
-
-  .total-amount { color: #1e40af; }
-  .total-ratio { color: #059669; }
-
-  .btn-row-del {
-    background: none;
-    border: none;
-    color: #9ca3af;
-    font-size: 18px;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 6px;
-    transition: all 0.15s;
-  }
-
-  .btn-row-del:hover { background: #fee2e2; color: #dc2626; }
-
-  .table-footer {
-    display: flex;
-    justify-content: flex-start;
-    margin-top: 12px;
-  }
-
-  /* ── 자동완성 드롭다운 ── */
-  .ac-list {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: #fff;
-    border: 1.5px solid #d1d5db;
-    border-top: none;
-    border-radius: 0 0 8px 8px;
-    z-index: 100;
-    max-height: 180px;
-    overflow-y: auto;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    display: none;
-  }
-
-  .ac-list.show { display: block; }
-
-  .ac-item {
-    padding: 8px 12px;
-    font-size: 13px;
-    cursor: pointer;
-    text-align: left;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .ac-item:hover, .ac-item.active {
-    background: #eff6ff;
-    color: #1a56db;
-  }
-
-  .ac-item .ac-type {
-    font-size: 11px;
-    color: #9ca3af;
-    margin-left: 8px;
-  }
-
-  .ac-item.active .ac-type { color: #60a5fa; }
-
-  /* 커스텀 모달 */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.2s;
-  }
-
-  .modal-overlay.show { opacity: 1; visibility: visible; }
-
-  .modal-box {
-    background: #fff;
-    border-radius: 14px;
-    padding: 28px 28px 22px;
-    min-width: 320px;
-    max-width: 420px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.18);
-    position: relative;
-    transform: scale(0.92);
-    transition: transform 0.2s;
-  }
-
-  .modal-overlay.show .modal-box { transform: scale(1); }
-
-  .modal-close {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    background: none;
-    border: none;
-    font-size: 20px;
-    color: #9ca3af;
-    cursor: pointer;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s;
-  }
-
-  .modal-close:hover { background: #f3f4f6; color: #374151; }
-
-  .modal-icon { font-size: 36px; text-align: center; margin-bottom: 12px; }
-
-  .modal-msg {
-    font-size: 15px;
-    font-weight: 600;
-    color: #1f2937;
-    text-align: center;
-    line-height: 1.5;
-    margin-bottom: 24px;
-    white-space: pre-line;
-  }
-
-  .modal-btns { display: flex; gap: 10px; justify-content: center; }
-
-  .modal-btn {
-    padding: 10px 28px;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .modal-btn:active { transform: scale(0.97); }
-  .modal-btn-cancel { background: #f3f4f6; color: #374151; }
-  .modal-btn-cancel:hover { background: #e5e7eb; }
-  .modal-btn-confirm { background: #dc2626; color: #fff; }
-  .modal-btn-confirm:hover { background: #b91c1c; }
-  .modal-btn-finalize { background: #059669; color: #fff; }
-  .modal-btn-finalize:hover { background: #047857; }
-
-  /* 토스트 */
-  .toast {
-    position: fixed;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%) translateY(80px);
-    background: #1e293b;
-    color: #fff;
-    padding: 12px 24px;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 500;
-    opacity: 0;
-    transition: all 0.3s;
-    z-index: 999;
-    pointer-events: none;
-  }
-
-  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-  .loading-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(255,255,255,0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-  }
-
-  .loading-overlay.hidden { display: none; }
-
-  .spinner {
-    width: 36px; height: 36px;
-    border: 3px solid #e5e7eb;
-    border-top-color: #1a56db;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* 도움말 모달 */
-  .help-box {
-    max-width: 480px;
-    min-width: 340px;
-    max-height: 85vh;
-    overflow-y: auto;
-  }
-
-  .help-title {
-    font-size: 18px;
-    font-weight: 700;
-    color: #1f2937;
-    margin-bottom: 18px;
-    text-align: center;
-  }
-
-  .help-content { margin-bottom: 18px; }
-
-  .help-section {
-    margin-bottom: 14px;
-    padding: 12px 14px;
-    background: #f8fafc;
-    border-radius: 10px;
-    border: 1px solid #e5e7eb;
-  }
-
-  .help-section:last-child { margin-bottom: 0; }
-
-  .help-subtitle {
-    font-size: 14px;
-    font-weight: 700;
-    color: #374151;
-    margin-bottom: 6px;
-  }
-
-  .help-text {
-    font-size: 13px;
-    color: #4b5563;
-    line-height: 1.65;
-  }
-
-  .help-text b { color: #1f2937; }
-
-  .help-footer { text-align: center; }
-
-  @media (max-width: 768px) {
-    .container { padding: 12px 8px; }
-    .header { padding: 16px; }
-    .header h1 { font-size: 18px; }
-    .btn { padding: 8px 14px; font-size: 12px; }
-    thead th { font-size: 12px; padding: 10px 6px; }
-    tbody td input { font-size: 12px; padding: 6px 4px; }
-    .version-tab { padding: 6px 10px; font-size: 12px; }
-    .product-row input { min-width: 140px; font-size: 14px; }
-    .modal-box { min-width: 280px; padding: 24px 20px 18px; }
-    .help-box { min-width: 300px; max-width: 92vw; }
-    .stage-indicator { font-size: 11px; padding: 3px 8px; }
+  .acc-sizes .toggle-btn{
+    padding:4px 9px;
+    font-size:11.5px;
+    border-radius:6px;
   }
 </style>
 </head>
 <body>
 
-<div class="version-badge">v2.1 · 2026-07-20</div>
+<header>
+  <div class="title-row">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 3H8l1-3z"/><path d="M6 6h12l1.2 13.2a2 2 0 0 1-2 2.1H6.8a2 2 0 0 1-2-2.1L6 6z"/><path d="M9 11c1 1 5 1 6 0"/></svg>
+    <h1>소모품 지급 관리표</h1>
+  </div>
+  <div class="header-right">
+    <div class="version-badge" id="versionBadge"></div>
+    <div class="status" id="statusText">Firebase 연결 확인 중...</div>
+  </div>
+</header>
 
-<div class="container">
-  <div class="header">
-    <h1><span>BBANG SSAEM</span> 배합비 계산</h1>
-    <div class="btn-group">
-      <button class="btn btn-save" onclick="saveRecipe()">💾 저장</button>
-      <button class="btn btn-finalize" id="btnFinalize" onclick="confirmFinalize()">✅ 최종확정</button>
-      <button class="btn btn-reset" onclick="confirmReset()">🗑️ 초기화</button>
-      <button class="btn btn-help" onclick="openHelp()">❓ 도움말</button>
-    </div>
-    <div class="load-section">
-      <select id="recipeList" onchange="loadRecipe()">
-        <option value="">-- 저장된 레시피 선택 --</option>
-      </select>
-      <button class="btn btn-delete" onclick="confirmDelete()">🗑️ 삭제</button>
-    </div>
+<div class="toolbar">
+  <button class="btn-primary" onclick="openAddEmployeeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>신규 직원 등록</button>
+  <button class="btn-gray" onclick="loadData()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg>새로고침</button>
+
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="직원명 검색" onkeydown="if(event.key==='Enter') applySearch()">
+    <button onclick="applySearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
   </div>
 
-  <div class="version-bar" id="versionBar">
-    <div class="version-section" id="initialSection">
-      <div class="version-bar-title" id="initialTitle">📋 초기 이력</div>
-      <div class="version-tabs" id="initialTabs"></div>
-    </div>
-    <hr class="version-divider" id="versionDivider" style="display:none;">
-    <div class="version-section" id="changeSection" style="display:none;">
-      <div class="version-bar-title">📋 변경 이력</div>
-      <div class="version-tabs" id="changeTabs"></div>
-    </div>
-  </div>
+  <div class="toolbar-spacer"></div>
 
-  <div class="readonly-banner" id="readonlyBanner">
-    ⚠️ 과거 이력 열람 중 — 수정하려면 최신 버전 탭을 선택 후 저장하세요
-  </div>
+  <button class="sort-btn" id="sortBtn" onclick="toggleSort()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h10M3 12h7M3 17h4"/><path d="m17 4 0 16M17 4l-3 3M17 4l3 3"/></svg><span id="sortBtnLabel">가나다순</span></button>
+</div>
 
-  <div class="table-card">
-    <div class="product-row">
-      <label>제 품 명 :</label>
-      <input type="text" id="productName" placeholder="제품명을 입력하세요">
-      <span class="stage-indicator stage-initial" id="stageIndicator">초기 단계</span>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th><div class="th-inner">직원명</div></th>
+        <th><div class="th-inner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16c0-5 3.5-9 8-9s8 4 8 9"/><path d="M3 16h18"/><path d="M9 7.5c1-1.2 5-1.2 6 0"/></svg>위생모</div></th>
+        <th><div class="th-inner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3 6 6 3 9l3 2v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9l3-2-3-3-3-3-1 2h-4l-1-2z"/></svg>위생복</div></th>
+        <th><div class="th-inner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19v-6c2-1 3-3 3-5V6h4v6l6 2c2 .6 3 1.5 3 3v2z"/></svg>위생화</div></th>
+        <th><div class="th-inner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5h12l1 4-3 2v10a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V11L5 9l1-4z"/><path d="M9 5c1 2 5 2 6 0"/></svg>앞치마</div></th>
+        <th><div class="th-inner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="4" width="8" height="16" rx="3"/><path d="M8 9h8M8 14h8"/></svg>토시</div></th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr class="empty-row"><td colspan="6">불러오는 중...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 신규 직원 등록 모달 -->
+<div class="overlay" id="addEmpOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <span>신규 직원 등록</span>
+      <span class="x" onclick="closeModal('addEmpOverlay')">&times;</span>
     </div>
-    <table id="recipeTable">
-      <thead>
-        <tr>
-          <th class="col-no">No.</th>
-          <th class="col-type">식품유형</th>
-          <th class="col-name">재 료 명</th>
-          <th class="col-desc">내용</th>
-          <th class="col-amount sortable" onclick="toggleSort()">투입량(g, EA)<span class="sort-arrow" id="sortArrow"></span></th>
-          <th class="col-ratio">구성비(%)</th>
-          <th class="col-allergen">알레르기</th>
-          <th class="col-del"></th>
-        </tr>
-      </thead>
-      <tbody id="tableBody"></tbody>
-      <tfoot>
-        <tr class="total-row">
-          <td colspan="4" style="text-align:right; padding-right:16px;">합 계</td>
-          <td class="total-amount" id="totalAmount">0.000</td>
-          <td class="total-ratio" id="totalRatio">0.00</td>
-          <td colspan="2"></td>
-        </tr>
-      </tfoot>
-    </table>
-    <div class="table-footer" id="tableFooter">
-      <button class="btn btn-add" onclick="addRow()">+ 행 추가</button>
+    <div class="modal-body">
+      <label>직원 성명</label>
+      <input type="text" id="newEmpName" placeholder="예: 홍길동">
+      <label>위생복 상의 사이즈 (선택)</label>
+      <div id="newEmpTopSizeWrap"></div>
+      <label>위생복 하의 사이즈 (선택)</label>
+      <div id="newEmpBottomSizeWrap"></div>
+      <label>위생화 사이즈 (선택)</label>
+      <div id="newEmpShoeSizeWrap"></div>
+      <div class="modal-actions">
+        <button class="btn-gray" onclick="closeModal('addEmpOverlay')">취소</button>
+        <button class="btn-primary" onclick="addEmployee()">등록</button>
+      </div>
     </div>
   </div>
 </div>
 
-<div class="modal-overlay" id="modalOverlay">
-  <div class="modal-box">
-    <button class="modal-close" onclick="closeModal()">✕</button>
-    <div class="modal-icon" id="modalIcon">⚠️</div>
-    <div class="modal-msg" id="modalMsg"></div>
-    <div class="modal-btns" id="modalBtns">
-      <button class="modal-btn modal-btn-cancel" onclick="closeModal()">취소</button>
-      <button class="modal-btn modal-btn-confirm" id="modalConfirmBtn">확인</button>
+<!-- 품목별 지급 등록/이력 모달 -->
+<div class="overlay" id="itemOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <span id="itemModalTitle">지급 이력</span>
+      <span class="x" onclick="closeModal('itemOverlay')">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="section-title">신규 지급 등록</div>
+      <label>지급일자 (6자리 숫자, 예: 260713 → 26.07.13)</label>
+      <input type="text" id="newDateInput" maxlength="6" placeholder="260713" oninput="formatDateInput(this)">
+      <div class="hint">YY MM DD 순서로 6자리 입력 시 자동으로 00.00.00 형식 표시됩니다.</div>
+      <div class="modal-actions" style="margin-bottom:16px;">
+        <button class="btn-teal" onclick="addRecord()">지급 등록</button>
+      </div>
+      <div class="section-title">지급 이력</div>
+      <ul class="history-list" id="historyList"></ul>
     </div>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
-
-<!-- 도움말 모달 -->
-<div class="modal-overlay" id="helpOverlay">
-  <div class="modal-box help-box">
-    <button class="modal-close" onclick="closeHelp()">✕</button>
-    <div class="help-title">📖 사용 안내</div>
-    <div class="help-content">
-      <div class="help-section">
-        <div class="help-subtitle">🟢 초기 단계 — 신제품 등록</div>
-        <div class="help-text">
-          새 제품의 배합비를 처음 작성하는 단계입니다.<br>
-          수정이 필요하면 저장을 반복할 수 있습니다.<br>
-          <b>초기 → 초기 1차 → 초기 2차 →</b> ... 순서로 이력이 쌓입니다.
-        </div>
-      </div>
-      <div class="help-section">
-        <div class="help-subtitle">✅ 최종확정</div>
-        <div class="help-text">
-          초기 배합비가 확정되면 <b>[✅ 최종확정]</b> 버튼을 누릅니다.<br>
-          확정 후 초기 이력은 <b>열람만 가능</b>하며 수정할 수 없습니다.<br>
-          품목제조보고 최초 등록 시점에 눌러 주세요.
-        </div>
-      </div>
-      <div class="help-section">
-        <div class="help-subtitle">🔵 변경 단계 — 품목제조보고 변경</div>
-        <div class="help-text">
-          최종확정 이후의 저장은 자동으로 변경 이력이 됩니다.<br>
-          <b>1차 → 2차 → 3차 →</b> ... 순서로 이력이 쌓입니다.
-        </div>
-      </div>
-      <div class="help-section">
-        <div class="help-subtitle">💡 기타</div>
-        <div class="help-text">
-          • 재료명 입력 시 이전에 사용한 원료가 자동완성됩니다.<br>
-          • 투입량 열 클릭 시 내림/오름차순 정렬이 가능합니다.<br>
-          • Enter 키로 아래 행 이동, 마지막 행에서 Enter 시 새 행이 추가됩니다.
-        </div>
-      </div>
-    </div>
-    <div class="help-footer">
-      <button class="modal-btn modal-btn-cancel" onclick="closeHelp()" style="width:100%;">닫기</button>
-    </div>
-  </div>
-</div>
-<div class="loading-overlay hidden" id="loading"><div class="spinner"></div></div>
-
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<div class="lock-overlay" id="lockOverlay">저장 중...</div>
 
 <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyDVnVaaNG7dGsmMKJmU4eeYVRaJen_Sa6Y",
-    authDomain: "m-db-6fe4e.firebaseapp.com",
-    projectId: "m-db-6fe4e",
-    storageBucket: "m-db-6fe4e.appspot.com",
-    messagingSenderId: "891482085043",
-    appId: "1:891482085043:web:1b0e3e67ff283687c4fa97"
-  };
+/* =========================================================
+   설정 및 기본 데이터 구조
+   ========================================================= */
+const ITEMS = ['위생모','위생복','위생화','앞치마','토시'];
+const DOC_PATH = { collection:'appData', doc:'consumableSupply' };
+const BACKUP_KEY = 'backup_consumableSupply';
+const SIZE_PRESETS = ['S','M','L','XL','XXL','XXXL'];
+const SHOE_SIZES = ['220','230','240','250','260','270','280','290','300'];
 
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
-  const COLLECTION = 'appData';
-  const DOC_ID = 'recipes';
-  const DICT_DOC_ID = 'recipes_materialDict';
+// 파일을 수정할 때마다 아래 두 값을 갱신하세요. (우측 상단 배지에 표시됨, 날짜만 기록)
+const APP_VERSION = 'v1.6';
+const LAST_UPDATED = '2026-07-13';
 
-  let rowCounter = 0;
-  let currentRecipeData = null;
-  let currentVersion = null;      // { stage: 'initial'|'change', ver: number }
-  let isReadonly = false;
-  let sortState = 0;
-  let originalOrder = [];
+// TODO: 실제 프로젝트(bbang-ssaem-prod)의 firebaseConfig 값으로 교체하세요.
+// 기존 원료수불부.html / 통합관리.html 에서 사용 중인 설정과 동일한 값을 넣으면 됩니다.
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "bbang-ssaem-prod.firebaseapp.com",
+  projectId: "bbang-ssaem-prod",
+  storageBucket: "bbang-ssaem-prod.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
 
-  let materialDict = {};
+let db = null;
+let fbLoadFailed = false;
+let appData = { employees: [], records: {} }; // records[empId][item] = [ '260713', ... ]
+let currentItemCtx = null; // {empId, item}
+let expandedEmpId = null;  // 아코디언으로 펼쳐진 직원 id
+let editingSizesEmpId = null; // 사이즈 수정 중인 직원 id
+let searchTerm = '';       // 직원 검색어
+let sortDir = 'asc';       // 이름 정렬 방향 (asc: 가나다순, desc: 역순)
 
-  // ─────────────────────────────
-  // 현재 단계 판별 헬퍼
-  // ─────────────────────────────
-  function isFinalized(recipe) {
-    return recipe && recipe.initialFinalized === true;
+/* =========================================================
+   Firebase 초기화 및 로드 (기존 MES 파일 패턴: 3초 타임아웃, 백업 fallback)
+   ========================================================= */
+function initFirebase(){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+  }catch(e){
+    console.error('Firebase 초기화 실패', e);
+    fbLoadFailed = true;
   }
+}
 
-  function getCurrentStage(recipe) {
-    if (!recipe) return 'initial';
-    return isFinalized(recipe) ? 'change' : 'initial';
-  }
+function setStatus(text, ok){
+  const el = document.getElementById('statusText');
+  el.textContent = text;
+  el.style.color = ok === false ? '#ffb4b4' : (ok === true ? '#b6e6c9' : '#cfe0f0');
+}
 
-  function getStageVersions(recipe, stage) {
-    if (!recipe) return {};
-    return stage === 'initial' ? (recipe.initialVersions || {}) : (recipe.versions || {});
-  }
-
-  function getLatestVer(recipe, stage) {
-    const vers = getStageVersions(recipe, stage);
-    const nums = Object.keys(vers).map(Number);
-    return nums.length > 0 ? Math.max(...nums) : 0;
-  }
-
-  // ─────────────────────────────
-  // UI 상태 업데이트
-  // ─────────────────────────────
-  function updateStageUI(recipe) {
-    const indicator = document.getElementById('stageIndicator');
-    const btnFinalize = document.getElementById('btnFinalize');
-    const stage = getCurrentStage(recipe);
-
-    if (stage === 'initial') {
-      indicator.textContent = '초기 단계';
-      indicator.className = 'stage-indicator stage-initial';
-      btnFinalize.disabled = false;
-      btnFinalize.style.display = '';
+async function loadData(){
+  setStatus('데이터 불러오는 중...');
+  const forceUnlock = setTimeout(()=>{ hideLock(); }, 10000);
+  try{
+    if(!db) throw new Error('Firestore 미초기화');
+    const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
+    const snap = await Promise.race([
+      docRef.get(),
+      new Promise((_, reject)=> setTimeout(()=> reject(new Error('timeout')), 3000))
+    ]);
+    if(snap.exists){
+      const d = snap.data();
+      appData = {
+        employees: Array.isArray(d.employees) ? d.employees : [],
+        records: d.records && typeof d.records === 'object' ? d.records : {}
+      };
     } else {
-      indicator.textContent = '변경 단계';
-      indicator.className = 'stage-indicator stage-change';
-      btnFinalize.disabled = true;
-      btnFinalize.style.display = 'none';
+      appData = { employees: [], records: {} };
     }
-  }
-
-  // ─────────────────────────────
-  // 원료사전 로드/저장
-  // ─────────────────────────────
-  async function loadMaterialDict() {
-    try {
-      const doc = await db.collection(COLLECTION).doc(DICT_DOC_ID).get();
-      if (doc.exists) materialDict = doc.data();
-    } catch (e) { console.error('원료사전 로드 실패:', e); }
-  }
-
-  async function saveMaterialDict(newEntries) {
-    try {
-      let updated = false;
-      for (const [name, type] of Object.entries(newEntries)) {
-        if (name && type && materialDict[name] !== type) {
-          materialDict[name] = type;
-          updated = true;
-        }
-      }
-      if (updated) {
-        await db.collection(COLLECTION).doc(DICT_DOC_ID).set(materialDict);
-      }
-    } catch (e) { console.error('원료사전 저장 실패:', e); }
-  }
-
-  // ─────────────────────────────
-  // 자동완성
-  // ─────────────────────────────
-  function setupAutocomplete(nameInput, typeInput) {
-    const td = nameInput.closest('td');
-    let acList = td.querySelector('.ac-list');
-    if (!acList) {
-      acList = document.createElement('div');
-      acList.className = 'ac-list';
-      td.appendChild(acList);
+    fbLoadFailed = false;
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(appData));
+    setStatus('Firebase 연결됨 · 정상 동기화', true);
+  }catch(e){
+    console.error('Firebase 로드 실패, 로컬 백업 사용', e);
+    fbLoadFailed = true;
+    const backup = localStorage.getItem(BACKUP_KEY);
+    if(backup){
+      try{ appData = JSON.parse(backup); }
+      catch(_e){ appData = { employees: [], records: {} }; }
+      setStatus('⚠ Firebase 연결 실패 · 로컬 백업 데이터 표시 중 (저장 제한됨)', false);
+    } else {
+      appData = { employees: [], records: {} };
+      setStatus('⚠ Firebase 연결 실패 · 백업 데이터 없음', false);
     }
+  }finally{
+    clearTimeout(forceUnlock);
+    render();
+  }
+}
 
-    let acIndex = -1;
+async function saveData(){
+  // 항상 로컬 백업 먼저 저장 (Firebase 실패 대비 가드)
+  localStorage.setItem(BACKUP_KEY, JSON.stringify(appData));
 
-    nameInput.addEventListener('input', () => {
-      const val = nameInput.value.trim();
-      acList.innerHTML = '';
-      acIndex = -1;
+  if(fbLoadFailed){
+    alert('Firebase 로드에 실패한 상태라 서버 저장이 제한됩니다.\n로컬에는 임시 저장되었습니다. 새로고침 후 다시 시도해주세요.');
+    return;
+  }
+  showLock();
+  const forceUnlock = setTimeout(()=>{ hideLock(); }, 10000);
+  try{
+    const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
+    await Promise.race([
+      docRef.set(appData),
+      new Promise((_, reject)=> setTimeout(()=> reject(new Error('timeout')), 3000))
+    ]);
+    setStatus('Firebase 연결됨 · 저장 완료', true);
+  }catch(e){
+    console.error('저장 실패', e);
+    alert('서버 저장에 실패했습니다. (로컬에는 백업됨)\n' + e.message);
+    setStatus('⚠ 저장 실패 · 로컬 백업만 유지 중', false);
+  }finally{
+    clearTimeout(forceUnlock);
+    hideLock();
+  }
+}
 
-      if (!val) { acList.classList.remove('show'); return; }
+function showLock(){ document.getElementById('lockOverlay').classList.add('show'); }
+function hideLock(){ document.getElementById('lockOverlay').classList.remove('show'); }
 
-      const matches = Object.keys(materialDict)
-        .filter(k => k.includes(val))
-        .slice(0, 6);
+/* =========================================================
+   렌더링
+   ========================================================= */
+function render(){
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
 
-      if (matches.length === 0) { acList.classList.remove('show'); return; }
-
-      matches.forEach((name, i) => {
-        const item = document.createElement('div');
-        item.className = 'ac-item';
-        item.dataset.index = i;
-        item.innerHTML = `<span>${name}</span><span class="ac-type">${materialDict[name]}</span>`;
-        item.addEventListener('mousedown', (e) => {
-          e.preventDefault();
-          selectAcItem(nameInput, typeInput, name, acList);
-        });
-        acList.appendChild(item);
-      });
-
-      acList.classList.add('show');
-    });
-
-    nameInput.addEventListener('keydown', (e) => {
-      const items = acList.querySelectorAll('.ac-item');
-      if (!acList.classList.contains('show') || items.length === 0) return;
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        acIndex = Math.min(acIndex + 1, items.length - 1);
-        updateAcActive(items, acIndex);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        acIndex = Math.max(acIndex - 1, 0);
-        updateAcActive(items, acIndex);
-      } else if (e.key === 'Enter' && acIndex >= 0) {
-        e.preventDefault();
-        e.stopPropagation();
-        const name = items[acIndex].querySelector('span').textContent;
-        selectAcItem(nameInput, typeInput, name, acList);
-      } else if (e.key === 'Escape') {
-        acList.classList.remove('show');
-        acIndex = -1;
-      }
-    });
-
-    nameInput.addEventListener('blur', () => {
-      setTimeout(() => {
-        acList.classList.remove('show');
-        acIndex = -1;
-      }, 150);
-    });
+  if(!appData.employees || appData.employees.length === 0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">등록된 직원이 없습니다. 상단의 "신규 직원 등록" 버튼을 눌러주세요.</td></tr>';
+    return;
   }
 
-  function selectAcItem(nameInput, typeInput, name, acList) {
-    nameInput.value = name;
-    typeInput.value = materialDict[name] || '';
-    acList.classList.remove('show');
-    const tr = nameInput.closest('tr');
-    const inputs = getRowInputs(tr);
-    const descIdx = 2;
-    if (inputs[descIdx]) inputs[descIdx].focus();
+  let list = appData.employees.slice();
+
+  if(searchTerm){
+    list = list.filter(emp => emp.name.includes(searchTerm));
   }
 
-  function updateAcActive(items, idx) {
-    items.forEach((el, i) => el.classList.toggle('active', i === idx));
+  list.sort((a,b)=> a.name.localeCompare(b.name, 'ko'));
+  if(sortDir === 'desc') list.reverse();
+
+  if(list.length === 0){
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">"${escapeHtml(searchTerm)}" 검색 결과가 없습니다.</td></tr>`;
+    return;
   }
 
-  // ─────────────────────────────
-  // 키보드 네비게이션
-  // ─────────────────────────────
-  function setupKeyNav(tr) {
-    const inputs = getRowInputs(tr);
-    inputs.forEach((input, colIdx) => {
-      input.addEventListener('keydown', (e) => {
-        const acList = input.closest('td')?.querySelector('.ac-list.show');
-        if (acList && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) return;
-        if (acList && e.key === 'Enter') return;
-
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          const allRows = Array.from(document.querySelectorAll('#tableBody tr'));
-          const rowIdx = allRows.indexOf(tr);
-
-          if (rowIdx === allRows.length - 1) {
-            const newTr = addRow();
-            if (newTr) {
-              const newInputs = getRowInputs(newTr);
-              if (newInputs[colIdx]) newInputs[colIdx].focus();
-              else if (newInputs[0]) newInputs[0].focus();
-            }
-          } else {
-            const nextRow = allRows[rowIdx + 1];
-            const nextInputs = getRowInputs(nextRow);
-            if (nextInputs[colIdx]) nextInputs[colIdx].focus();
-          }
-        }
-      });
-    });
-  }
-
-  function getRowInputs(tr) {
-    return Array.from(tr.querySelectorAll('input'));
-  }
-
-  // ─────────────────────────────
-  // 행 관리
-  // ─────────────────────────────
-  function addRow(data = {}) {
-    if (isReadonly) return null;
-    rowCounter++;
-    const tbody = document.getElementById('tableBody');
+  list.forEach(emp=>{
     const tr = document.createElement('tr');
-    tr.dataset.rowId = String(rowCounter);
+    if(expandedEmpId === emp.id) tr.className = 'expanded';
 
-    tr.innerHTML = `
-      <td class="no-cell">${tbody.children.length + 1}</td>
-      <td><input type="text" data-col="type" value="${escHtml(data.foodType || '')}" placeholder="식품유형"></td>
-      <td><input type="text" data-col="name" value="${escHtml(data.materialName || '')}" placeholder="재료명"></td>
-      <td><input type="text" data-col="desc" value="${escHtml(data.description || '')}" placeholder="내용"></td>
-      <td><input type="number" data-col="amount" class="amount-input" value="${data.amount || ''}" placeholder="0" step="any" oninput="calcRatio()"></td>
-      <td class="ratio-cell">${data.amount ? '0.00' : ''}</td>
-      <td><input type="text" data-col="allergen" value="${escHtml(data.allergen || '')}" placeholder=""></td>
-      <td><button class="btn-row-del" onclick="deleteRow(this)" title="삭제">✕</button></td>
-    `;
+    const nameTd = document.createElement('td');
+    nameTd.textContent = emp.name;
+    nameTd.onclick = ()=> toggleAccordion(emp.id);
+    tr.appendChild(nameTd);
 
-    tbody.appendChild(tr);
+    ITEMS.forEach(item=>{
+      const td = document.createElement('td');
+      const records = getRecords(emp.id, item);
+      const latest = records.length ? records[records.length-1] : null;
 
-    const typeInput = tr.querySelector('[data-col="type"]');
-    const nameInput = tr.querySelector('[data-col="name"]');
-    setupAutocomplete(nameInput, typeInput);
-    setupKeyNav(tr);
-
-    calcRatio();
-    return tr;
-  }
-
-  function addRowReadonly(data = {}) {
-    rowCounter++;
-    const tbody = document.getElementById('tableBody');
-    const tr = document.createElement('tr');
-
-    tr.innerHTML = `
-      <td class="no-cell">${tbody.children.length + 1}</td>
-      <td><input type="text" value="${escHtml(data.foodType || '')}" readonly></td>
-      <td><input type="text" value="${escHtml(data.materialName || '')}" readonly></td>
-      <td><input type="text" value="${escHtml(data.description || '')}" readonly></td>
-      <td><input type="number" class="amount-input" value="${data.amount || ''}" readonly></td>
-      <td class="ratio-cell">0.00</td>
-      <td><input type="text" value="${escHtml(data.allergen || '')}" readonly></td>
-      <td></td>
-    `;
-
-    tbody.appendChild(tr);
-    calcRatio();
-  }
-
-  function escHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  function deleteRow(btn) {
-    if (isReadonly) return;
-    btn.closest('tr').remove();
-    reNumberRows();
-    calcRatio();
-    resetSort();
-  }
-
-  function reNumberRows() {
-    document.querySelectorAll('#tableBody tr').forEach((tr, i) => {
-      tr.querySelector('td:first-child').textContent = i + 1;
-    });
-  }
-
-  // ─────────────────────────────
-  // 구성비 자동계산
-  // ─────────────────────────────
-  function calcRatio() {
-    const rows = document.querySelectorAll('#tableBody tr');
-    let total = 0;
-    rows.forEach(tr => { total += parseFloat(tr.querySelector('.amount-input').value) || 0; });
-    rows.forEach(tr => {
-      const val = parseFloat(tr.querySelector('.amount-input').value) || 0;
-      tr.querySelector('.ratio-cell').textContent = (total > 0 && val > 0) ? ((val / total) * 100).toFixed(2) : '';
-    });
-    document.getElementById('totalAmount').textContent = total > 0 ? total.toFixed(3) : '0.000';
-    document.getElementById('totalRatio').textContent = total > 0 ? '100.00' : '0.00';
-  }
-
-  // ─────────────────────────────
-  // 투입량 정렬
-  // ─────────────────────────────
-  function toggleSort() {
-    sortState = (sortState + 1) % 3;
-    const arrow = document.getElementById('sortArrow');
-    const tbody = document.getElementById('tableBody');
-    const rows = Array.from(tbody.querySelectorAll('tr'));
-
-    if (sortState === 0) {
-      arrow.textContent = '';
-      if (originalOrder.length > 0) {
-        originalOrder.forEach(id => {
-          const tr = rows.find(r => r.dataset.rowId === id);
-          if (tr) tbody.appendChild(tr);
-        });
-      }
-    } else {
-      if (sortState === 1) originalOrder = rows.map(r => r.dataset.rowId);
-      rows.sort((a, b) => {
-        const va = parseFloat(a.querySelector('.amount-input').value) || 0;
-        const vb = parseFloat(b.querySelector('.amount-input').value) || 0;
-        return sortState === 1 ? vb - va : va - vb;
-      });
-      arrow.textContent = sortState === 1 ? ' ▼' : ' ▲';
-      rows.forEach(tr => tbody.appendChild(tr));
-    }
-    reNumberRows();
-  }
-
-  function resetSort() {
-    sortState = 0;
-    originalOrder = [];
-    document.getElementById('sortArrow').textContent = '';
-  }
-
-  // ─────────────────────────────
-  // 읽기전용
-  // ─────────────────────────────
-  function setReadonly(readonly) {
-    isReadonly = readonly;
-    document.getElementById('readonlyBanner').classList.toggle('show', readonly);
-    document.getElementById('tableFooter').style.display = readonly ? 'none' : 'flex';
-  }
-
-  // ─────────────────────────────
-  // 버전 탭 렌더링 (2단계)
-  // ─────────────────────────────
-  function renderVersionTabs(recipe, activeStage, activeVer) {
-    const bar = document.getElementById('versionBar');
-    const initialTabs = document.getElementById('initialTabs');
-    const changeTabs = document.getElementById('changeTabs');
-    const initialTitle = document.getElementById('initialTitle');
-    const changeSection = document.getElementById('changeSection');
-    const divider = document.getElementById('versionDivider');
-
-    initialTabs.innerHTML = '';
-    changeTabs.innerHTML = '';
-
-    if (!recipe) { bar.classList.remove('show'); return; }
-
-    const initVers = recipe.initialVersions || {};
-    const changeVers = recipe.versions || {};
-    const initNums = Object.keys(initVers).map(Number).sort((a, b) => a - b);
-    const changeNums = Object.keys(changeVers).map(Number).sort((a, b) => a - b);
-
-    if (initNums.length === 0 && changeNums.length === 0) {
-      bar.classList.remove('show');
-      return;
-    }
-
-    bar.classList.add('show');
-
-    const finalized = isFinalized(recipe);
-    const finalVer = recipe.initialFinalVer || 0;
-
-    // 초기 이력 타이틀
-    if (finalized) {
-      initialTitle.innerHTML = '📋 초기 이력 <span class="finalized-badge">확정 완료</span>';
-    } else {
-      initialTitle.innerHTML = '📋 초기 이력';
-    }
-
-    // 초기 단계 최신 버전
-    const initLatest = initNums.length > 0 ? initNums[initNums.length - 1] : 0;
-
-    // 초기 탭 렌더
-    initNums.forEach(v => {
       const btn = document.createElement('button');
-      const isActive = activeStage === 'initial' && v === activeVer;
-      btn.className = 'version-tab initial-tab' + (isActive ? ' active' : '');
-      const dateStr = initVers[v].savedAt ? formatDate(initVers[v].savedAt) : '';
+      btn.className = 'cell-btn' + (latest ? ' issued' : '');
+      btn.onclick = ()=> openItemModal(emp.id, item);
 
-      let label = v === 1 ? '초기' : `초기 ${v - 1}차`;
-      if (finalized && v === finalVer) label += ' (확정)';
-      else if (!finalized && v === initLatest) label += ' (최신)';
+      const mark = document.createElement('div');
+      mark.className = 'mark';
+      mark.textContent = latest ? '✔' : '☐';
+      btn.appendChild(mark);
 
-      btn.innerHTML = `
-        <span class="version-label">${label}</span>
-        <span class="version-date">${dateStr}</span>
-      `;
-      btn.onclick = () => loadVersionByStage(recipe, 'initial', v);
-      initialTabs.appendChild(btn);
+      if(latest){
+        const dateDiv = document.createElement('div');
+        dateDiv.className = 'date';
+        dateDiv.textContent = formatDisplayDate(latest);
+        btn.appendChild(dateDiv);
+      }
+
+      td.appendChild(btn);
+      tr.appendChild(td);
     });
 
-    // 변경 단계
-    if (changeNums.length > 0) {
-      changeSection.style.display = '';
-      divider.style.display = '';
+    tbody.appendChild(tr);
 
-      const changeLatest = changeNums[changeNums.length - 1];
-      changeNums.forEach(v => {
-        const btn = document.createElement('button');
-        const isActive = activeStage === 'change' && v === activeVer;
-        btn.className = 'version-tab' + (isActive ? ' active' : '');
-        const dateStr = changeVers[v].savedAt ? formatDate(changeVers[v].savedAt) : '';
-        const label = v === changeLatest ? `${v}차 (최신)` : `${v}차`;
+    if(expandedEmpId === emp.id){
+      tbody.appendChild(buildAccordionRow(emp));
+    }
+  });
+}
 
-        btn.innerHTML = `
-          <span class="version-label">${label}</span>
-          <span class="version-date">${dateStr}</span>
-        `;
-        btn.onclick = () => loadVersionByStage(recipe, 'change', v);
-        changeTabs.appendChild(btn);
-      });
+function applySearch(){
+  searchTerm = document.getElementById('searchInput').value.trim();
+  render();
+}
+
+function toggleSort(){
+  sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
+  const btn = document.getElementById('sortBtn');
+  const label = document.getElementById('sortBtnLabel');
+  if(sortDir === 'desc'){
+    btn.classList.add('desc');
+    label.textContent = '역순';
+  } else {
+    btn.classList.remove('desc');
+    label.textContent = '가나다순';
+  }
+  render();
+}
+
+function getSizes(emp){
+  const s = emp.sizes || {};
+  // 이전 버전(위생복 단일값) 데이터 호환: 위생복 값이 있으면 상의로 이관
+  return {
+    상의: s.상의 || s.위생복 || '',
+    하의: s.하의 || '',
+    위생화: s.위생화 || ''
+  };
+}
+
+/* 사이즈 나열형 토글 버튼 (S~XXXL, 위생화 220~300 공용) */
+function sizeToggleHtml(hiddenId, options, currentValue){
+  const val = currentValue || '';
+  const btns = options.map(o=>
+    `<button type="button" class="toggle-btn${o===val ? ' active' : ''}" onclick="selectSizeToggle('${hiddenId}','${o}')">${o}</button>`
+  ).join('');
+  return `<div class="size-toggle" id="${hiddenId}_wrap">
+      <input type="hidden" id="${hiddenId}" value="${escapeHtml(val)}">
+      ${btns}
+    </div>`;
+}
+
+function selectSizeToggle(hiddenId, value){
+  const hidden = document.getElementById(hiddenId);
+  const wrap = document.getElementById(hiddenId + '_wrap');
+  // 같은 값을 다시 누르면 선택 해제, 다른 값이면 그 값으로 교체
+  const newVal = (hidden.value === value) ? '' : value;
+  hidden.value = newVal;
+  wrap.querySelectorAll('.toggle-btn').forEach(b=>{
+    b.classList.toggle('active', b.textContent === newVal);
+  });
+}
+
+function readSizeToggle(hiddenId){
+  const hidden = document.getElementById(hiddenId);
+  return hidden ? hidden.value : '';
+}
+
+function buildAccordionRow(emp){
+  const tr = document.createElement('tr');
+  tr.className = 'accordion-row';
+
+  const td = document.createElement('td');
+  td.colSpan = 6;
+
+  const inner = document.createElement('div');
+  inner.className = 'accordion-inner';
+
+  /* ---- 상단: 사이즈 + 액션 ---- */
+  const head = document.createElement('div');
+  head.className = 'acc-head';
+
+  const sizesWrap = document.createElement('div');
+  sizesWrap.className = 'acc-sizes';
+
+  if(editingSizesEmpId === emp.id){
+    const sizes = getSizes(emp);
+    sizesWrap.innerHTML = `
+      <span>상의 ${sizeToggleHtml('editTopSize', SIZE_PRESETS, sizes.상의)}</span>
+      <span>하의 ${sizeToggleHtml('editBottomSize', SIZE_PRESETS, sizes.하의)}</span>
+      <span>위생화 ${sizeToggleHtml('editShoeSize', SHOE_SIZES, sizes.위생화)}</span>
+    `;
+  } else {
+    const sizes = getSizes(emp);
+    const top = sizes.상의 ? sizes.상의 : '미등록';
+    const bottom = sizes.하의 ? sizes.하의 : '미등록';
+    const shoe = sizes.위생화 ? sizes.위생화 : '미등록';
+    sizesWrap.innerHTML = `<span><b>상의</b> ${escapeHtml(top)}</span><span><b>하의</b> ${escapeHtml(bottom)}</span><span><b>위생화</b> ${escapeHtml(shoe)}</span>`;
+  }
+  head.appendChild(sizesWrap);
+
+  const actions = document.createElement('div');
+  actions.className = 'acc-actions';
+
+  if(editingSizesEmpId === emp.id){
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn-teal';
+    saveBtn.textContent = '저장';
+    saveBtn.onclick = ()=> saveSizes(emp.id);
+    actions.appendChild(saveBtn);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn-gray';
+    cancelBtn.textContent = '취소';
+    cancelBtn.onclick = ()=> { editingSizesEmpId = null; render(); };
+    actions.appendChild(cancelBtn);
+  } else {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn-gray';
+    editBtn.textContent = '사이즈 수정';
+    editBtn.onclick = ()=> { editingSizesEmpId = emp.id; render(); };
+    actions.appendChild(editBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-danger';
+    delBtn.textContent = '이 직원 삭제';
+    delBtn.onclick = ()=> deleteEmployee(emp.id);
+    actions.appendChild(delBtn);
+  }
+  head.appendChild(actions);
+  inner.appendChild(head);
+
+  /* ---- 하단: 품목별 이력 ---- */
+  const itemsWrap = document.createElement('div');
+  itemsWrap.className = 'acc-items';
+
+  ITEMS.forEach(item=>{
+    const block = document.createElement('div');
+    block.className = 'acc-item-block';
+
+    const h5 = document.createElement('h5');
+    const titleSpan = document.createElement('span');
+    titleSpan.textContent = item;
+    h5.appendChild(titleSpan);
+
+    const sizes = getSizes(emp);
+    const badgeWrap = document.createElement('span');
+    if(item === '위생복' && (sizes.상의 || sizes.하의)){
+      if(sizes.상의){
+        const b1 = document.createElement('span');
+        b1.className = 'size-badge';
+        b1.textContent = '상 ' + sizes.상의;
+        badgeWrap.appendChild(b1);
+      }
+      if(sizes.하의){
+        const b2 = document.createElement('span');
+        b2.className = 'size-badge';
+        b2.textContent = '하 ' + sizes.하의;
+        badgeWrap.appendChild(b2);
+      }
+    } else if(item === '위생화' && sizes.위생화){
+      const badge = document.createElement('span');
+      badge.className = 'size-badge';
+      badge.textContent = sizes.위생화;
+      badgeWrap.appendChild(badge);
+    }
+    h5.appendChild(badgeWrap);
+    block.appendChild(h5);
+
+    const records = getRecords(emp.id, item);
+    if(records.length === 0){
+      const p = document.createElement('div');
+      p.className = 'none';
+      p.textContent = '지급 이력 없음';
+      block.appendChild(p);
     } else {
-      changeSection.style.display = 'none';
-      divider.style.display = 'none';
-    }
-  }
-
-  function formatDate(isoStr) {
-    try {
-      const d = new Date(isoStr);
-      return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    } catch { return ''; }
-  }
-
-  // ─────────────────────────────
-  // 버전 로드 (단계 구분)
-  // ─────────────────────────────
-  function loadVersionByStage(recipe, stage, verNum) {
-    currentVersion = { stage, ver: verNum };
-    const vers = getStageVersions(recipe, stage);
-    const verData = vers[verNum];
-    if (!verData) return;
-
-    document.getElementById('tableBody').innerHTML = '';
-    rowCounter = 0;
-    resetSort();
-
-    // 읽기전용 판별
-    let editable = false;
-    if (stage === 'initial') {
-      if (!isFinalized(recipe)) {
-        // 초기 미확정: 최신만 편집 가능
-        const latestInit = getLatestVer(recipe, 'initial');
-        editable = (verNum === latestInit);
-      }
-      // 확정됐으면 초기는 전부 읽기전용
-    } else {
-      // 변경 단계: 최신만 편집 가능
-      const latestChange = getLatestVer(recipe, 'change');
-      editable = (verNum === latestChange);
-    }
-
-    setReadonly(!editable);
-    verData.ingredients.forEach(ing => editable ? addRow(ing) : addRowReadonly(ing));
-    calcRatio();
-    renderVersionTabs(recipe, stage, verNum);
-    updateStageUI(recipe);
-  }
-
-  // ─────────────────────────────
-  // 커스텀 모달
-  // ─────────────────────────────
-  function openModal(msg, onConfirm, options = {}) {
-    document.getElementById('modalMsg').textContent = msg;
-    document.getElementById('modalIcon').textContent = options.icon || '⚠️';
-    const confirmBtn = document.getElementById('modalConfirmBtn');
-    confirmBtn.textContent = options.confirmText || '확인';
-    confirmBtn.className = 'modal-btn ' + (options.confirmClass || 'modal-btn-confirm');
-    confirmBtn.onclick = () => { closeModal(); onConfirm(); };
-    document.getElementById('modalOverlay').classList.add('show');
-  }
-
-  function closeModal() {
-    document.getElementById('modalOverlay').classList.remove('show');
-  }
-
-  function openHelp() {
-    document.getElementById('helpOverlay').classList.add('show');
-  }
-
-  function closeHelp() {
-    document.getElementById('helpOverlay').classList.remove('show');
-  }
-
-  function confirmDelete() {
-    const sel = document.getElementById('recipeList').value;
-    if (!sel) { showToast('삭제할 레시피를 선택해 주세요.'); return; }
-    openModal(`"${sel}" 레시피의\n모든 버전을 삭제하시겠습니까?`, () => deleteRecipe(sel));
-  }
-
-  function confirmReset() {
-    openModal('입력 내용을 모두 초기화하시겠습니까?', resetAll);
-  }
-
-  function confirmFinalize() {
-    if (!currentRecipeData || isFinalized(currentRecipeData)) {
-      showToast('확정할 수 없는 상태입니다.');
-      return;
-    }
-    const productName = document.getElementById('productName').value.trim();
-    if (!productName) { showToast('제품명을 입력해 주세요.'); return; }
-
-    const initNums = Object.keys(currentRecipeData.initialVersions || {}).map(Number);
-    if (initNums.length === 0) { showToast('초기 배합비를 먼저 저장해 주세요.'); return; }
-
-    openModal(
-      `"${productName}" 초기 배합비를\n최종 확정하시겠습니까?\n\n확정 후 초기 이력은 수정 불가하며,\n이후 저장은 변경(1차~)으로 진행됩니다.`,
-      () => finalizeInitial(productName),
-      { icon: '✅', confirmText: '최종확정', confirmClass: 'modal-btn-finalize' }
-    );
-  }
-
-  // ─────────────────────────────
-  // 최종확정
-  // ─────────────────────────────
-  async function finalizeInitial(productName) {
-    showLoading(true);
-    try {
-      const docRef = db.collection(COLLECTION).doc(DOC_ID);
-      const docSnap = await docRef.get();
-      let allRecipes = docSnap.exists ? docSnap.data() : {};
-      let recipe = allRecipes[productName];
-      if (!recipe) { showToast('레시피를 찾을 수 없습니다.'); showLoading(false); return; }
-
-      const latestInit = getLatestVer(recipe, 'initial');
-      recipe.initialFinalized = true;
-      recipe.initialFinalVer = latestInit;
-      recipe.updatedAt = new Date().toISOString();
-
-      allRecipes[productName] = recipe;
-      await docRef.set(allRecipes);
-
-      currentRecipeData = recipe;
-      // 확정된 최신 초기 버전 표시 (읽기전용)
-      loadVersionByStage(recipe, 'initial', latestInit);
-
-      showToast(`"${productName}" 초기 배합비 최종 확정 완료!`);
-      await loadRecipeList();
-    } catch (err) {
-      console.error(err);
-      showToast('확정 실패: ' + err.message);
-    }
-    showLoading(false);
-  }
-
-  // ─────────────────────────────
-  // Firebase 저장
-  // ─────────────────────────────
-  async function saveRecipe() {
-    if (isReadonly) { showToast('과거 이력은 수정할 수 없습니다. 최신 버전 탭을 선택해 주세요.'); return; }
-
-    const productName = document.getElementById('productName').value.trim();
-    if (!productName) { showToast('제품명을 입력해 주세요.'); return; }
-
-    const rows = document.querySelectorAll('#tableBody tr');
-    if (rows.length === 0) { showToast('원재료를 추가해 주세요.'); return; }
-
-    const ingredients = [];
-    const dictEntries = {};
-    rows.forEach((tr, i) => {
-      const inputs = tr.querySelectorAll('input');
-      const foodType = inputs[0].value.trim();
-      const materialName = inputs[1].value.trim();
-      ingredients.push({
-        no: i + 1,
-        foodType,
-        materialName,
-        description: inputs[2].value.trim(),
-        amount: parseFloat(inputs[3].value) || 0,
-        allergen: inputs[4].value.trim()
+      const ul = document.createElement('ul');
+      records.slice().reverse().forEach(raw=>{
+        const li = document.createElement('li');
+        li.textContent = formatDisplayDate(raw);
+        ul.appendChild(li);
       });
-      if (materialName && foodType) dictEntries[materialName] = foodType;
-    });
-
-    showLoading(true);
-    try {
-      const docRef = db.collection(COLLECTION).doc(DOC_ID);
-      const docSnap = await docRef.get();
-      let allRecipes = docSnap.exists ? docSnap.data() : {};
-
-      let recipe = allRecipes[productName];
-      if (!recipe) {
-        recipe = { productName, initialVersions: {}, versions: {}, initialFinalized: false };
-      }
-
-      // 구 형식 호환: initialVersions가 없으면 생성
-      if (!recipe.initialVersions) recipe.initialVersions = {};
-      if (recipe.initialFinalized === undefined) recipe.initialFinalized = false;
-
-      const stage = getCurrentStage(recipe);
-      let newVer, stageLabel;
-
-      if (stage === 'initial') {
-        newVer = getLatestVer(recipe, 'initial') + 1;
-        recipe.initialVersions[newVer] = { ingredients, savedAt: new Date().toISOString() };
-        stageLabel = newVer === 1 ? '초기' : `초기 ${newVer - 1}차`;
-      } else {
-        if (!recipe.versions) recipe.versions = {};
-        newVer = getLatestVer(recipe, 'change') + 1;
-        recipe.versions[newVer] = { ingredients, savedAt: new Date().toISOString() };
-        recipe.currentVersion = newVer;
-        stageLabel = `${newVer}차`;
-      }
-
-      recipe.updatedAt = new Date().toISOString();
-      allRecipes[productName] = recipe;
-      await docRef.set(allRecipes);
-
-      await saveMaterialDict(dictEntries);
-
-      currentRecipeData = recipe;
-      currentVersion = { stage, ver: newVer };
-      resetSort();
-      renderVersionTabs(recipe, stage, newVer);
-      setReadonly(false);
-      updateStageUI(recipe);
-
-      showToast(`"${productName}" ${stageLabel} 저장 완료!`);
-      await loadRecipeList();
-    } catch (err) {
-      console.error(err);
-      showToast('저장 실패: ' + err.message);
+      block.appendChild(ul);
     }
-    showLoading(false);
-  }
-
-  // ─────────────────────────────
-  // Firebase 목록 로드
-  // ─────────────────────────────
-  async function loadRecipeList() {
-    try {
-      const docRef = db.collection(COLLECTION).doc(DOC_ID);
-      const docSnap = await docRef.get();
-      const select = document.getElementById('recipeList');
-      const currentVal = select.value;
-      select.innerHTML = '<option value="">-- 저장된 레시피 선택 --</option>';
-
-      if (docSnap.exists) {
-        const data = docSnap.data();
-        const names = Object.keys(data).sort();
-        names.forEach(name => {
-          const recipe = data[name];
-          const opt = document.createElement('option');
-          opt.value = name;
-
-          let info = '';
-          const finalized = isFinalized(recipe);
-
-          if (finalized && recipe.versions) {
-            const changeNums = Object.keys(recipe.versions).map(Number);
-            if (changeNums.length > 0) {
-              const latest = Math.max(...changeNums);
-              const dateStr = recipe.versions[latest].savedAt ? formatDate(recipe.versions[latest].savedAt) : '';
-              info = dateStr ? `${latest}차 · ${dateStr}` : `${latest}차`;
-            } else {
-              info = '확정 완료';
-            }
-          } else if (recipe.initialVersions) {
-            const initNums = Object.keys(recipe.initialVersions).map(Number);
-            if (initNums.length > 0) {
-              const latest = Math.max(...initNums);
-              const label = latest === 1 ? '초기' : `초기 ${latest - 1}차`;
-              const dateStr = recipe.initialVersions[latest].savedAt ? formatDate(recipe.initialVersions[latest].savedAt) : '';
-              info = dateStr ? `${label} · ${dateStr}` : label;
-            }
-          } else if (recipe.versions) {
-            // 구 형식 호환
-            const verNums = Object.keys(recipe.versions).map(Number);
-            if (verNums.length > 0) {
-              const latestVer = Math.max(...verNums);
-              const dateStr = recipe.versions[latestVer].savedAt ? formatDate(recipe.versions[latestVer].savedAt) : '';
-              info = dateStr ? `${latestVer}차 · ${dateStr}` : `${latestVer}차`;
-            }
-          }
-
-          opt.textContent = info ? `${name} (${info})` : name;
-          select.appendChild(opt);
-        });
-        if (currentVal && names.includes(currentVal)) select.value = currentVal;
-      }
-    } catch (err) { console.error('목록 로드 실패:', err); }
-  }
-
-  // ─────────────────────────────
-  // Firebase 불러오기
-  // ─────────────────────────────
-  async function loadRecipe() {
-    const selectedName = document.getElementById('recipeList').value;
-    if (!selectedName) { showToast('불러올 레시피를 선택해 주세요.'); return; }
-
-    showLoading(true);
-    try {
-      const docSnap = await db.collection(COLLECTION).doc(DOC_ID).get();
-      if (docSnap.exists && docSnap.data()[selectedName]) {
-        let recipe = docSnap.data()[selectedName];
-        document.getElementById('productName').value = recipe.productName || selectedName;
-
-        // ─── 구 형식 마이그레이션 ───
-        // 구 형식: versions만 있고 initialVersions가 없는 경우
-        if (recipe.versions && !recipe.initialVersions && recipe.initialFinalized === undefined) {
-          // 구 형식 데이터 → 기존 버전을 변경 이력으로 유지하되
-          // initialVersions를 빈 상태로 생성, 확정된 것으로 표시
-          // (이미 변경 이력이 있으므로 초기는 건너뛴 것으로 간주)
-          recipe.initialVersions = {};
-          recipe.initialFinalized = true;
-          recipe.initialFinalVer = 0;
-        }
-
-        // 구 형식 (ingredients만 있는 경우)
-        if (recipe.ingredients && !recipe.versions && !recipe.initialVersions) {
-          recipe.initialVersions = {
-            1: { ingredients: recipe.ingredients, savedAt: recipe.updatedAt || new Date().toISOString() }
-          };
-          recipe.initialFinalized = false;
-          delete recipe.ingredients;
-        }
-
-        currentRecipeData = recipe;
-        resetSort();
-
-        // 가장 최근 단계의 최신 버전 로드
-        const stage = getCurrentStage(recipe);
-        let targetStage, targetVer;
-
-        if (stage === 'change') {
-          const changeLatest = getLatestVer(recipe, 'change');
-          if (changeLatest > 0) {
-            targetStage = 'change';
-            targetVer = changeLatest;
-          } else {
-            // 확정됐지만 변경 이력이 없으면 확정 초기 표시
-            targetStage = 'initial';
-            targetVer = recipe.initialFinalVer || getLatestVer(recipe, 'initial');
-          }
-        } else {
-          targetStage = 'initial';
-          targetVer = getLatestVer(recipe, 'initial');
-        }
-
-        if (targetVer > 0) {
-          loadVersionByStage(recipe, targetStage, targetVer);
-          const label = targetStage === 'initial'
-            ? (targetVer === 1 ? '초기' : `초기 ${targetVer - 1}차`)
-            : `${targetVer}차`;
-          showToast(`"${selectedName}" ${label} 불러오기 완료!`);
-        } else {
-          // 빈 상태
-          document.getElementById('tableBody').innerHTML = '';
-          rowCounter = 0;
-          setReadonly(false);
-          for (let i = 0; i < 13; i++) addRow();
-          calcRatio();
-          updateStageUI(recipe);
-          renderVersionTabs(recipe, 'initial', 0);
-          showToast(`"${selectedName}" 불러오기 완료! (데이터를 입력 후 저장하세요)`);
-        }
-      } else {
-        showToast('레시피를 찾을 수 없습니다.');
-      }
-    } catch (err) {
-      console.error(err);
-      showToast('불러오기 실패: ' + err.message);
-    }
-    showLoading(false);
-  }
-
-  // ─────────────────────────────
-  // Firebase 삭제
-  // ─────────────────────────────
-  async function deleteRecipe(selectedName) {
-    showLoading(true);
-    try {
-      const docRef = db.collection(COLLECTION).doc(DOC_ID);
-      const docSnap = await docRef.get();
-      if (docSnap.exists) {
-        const data = docSnap.data();
-        delete data[selectedName];
-        await docRef.set(data);
-        currentRecipeData = null;
-        currentVersion = null;
-        document.getElementById('versionBar').classList.remove('show');
-        setReadonly(false);
-        resetSort();
-        updateStageUI(null);
-        showToast(`"${selectedName}" 삭제 완료!`);
-        await loadRecipeList();
-      }
-    } catch (err) {
-      console.error(err);
-      showToast('삭제 실패: ' + err.message);
-    }
-    showLoading(false);
-  }
-
-  // ─────────────────────────────
-  // 초기화
-  // ─────────────────────────────
-  function resetAll() {
-    document.getElementById('productName').value = '';
-    document.getElementById('tableBody').innerHTML = '';
-    document.getElementById('recipeList').value = '';
-    document.getElementById('versionBar').classList.remove('show');
-    setReadonly(false);
-    currentRecipeData = null;
-    currentVersion = null;
-    rowCounter = 0;
-    resetSort();
-    calcRatio();
-    updateStageUI(null);
-    for (let i = 0; i < 13; i++) addRow();
-    showToast('초기화 완료!');
-  }
-
-  // ─────────────────────────────
-  // 유틸
-  // ─────────────────────────────
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2500);
-  }
-
-  function showLoading(show) {
-    document.getElementById('loading').classList.toggle('hidden', !show);
-  }
-
-  // ─────────────────────────────
-  // 초기 실행
-  // ─────────────────────────────
-  window.addEventListener('DOMContentLoaded', async () => {
-    await loadMaterialDict();
-    for (let i = 0; i < 13; i++) addRow();
-    loadRecipeList();
-    updateStageUI(null);
+    itemsWrap.appendChild(block);
   });
 
-  document.getElementById('modalOverlay').addEventListener('click', (e) => {
-    // 아무것도 안 함 — X버튼이나 취소로만 닫힘
-  });
+  inner.appendChild(itemsWrap);
+  td.appendChild(inner);
+  tr.appendChild(td);
+  return tr;
+}
 
-  document.getElementById('helpOverlay').addEventListener('click', (e) => {
-    if (e.target === document.getElementById('helpOverlay')) closeHelp();
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, ch=>({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[ch]));
+}
+
+function toggleAccordion(empId){
+  editingSizesEmpId = null;
+  expandedEmpId = (expandedEmpId === empId) ? null : empId;
+  render();
+}
+
+function saveSizes(empId){
+  const emp = appData.employees.find(e=> e.id === empId);
+  if(!emp) return;
+  const top = readSizeToggle('editTopSize');
+  const bottom = readSizeToggle('editBottomSize');
+  const shoe = readSizeToggle('editShoeSize');
+  emp.sizes = { 상의: top, 하의: bottom, 위생화: shoe };
+  editingSizesEmpId = null;
+  render();
+  saveData();
+}
+
+function deleteEmployee(empId){
+  const emp = appData.employees.find(e=> e.id === empId);
+  if(!emp) return;
+  if(!confirm(`"${emp.name}" 직원을 삭제하시겠습니까?\n해당 직원의 모든 지급 이력이 함께 삭제됩니다.`)) return;
+
+  appData.employees = appData.employees.filter(e=> e.id !== empId);
+  delete appData.records[empId];
+  if(expandedEmpId === empId) expandedEmpId = null;
+
+  render();
+  saveData();
+}
+
+function getRecords(empId, item){
+  if(!appData.records[empId]) return [];
+  if(!appData.records[empId][item]) return [];
+  return appData.records[empId][item].slice().sort();
+}
+
+/* =========================================================
+   날짜 입력 포맷 (6자리 숫자 -> 00.00.00)
+   ========================================================= */
+function formatDateInput(inputEl){
+  let v = inputEl.value.replace(/[^0-9]/g,'');
+  if(v.length > 6) v = v.slice(0,6);
+  inputEl.value = v;
+}
+
+function formatDisplayDate(raw){
+  // raw: 6자리 숫자 문자열 YYMMDD
+  if(!raw || raw.length !== 6) return raw || '';
+  return raw.slice(0,2) + '.' + raw.slice(2,4) + '.' + raw.slice(4,6);
+}
+
+function isValidDate6(raw){
+  if(!/^\d{6}$/.test(raw)) return false;
+  const mm = parseInt(raw.slice(2,4),10);
+  const dd = parseInt(raw.slice(4,6),10);
+  return mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31;
+}
+
+/* =========================================================
+   신규 직원 등록 / 삭제
+   ========================================================= */
+function openAddEmployeeModal(){
+  document.getElementById('newEmpName').value = '';
+  document.getElementById('newEmpTopSizeWrap').innerHTML = sizeToggleHtml('newEmpTopSize', SIZE_PRESETS, '');
+  document.getElementById('newEmpBottomSizeWrap').innerHTML = sizeToggleHtml('newEmpBottomSize', SIZE_PRESETS, '');
+  document.getElementById('newEmpShoeSizeWrap').innerHTML = sizeToggleHtml('newEmpShoeSize', SHOE_SIZES, '');
+  document.getElementById('addEmpOverlay').classList.add('show');
+}
+
+function addEmployee(){
+  const nameInput = document.getElementById('newEmpName');
+  const name = nameInput.value.trim();
+  if(!name){ alert('직원 성명을 입력해주세요.'); return; }
+
+  const top = readSizeToggle('newEmpTopSize');
+  const bottom = readSizeToggle('newEmpBottomSize');
+  const shoe = readSizeToggle('newEmpShoeSize');
+
+  const id = 'emp_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+  appData.employees.push({ id, name, sizes: { 상의: top, 하의: bottom, 위생화: shoe } });
+  appData.records[id] = {};
+
+  closeModal('addEmpOverlay');
+  render();
+  saveData();
+}
+
+/* =========================================================
+   품목별 지급 등록 / 이력 모달
+   ========================================================= */
+function openItemModal(empId, item){
+  currentItemCtx = { empId, item };
+  const emp = appData.employees.find(e=> e.id === empId);
+  document.getElementById('itemModalTitle').textContent = `${emp ? emp.name : ''} · ${item}`;
+  document.getElementById('newDateInput').value = '';
+  renderHistoryList();
+  document.getElementById('itemOverlay').classList.add('show');
+}
+
+function renderHistoryList(){
+  const ul = document.getElementById('historyList');
+  ul.innerHTML = '';
+  if(!currentItemCtx) return;
+  const records = getRecords(currentItemCtx.empId, currentItemCtx.item);
+
+  if(records.length === 0){
+    ul.innerHTML = '<li class="none">지급 이력이 없습니다.</li>';
+    return;
+  }
+
+  records.slice().reverse().forEach(raw=>{
+    const li = document.createElement('li');
+    const dateSpan = document.createElement('span');
+    dateSpan.textContent = formatDisplayDate(raw);
+    const delSpan = document.createElement('span');
+    delSpan.className = 'del-record';
+    delSpan.textContent = '삭제';
+    delSpan.onclick = ()=> deleteRecord(raw);
+    li.appendChild(dateSpan);
+    li.appendChild(delSpan);
+    ul.appendChild(li);
   });
+}
+
+function addRecord(){
+  if(!currentItemCtx) return;
+  const input = document.getElementById('newDateInput');
+  const raw = input.value.trim();
+
+  if(!isValidDate6(raw)){
+    alert('날짜는 6자리 숫자(YYMMDD)로 입력해주세요. 예: 260713');
+    return;
+  }
+
+  const { empId, item } = currentItemCtx;
+  if(!appData.records[empId]) appData.records[empId] = {};
+  if(!appData.records[empId][item]) appData.records[empId][item] = [];
+  appData.records[empId][item].push(raw);
+
+  input.value = '';
+  renderHistoryList();
+  render();
+  saveData();
+}
+
+function deleteRecord(raw){
+  if(!currentItemCtx) return;
+  const { empId, item } = currentItemCtx;
+  if(!confirm(`${formatDisplayDate(raw)} 지급 기록을 삭제하시겠습니까?`)) return;
+
+  appData.records[empId][item] = (appData.records[empId][item] || []).filter(d=> d !== raw);
+
+  renderHistoryList();
+  render();
+  saveData();
+}
+
+/* =========================================================
+   공통 유틸
+   ========================================================= */
+function closeModal(id){
+  document.getElementById(id).classList.remove('show');
+  if(id === 'itemOverlay') currentItemCtx = null;
+}
+
+document.querySelectorAll('.overlay').forEach(ov=>{
+  ov.addEventListener('click', (e)=>{
+    if(e.target === ov) closeModal(ov.id);
+  });
+});
+
+/* =========================================================
+   시작
+   ========================================================= */
+document.getElementById('versionBadge').innerHTML = `<b>${APP_VERSION}</b> · 수정일 ${LAST_UPDATED}`;
+initFirebase();
+loadData();
 </script>
-
 </body>
 </html>
