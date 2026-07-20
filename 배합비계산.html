@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BBANG SSAEM 배합비 계산</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: #f0f2f5;
+    color: #1a1a1a;
+    min-height: 100vh;
+  }
+
+  .version-badge {
+    position: fixed;
+    top: 8px;
+    right: 12px;
+    background: rgba(30,41,59,0.85);
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 6px;
+    z-index: 3000;
+    pointer-events: none;
+    letter-spacing: 0.3px;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 16px;
+  }
+
+  .header {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  .header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a56db;
+    margin-bottom: 16px;
+    letter-spacing: -0.5px;
+  }
+
+  .header h1 span { font-weight: 800; letter-spacing: 1px; }
+
+  .btn-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 9px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .btn:active { transform: scale(0.97); }
+  .btn-save { background: #1a56db; color: #fff; }
+  .btn-save:hover { background: #1648b8; }
+
+  .btn-finalize { background: #059669; color: #fff; }
+  .btn-finalize:hover { background: #047857; }
+  .btn-finalize:disabled { background: #9ca3af; cursor: not-allowed; }
+  .btn-finalize:disabled:active { transform: none; }
+
+  .btn-delete { background: #dc2626; color: #fff; }
+  .btn-delete:hover { background: #b91c1c; }
+  .btn-reset { background: #6b7280; color: #fff; }
+  .btn-reset:hover { background: #4b5563; }
+  .btn-help { background: #8b5cf6; color: #fff; }
+  .btn-help:hover { background: #7c3aed; }
+  .btn-add { background: #2563eb; color: #fff; }
+  .btn-add:hover { background: #1d4ed8; }
+
+  .load-section {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .load-section select {
+    flex: 1;
+    min-width: 200px;
+    padding: 9px 12px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #fff;
+  }
+
+  .load-section select:focus { outline: none; border-color: #1a56db; }
+
+  /* 버전 이력 바 */
+  .version-bar {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    display: none;
+  }
+
+  .version-bar.show { display: block; }
+
+  .version-section { margin-bottom: 12px; }
+  .version-section:last-child { margin-bottom: 0; }
+
+  .version-bar-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .version-bar-title .finalized-badge {
+    font-size: 11px;
+    background: #059669;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+
+  .version-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .version-tab {
+    padding: 8px 16px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    background: #fff;
+    color: #374151;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .version-tab:hover { border-color: #93c5fd; background: #eff6ff; }
+
+  .version-tab.active { background: #1a56db; color: #fff; border-color: #1a56db; }
+  .version-tab.active .version-date { color: #bfdbfe; }
+
+  .version-tab.initial-tab { border-color: #6ee7b7; }
+  .version-tab.initial-tab:hover { background: #ecfdf5; border-color: #34d399; }
+  .version-tab.initial-tab.active { background: #059669; color: #fff; border-color: #059669; }
+  .version-tab.initial-tab.active .version-date { color: #a7f3d0; }
+
+  .version-tab .version-label { font-weight: 700; font-size: 13px; }
+  .version-tab .version-date { font-size: 10px; color: #9ca3af; font-weight: 400; }
+
+  .version-divider {
+    border: none;
+    border-top: 1.5px dashed #e5e7eb;
+    margin: 8px 0;
+  }
+
+  .readonly-banner {
+    background: #fef3c7;
+    border: 1.5px solid #f59e0b;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #92400e;
+    margin-bottom: 12px;
+    display: none;
+    text-align: center;
+  }
+
+  .readonly-banner.show { display: block; }
+
+  /* 테이블 영역 */
+  .table-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    overflow-x: auto;
+  }
+
+  .product-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1.5px solid #e5e7eb;
+  }
+
+  .product-row label {
+    font-weight: 700;
+    font-size: 15px;
+    white-space: nowrap;
+    color: #374151;
+  }
+
+  .product-row input {
+    flex: 1;
+    min-width: 200px;
+    padding: 10px 14px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    transition: border-color 0.2s;
+  }
+
+  .product-row input:focus {
+    outline: none;
+    border-color: #1a56db;
+    box-shadow: 0 0 0 3px rgba(26,86,219,0.1);
+  }
+
+  .stage-indicator {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .stage-initial { background: #ecfdf5; color: #059669; border: 1.5px solid #6ee7b7; }
+  .stage-change { background: #eff6ff; color: #1a56db; border: 1.5px solid #93c5fd; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 820px;
+  }
+
+  thead th {
+    background: #1a56db;
+    color: #fff;
+    padding: 12px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+    border: 1px solid #1648b8;
+  }
+
+  thead th:first-child { border-radius: 8px 0 0 0; }
+  thead th:last-child { border-radius: 0 8px 0 0; }
+  thead th.sortable { cursor: pointer; user-select: none; }
+  thead th.sortable:hover { background: #1648b8; }
+  .sort-arrow { margin-left: 4px; font-size: 11px; }
+
+  tbody td {
+    padding: 6px 6px;
+    border: 1px solid #e5e7eb;
+    text-align: center;
+    vertical-align: middle;
+    position: relative;
+  }
+
+  tbody tr:hover { background: #f8fafc; }
+
+  tbody td input {
+    width: 100%;
+    padding: 8px 8px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    text-align: center;
+    background: transparent;
+    transition: all 0.15s;
+  }
+
+  tbody td input:focus {
+    outline: none;
+    border-color: #93c5fd;
+    background: #eff6ff;
+  }
+
+  tbody td input.amount-input { font-weight: 500; color: #1e40af; }
+  tbody td input[readonly] { color: #6b7280; cursor: default; }
+  tbody td input[readonly]:focus { border-color: transparent; background: transparent; }
+
+  .col-no { width: 45px; }
+  .col-type { width: 100px; }
+  .col-name { width: 130px; }
+  .col-desc { width: 200px; }
+  .col-amount { width: 110px; }
+  .col-ratio { width: 90px; }
+  .col-allergen { width: 80px; }
+  .col-del { width: 50px; }
+
+  .ratio-cell { font-weight: 600; color: #1a56db; font-size: 13px; }
+  .no-cell { font-weight: 600; color: #6b7280; font-size: 13px; }
+
+  .total-row td {
+    background: #f1f5f9;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 12px 10px;
+    border: 1px solid #e5e7eb;
+  }
+
+  .total-amount { color: #1e40af; }
+  .total-ratio { color: #059669; }
+
+  .btn-row-del {
+    background: none;
+    border: none;
+    color: #9ca3af;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+
+  .btn-row-del:hover { background: #fee2e2; color: #dc2626; }
+
+  .table-footer {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 12px;
+  }
+
+  /* ── 자동완성 드롭다운 ── */
+  .ac-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1.5px solid #d1d5db;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    z-index: 100;
+    max-height: 180px;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    display: none;
+  }
+
+  .ac-list.show { display: block; }
+
+  .ac-item {
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .ac-item:hover, .ac-item.active {
+    background: #eff6ff;
+    color: #1a56db;
+  }
+
+  .ac-item .ac-type {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-left: 8px;
+  }
+
+  .ac-item.active .ac-type { color: #60a5fa; }
+
+  /* 커스텀 모달 */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s;
+  }
+
+  .modal-overlay.show { opacity: 1; visibility: visible; }
+
+  .modal-box {
+    background: #fff;
+    border-radius: 14px;
+    padding: 28px 28px 22px;
+    min-width: 320px;
+    max-width: 420px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+    position: relative;
+    transform: scale(0.92);
+    transition: transform 0.2s;
+  }
+
+  .modal-overlay.show .modal-box { transform: scale(1); }
+
+  .modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: #9ca3af;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .modal-close:hover { background: #f3f4f6; color: #374151; }
+
+  .modal-icon { font-size: 36px; text-align: center; margin-bottom: 12px; }
+
+  .modal-msg {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1f2937;
+    text-align: center;
+    line-height: 1.5;
+    margin-bottom: 24px;
+    white-space: pre-line;
+  }
+
+  .modal-btns { display: flex; gap: 10px; justify-content: center; }
+
+  .modal-btn {
+    padding: 10px 28px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .modal-btn:active { transform: scale(0.97); }
+  .modal-btn-cancel { background: #f3f4f6; color: #374151; }
+  .modal-btn-cancel:hover { background: #e5e7eb; }
+  .modal-btn-confirm { background: #dc2626; color: #fff; }
+  .modal-btn-confirm:hover { background: #b91c1c; }
+  .modal-btn-finalize { background: #059669; color: #fff; }
+  .modal-btn-finalize:hover { background: #047857; }
+
+  /* 토스트 */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #1e293b;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 999;
+    pointer-events: none;
+  }
+
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255,255,255,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .loading-overlay.hidden { display: none; }
+
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid #e5e7eb;
+    border-top-color: #1a56db;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 도움말 모달 */
+  .help-box {
+    max-width: 480px;
+    min-width: 340px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  .help-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 18px;
+    text-align: center;
+  }
+
+  .help-content { margin-bottom: 18px; }
+
+  .help-section {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+  }
+
+  .help-section:last-child { margin-bottom: 0; }
+
+  .help-subtitle {
+    font-size: 14px;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 6px;
+  }
+
+  .help-text {
+    font-size: 13px;
+    color: #4b5563;
+    line-height: 1.65;
+  }
+
+  .help-text b { color: #1f2937; }
+
+  .help-footer { text-align: center; }
+
+  @media (max-width: 768px) {
+    .container { padding: 12px 8px; }
+    .header { padding: 16px; }
+    .header h1 { font-size: 18px; }
+    .btn { padding: 8px 14px; font-size: 12px; }
+    thead th { font-size: 12px; padding: 10px 6px; }
+    tbody td input { font-size: 12px; padding: 6px 4px; }
+    .version-tab { padding: 6px 10px; font-size: 12px; }
+    .product-row input { min-width: 140px; font-size: 14px; }
+    .modal-box { min-width: 280px; padding: 24px 20px 18px; }
+    .help-box { min-width: 300px; max-width: 92vw; }
+    .stage-indicator { font-size: 11px; padding: 3px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="version-badge">v2.1 · 2026-07-20</div>
+
+<div class="container">
+  <div class="header">
+    <h1><span>BBANG SSAEM</span> 배합비 계산</h1>
+    <div class="btn-group">
+      <button class="btn btn-save" onclick="saveRecipe()">💾 저장</button>
+      <button class="btn btn-finalize" id="btnFinalize" onclick="confirmFinalize()">✅ 최종확정</button>
+      <button class="btn btn-reset" onclick="confirmReset()">🗑️ 초기화</button>
+      <button class="btn btn-help" onclick="openHelp()">❓ 도움말</button>
+    </div>
+    <div class="load-section">
+      <select id="recipeList" onchange="loadRecipe()">
+        <option value="">-- 저장된 레시피 선택 --</option>
+      </select>
+      <button class="btn btn-delete" onclick="confirmDelete()">🗑️ 삭제</button>
+    </div>
+  </div>
+
+  <div class="version-bar" id="versionBar">
+    <div class="version-section" id="initialSection">
+      <div class="version-bar-title" id="initialTitle">📋 초기 이력</div>
+      <div class="version-tabs" id="initialTabs"></div>
+    </div>
+    <hr class="version-divider" id="versionDivider" style="display:none;">
+    <div class="version-section" id="changeSection" style="display:none;">
+      <div class="version-bar-title">📋 변경 이력</div>
+      <div class="version-tabs" id="changeTabs"></div>
+    </div>
+  </div>
+
+  <div class="readonly-banner" id="readonlyBanner">
+    ⚠️ 과거 이력 열람 중 — 수정하려면 최신 버전 탭을 선택 후 저장하세요
+  </div>
+
+  <div class="table-card">
+    <div class="product-row">
+      <label>제 품 명 :</label>
+      <input type="text" id="productName" placeholder="제품명을 입력하세요">
+      <span class="stage-indicator stage-initial" id="stageIndicator">초기 단계</span>
+    </div>
+    <table id="recipeTable">
+      <thead>
+        <tr>
+          <th class="col-no">No.</th>
+          <th class="col-type">식품유형</th>
+          <th class="col-name">재 료 명</th>
+          <th class="col-desc">내용</th>
+          <th class="col-amount sortable" onclick="toggleSort()">투입량(g, EA)<span class="sort-arrow" id="sortArrow"></span></th>
+          <th class="col-ratio">구성비(%)</th>
+          <th class="col-allergen">알레르기</th>
+          <th class="col-del"></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td colspan="4" style="text-align:right; padding-right:16px;">합 계</td>
+          <td class="total-amount" id="totalAmount">0.000</td>
+          <td class="total-ratio" id="totalRatio">0.00</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="table-footer" id="tableFooter">
+      <button class="btn btn-add" onclick="addRow()">+ 행 추가</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-icon" id="modalIcon">⚠️</div>
+    <div class="modal-msg" id="modalMsg"></div>
+    <div class="modal-btns" id="modalBtns">
+      <button class="modal-btn modal-btn-cancel" onclick="closeModal()">취소</button>
+      <button class="modal-btn modal-btn-confirm" id="modalConfirmBtn">확인</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 도움말 모달 -->
+<div class="modal-overlay" id="helpOverlay">
+  <div class="modal-box help-box">
+    <button class="modal-close" onclick="closeHelp()">✕</button>
+    <div class="help-title">📖 사용 안내</div>
+    <div class="help-content">
+      <div class="help-section">
+        <div class="help-subtitle">🟢 초기 단계 — 신제품 등록</div>
+        <div class="help-text">
+          새 제품의 배합비를 처음 작성하는 단계입니다.<br>
+          수정이 필요하면 저장을 반복할 수 있습니다.<br>
+          <b>초기 → 초기 1차 → 초기 2차 →</b> ... 순서로 이력이 쌓입니다.
+        </div>
+      </div>
+      <div class="help-section">
+        <div class="help-subtitle">✅ 최종확정</div>
+        <div class="help-text">
+          초기 배합비가 확정되면 <b>[✅ 최종확정]</b> 버튼을 누릅니다.<br>
+          확정 후 초기 이력은 <b>열람만 가능</b>하며 수정할 수 없습니다.<br>
+          품목제조보고 최초 등록 시점에 눌러 주세요.
+        </div>
+      </div>
+      <div class="help-section">
+        <div class="help-subtitle">🔵 변경 단계 — 품목제조보고 변경</div>
+        <div class="help-text">
+          최종확정 이후의 저장은 자동으로 변경 이력이 됩니다.<br>
+          <b>1차 → 2차 → 3차 →</b> ... 순서로 이력이 쌓입니다.
+        </div>
+      </div>
+      <div class="help-section">
+        <div class="help-subtitle">💡 기타</div>
+        <div class="help-text">
+          • 재료명 입력 시 이전에 사용한 원료가 자동완성됩니다.<br>
+          • 투입량 열 클릭 시 내림/오름차순 정렬이 가능합니다.<br>
+          • Enter 키로 아래 행 이동, 마지막 행에서 Enter 시 새 행이 추가됩니다.
+        </div>
+      </div>
+    </div>
+    <div class="help-footer">
+      <button class="modal-btn modal-btn-cancel" onclick="closeHelp()" style="width:100%;">닫기</button>
+    </div>
+  </div>
+</div>
+<div class="loading-overlay hidden" id="loading"><div class="spinner"></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDVnVaaNG7dGsmMKJmU4eeYVRaJen_Sa6Y",
+    authDomain: "m-db-6fe4e.firebaseapp.com",
+    projectId: "m-db-6fe4e",
+    storageBucket: "m-db-6fe4e.appspot.com",
+    messagingSenderId: "891482085043",
+    appId: "1:891482085043:web:1b0e3e67ff283687c4fa97"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const COLLECTION = 'appData';
+  const DOC_ID = 'recipes';
+  const DICT_DOC_ID = 'recipes_materialDict';
+
+  let rowCounter = 0;
+  let currentRecipeData = null;
+  let currentVersion = null;      // { stage: 'initial'|'change', ver: number }
+  let isReadonly = false;
+  let sortState = 0;
+  let originalOrder = [];
+
+  let materialDict = {};
+
+  // ─────────────────────────────
+  // 현재 단계 판별 헬퍼
+  // ─────────────────────────────
+  function isFinalized(recipe) {
+    return recipe && recipe.initialFinalized === true;
+  }
+
+  function getCurrentStage(recipe) {
+    if (!recipe) return 'initial';
+    return isFinalized(recipe) ? 'change' : 'initial';
+  }
+
+  function getStageVersions(recipe, stage) {
+    if (!recipe) return {};
+    return stage === 'initial' ? (recipe.initialVersions || {}) : (recipe.versions || {});
+  }
+
+  function getLatestVer(recipe, stage) {
+    const vers = getStageVersions(recipe, stage);
+    const nums = Object.keys(vers).map(Number);
+    return nums.length > 0 ? Math.max(...nums) : 0;
+  }
+
+  // ─────────────────────────────
+  // UI 상태 업데이트
+  // ─────────────────────────────
+  function updateStageUI(recipe) {
+    const indicator = document.getElementById('stageIndicator');
+    const btnFinalize = document.getElementById('btnFinalize');
+    const stage = getCurrentStage(recipe);
+
+    if (stage === 'initial') {
+      indicator.textContent = '초기 단계';
+      indicator.className = 'stage-indicator stage-initial';
+      btnFinalize.disabled = false;
+      btnFinalize.style.display = '';
+    } else {
+      indicator.textContent = '변경 단계';
+      indicator.className = 'stage-indicator stage-change';
+      btnFinalize.disabled = true;
+      btnFinalize.style.display = 'none';
+    }
+  }
+
+  // ─────────────────────────────
+  // 원료사전 로드/저장
+  // ─────────────────────────────
+  async function loadMaterialDict() {
+    try {
+      const doc = await db.collection(COLLECTION).doc(DICT_DOC_ID).get();
+      if (doc.exists) materialDict = doc.data();
+    } catch (e) { console.error('원료사전 로드 실패:', e); }
+  }
+
+  async function saveMaterialDict(newEntries) {
+    try {
+      let updated = false;
+      for (const [name, type] of Object.entries(newEntries)) {
+        if (name && type && materialDict[name] !== type) {
+          materialDict[name] = type;
+          updated = true;
+        }
+      }
+      if (updated) {
+        await db.collection(COLLECTION).doc(DICT_DOC_ID).set(materialDict);
+      }
+    } catch (e) { console.error('원료사전 저장 실패:', e); }
+  }
+
+  // ─────────────────────────────
+  // 자동완성
+  // ─────────────────────────────
+  function setupAutocomplete(nameInput, typeInput) {
+    const td = nameInput.closest('td');
+    let acList = td.querySelector('.ac-list');
+    if (!acList) {
+      acList = document.createElement('div');
+      acList.className = 'ac-list';
+      td.appendChild(acList);
+    }
+
+    let acIndex = -1;
+
+    nameInput.addEventListener('input', () => {
+      const val = nameInput.value.trim();
+      acList.innerHTML = '';
+      acIndex = -1;
+
+      if (!val) { acList.classList.remove('show'); return; }
+
+      const matches = Object.keys(materialDict)
+        .filter(k => k.includes(val))
+        .slice(0, 6);
+
+      if (matches.length === 0) { acList.classList.remove('show'); return; }
+
+      matches.forEach((name, i) => {
+        const item = document.createElement('div');
+        item.className = 'ac-item';
+        item.dataset.index = i;
+        item.innerHTML = `<span>${name}</span><span class="ac-type">${materialDict[name]}</span>`;
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          selectAcItem(nameInput, typeInput, name, acList);
+        });
+        acList.appendChild(item);
+      });
+
+      acList.classList.add('show');
+    });
+
+    nameInput.addEventListener('keydown', (e) => {
+      const items = acList.querySelectorAll('.ac-item');
+      if (!acList.classList.contains('show') || items.length === 0) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        acIndex = Math.min(acIndex + 1, items.length - 1);
+        updateAcActive(items, acIndex);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        acIndex = Math.max(acIndex - 1, 0);
+        updateAcActive(items, acIndex);
+      } else if (e.key === 'Enter' && acIndex >= 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        const name = items[acIndex].querySelector('span').textContent;
+        selectAcItem(nameInput, typeInput, name, acList);
+      } else if (e.key === 'Escape') {
+        acList.classList.remove('show');
+        acIndex = -1;
+      }
+    });
+
+    nameInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        acList.classList.remove('show');
+        acIndex = -1;
+      }, 150);
+    });
+  }
+
+  function selectAcItem(nameInput, typeInput, name, acList) {
+    nameInput.value = name;
+    typeInput.value = materialDict[name] || '';
+    acList.classList.remove('show');
+    const tr = nameInput.closest('tr');
+    const inputs = getRowInputs(tr);
+    const descIdx = 2;
+    if (inputs[descIdx]) inputs[descIdx].focus();
+  }
+
+  function updateAcActive(items, idx) {
+    items.forEach((el, i) => el.classList.toggle('active', i === idx));
+  }
+
+  // ─────────────────────────────
+  // 키보드 네비게이션
+  // ─────────────────────────────
+  function setupKeyNav(tr) {
+    const inputs = getRowInputs(tr);
+    inputs.forEach((input, colIdx) => {
+      input.addEventListener('keydown', (e) => {
+        const acList = input.closest('td')?.querySelector('.ac-list.show');
+        if (acList && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) return;
+        if (acList && e.key === 'Enter') return;
+
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const allRows = Array.from(document.querySelectorAll('#tableBody tr'));
+          const rowIdx = allRows.indexOf(tr);
+
+          if (rowIdx === allRows.length - 1) {
+            const newTr = addRow();
+            if (newTr) {
+              const newInputs = getRowInputs(newTr);
+              if (newInputs[colIdx]) newInputs[colIdx].focus();
+              else if (newInputs[0]) newInputs[0].focus();
+            }
+          } else {
+            const nextRow = allRows[rowIdx + 1];
+            const nextInputs = getRowInputs(nextRow);
+            if (nextInputs[colIdx]) nextInputs[colIdx].focus();
+          }
+        }
+      });
+    });
+  }
+
+  function getRowInputs(tr) {
+    return Array.from(tr.querySelectorAll('input'));
+  }
+
+  // ─────────────────────────────
+  // 행 관리
+  // ─────────────────────────────
+  function addRow(data = {}) {
+    if (isReadonly) return null;
+    rowCounter++;
+    const tbody = document.getElementById('tableBody');
+    const tr = document.createElement('tr');
+    tr.dataset.rowId = String(rowCounter);
+
+    tr.innerHTML = `
+      <td class="no-cell">${tbody.children.length + 1}</td>
+      <td><input type="text" data-col="type" value="${escHtml(data.foodType || '')}" placeholder="식품유형"></td>
+      <td><input type="text" data-col="name" value="${escHtml(data.materialName || '')}" placeholder="재료명"></td>
+      <td><input type="text" data-col="desc" value="${escHtml(data.description || '')}" placeholder="내용"></td>
+      <td><input type="number" data-col="amount" class="amount-input" value="${data.amount || ''}" placeholder="0" step="any" oninput="calcRatio()"></td>
+      <td class="ratio-cell">${data.amount ? '0.00' : ''}</td>
+      <td><input type="text" data-col="allergen" value="${escHtml(data.allergen || '')}" placeholder=""></td>
+      <td><button class="btn-row-del" onclick="deleteRow(this)" title="삭제">✕</button></td>
+    `;
+
+    tbody.appendChild(tr);
+
+    const typeInput = tr.querySelector('[data-col="type"]');
+    const nameInput = tr.querySelector('[data-col="name"]');
+    setupAutocomplete(nameInput, typeInput);
+    setupKeyNav(tr);
+
+    calcRatio();
+    return tr;
+  }
+
+  function addRowReadonly(data = {}) {
+    rowCounter++;
+    const tbody = document.getElementById('tableBody');
+    const tr = document.createElement('tr');
+
+    tr.innerHTML = `
+      <td class="no-cell">${tbody.children.length + 1}</td>
+      <td><input type="text" value="${escHtml(data.foodType || '')}" readonly></td>
+      <td><input type="text" value="${escHtml(data.materialName || '')}" readonly></td>
+      <td><input type="text" value="${escHtml(data.description || '')}" readonly></td>
+      <td><input type="number" class="amount-input" value="${data.amount || ''}" readonly></td>
+      <td class="ratio-cell">0.00</td>
+      <td><input type="text" value="${escHtml(data.allergen || '')}" readonly></td>
+      <td></td>
+    `;
+
+    tbody.appendChild(tr);
+    calcRatio();
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function deleteRow(btn) {
+    if (isReadonly) return;
+    btn.closest('tr').remove();
+    reNumberRows();
+    calcRatio();
+    resetSort();
+  }
+
+  function reNumberRows() {
+    document.querySelectorAll('#tableBody tr').forEach((tr, i) => {
+      tr.querySelector('td:first-child').textContent = i + 1;
+    });
+  }
+
+  // ─────────────────────────────
+  // 구성비 자동계산
+  // ─────────────────────────────
+  function calcRatio() {
+    const rows = document.querySelectorAll('#tableBody tr');
+    let total = 0;
+    rows.forEach(tr => { total += parseFloat(tr.querySelector('.amount-input').value) || 0; });
+    rows.forEach(tr => {
+      const val = parseFloat(tr.querySelector('.amount-input').value) || 0;
+      tr.querySelector('.ratio-cell').textContent = (total > 0 && val > 0) ? ((val / total) * 100).toFixed(2) : '';
+    });
+    document.getElementById('totalAmount').textContent = total > 0 ? total.toFixed(3) : '0.000';
+    document.getElementById('totalRatio').textContent = total > 0 ? '100.00' : '0.00';
+  }
+
+  // ─────────────────────────────
+  // 투입량 정렬
+  // ─────────────────────────────
+  function toggleSort() {
+    sortState = (sortState + 1) % 3;
+    const arrow = document.getElementById('sortArrow');
+    const tbody = document.getElementById('tableBody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    if (sortState === 0) {
+      arrow.textContent = '';
+      if (originalOrder.length > 0) {
+        originalOrder.forEach(id => {
+          const tr = rows.find(r => r.dataset.rowId === id);
+          if (tr) tbody.appendChild(tr);
+        });
+      }
+    } else {
+      if (sortState === 1) originalOrder = rows.map(r => r.dataset.rowId);
+      rows.sort((a, b) => {
+        const va = parseFloat(a.querySelector('.amount-input').value) || 0;
+        const vb = parseFloat(b.querySelector('.amount-input').value) || 0;
+        return sortState === 1 ? vb - va : va - vb;
+      });
+      arrow.textContent = sortState === 1 ? ' ▼' : ' ▲';
+      rows.forEach(tr => tbody.appendChild(tr));
+    }
+    reNumberRows();
+  }
+
+  function resetSort() {
+    sortState = 0;
+    originalOrder = [];
+    document.getElementById('sortArrow').textContent = '';
+  }
+
+  // ─────────────────────────────
+  // 읽기전용
+  // ─────────────────────────────
+  function setReadonly(readonly) {
+    isReadonly = readonly;
+    document.getElementById('readonlyBanner').classList.toggle('show', readonly);
+    document.getElementById('tableFooter').style.display = readonly ? 'none' : 'flex';
+  }
+
+  // ─────────────────────────────
+  // 버전 탭 렌더링 (2단계)
+  // ─────────────────────────────
+  function renderVersionTabs(recipe, activeStage, activeVer) {
+    const bar = document.getElementById('versionBar');
+    const initialTabs = document.getElementById('initialTabs');
+    const changeTabs = document.getElementById('changeTabs');
+    const initialTitle = document.getElementById('initialTitle');
+    const changeSection = document.getElementById('changeSection');
+    const divider = document.getElementById('versionDivider');
+
+    initialTabs.innerHTML = '';
+    changeTabs.innerHTML = '';
+
+    if (!recipe) { bar.classList.remove('show'); return; }
+
+    const initVers = recipe.initialVersions || {};
+    const changeVers = recipe.versions || {};
+    const initNums = Object.keys(initVers).map(Number).sort((a, b) => a - b);
+    const changeNums = Object.keys(changeVers).map(Number).sort((a, b) => a - b);
+
+    if (initNums.length === 0 && changeNums.length === 0) {
+      bar.classList.remove('show');
+      return;
+    }
+
+    bar.classList.add('show');
+
+    const finalized = isFinalized(recipe);
+    const finalVer = recipe.initialFinalVer || 0;
+
+    // 초기 이력 타이틀
+    if (finalized) {
+      initialTitle.innerHTML = '📋 초기 이력 <span class="finalized-badge">확정 완료</span>';
+    } else {
+      initialTitle.innerHTML = '📋 초기 이력';
+    }
+
+    // 초기 단계 최신 버전
+    const initLatest = initNums.length > 0 ? initNums[initNums.length - 1] : 0;
+
+    // 초기 탭 렌더
+    initNums.forEach(v => {
+      const btn = document.createElement('button');
+      const isActive = activeStage === 'initial' && v === activeVer;
+      btn.className = 'version-tab initial-tab' + (isActive ? ' active' : '');
+      const dateStr = initVers[v].savedAt ? formatDate(initVers[v].savedAt) : '';
+
+      let label = v === 1 ? '초기' : `초기 ${v - 1}차`;
+      if (finalized && v === finalVer) label += ' (확정)';
+      else if (!finalized && v === initLatest) label += ' (최신)';
+
+      btn.innerHTML = `
+        <span class="version-label">${label}</span>
+        <span class="version-date">${dateStr}</span>
+      `;
+      btn.onclick = () => loadVersionByStage(recipe, 'initial', v);
+      initialTabs.appendChild(btn);
+    });
+
+    // 변경 단계
+    if (changeNums.length > 0) {
+      changeSection.style.display = '';
+      divider.style.display = '';
+
+      const changeLatest = changeNums[changeNums.length - 1];
+      changeNums.forEach(v => {
+        const btn = document.createElement('button');
+        const isActive = activeStage === 'change' && v === activeVer;
+        btn.className = 'version-tab' + (isActive ? ' active' : '');
+        const dateStr = changeVers[v].savedAt ? formatDate(changeVers[v].savedAt) : '';
+        const label = v === changeLatest ? `${v}차 (최신)` : `${v}차`;
+
+        btn.innerHTML = `
+          <span class="version-label">${label}</span>
+          <span class="version-date">${dateStr}</span>
+        `;
+        btn.onclick = () => loadVersionByStage(recipe, 'change', v);
+        changeTabs.appendChild(btn);
+      });
+    } else {
+      changeSection.style.display = 'none';
+      divider.style.display = 'none';
+    }
+  }
+
+  function formatDate(isoStr) {
+    try {
+      const d = new Date(isoStr);
+      return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    } catch { return ''; }
+  }
+
+  // ─────────────────────────────
+  // 버전 로드 (단계 구분)
+  // ─────────────────────────────
+  function loadVersionByStage(recipe, stage, verNum) {
+    currentVersion = { stage, ver: verNum };
+    const vers = getStageVersions(recipe, stage);
+    const verData = vers[verNum];
+    if (!verData) return;
+
+    document.getElementById('tableBody').innerHTML = '';
+    rowCounter = 0;
+    resetSort();
+
+    // 읽기전용 판별
+    let editable = false;
+    if (stage === 'initial') {
+      if (!isFinalized(recipe)) {
+        // 초기 미확정: 최신만 편집 가능
+        const latestInit = getLatestVer(recipe, 'initial');
+        editable = (verNum === latestInit);
+      }
+      // 확정됐으면 초기는 전부 읽기전용
+    } else {
+      // 변경 단계: 최신만 편집 가능
+      const latestChange = getLatestVer(recipe, 'change');
+      editable = (verNum === latestChange);
+    }
+
+    setReadonly(!editable);
+    verData.ingredients.forEach(ing => editable ? addRow(ing) : addRowReadonly(ing));
+    calcRatio();
+    renderVersionTabs(recipe, stage, verNum);
+    updateStageUI(recipe);
+  }
+
+  // ─────────────────────────────
+  // 커스텀 모달
+  // ─────────────────────────────
+  function openModal(msg, onConfirm, options = {}) {
+    document.getElementById('modalMsg').textContent = msg;
+    document.getElementById('modalIcon').textContent = options.icon || '⚠️';
+    const confirmBtn = document.getElementById('modalConfirmBtn');
+    confirmBtn.textContent = options.confirmText || '확인';
+    confirmBtn.className = 'modal-btn ' + (options.confirmClass || 'modal-btn-confirm');
+    confirmBtn.onclick = () => { closeModal(); onConfirm(); };
+    document.getElementById('modalOverlay').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('show');
+  }
+
+  function openHelp() {
+    document.getElementById('helpOverlay').classList.add('show');
+  }
+
+  function closeHelp() {
+    document.getElementById('helpOverlay').classList.remove('show');
+  }
+
+  function confirmDelete() {
+    const sel = document.getElementById('recipeList').value;
+    if (!sel) { showToast('삭제할 레시피를 선택해 주세요.'); return; }
+    openModal(`"${sel}" 레시피의\n모든 버전을 삭제하시겠습니까?`, () => deleteRecipe(sel));
+  }
+
+  function confirmReset() {
+    openModal('입력 내용을 모두 초기화하시겠습니까?', resetAll);
+  }
+
+  function confirmFinalize() {
+    if (!currentRecipeData || isFinalized(currentRecipeData)) {
+      showToast('확정할 수 없는 상태입니다.');
+      return;
+    }
+    const productName = document.getElementById('productName').value.trim();
+    if (!productName) { showToast('제품명을 입력해 주세요.'); return; }
+
+    const initNums = Object.keys(currentRecipeData.initialVersions || {}).map(Number);
+    if (initNums.length === 0) { showToast('초기 배합비를 먼저 저장해 주세요.'); return; }
+
+    openModal(
+      `"${productName}" 초기 배합비를\n최종 확정하시겠습니까?\n\n확정 후 초기 이력은 수정 불가하며,\n이후 저장은 변경(1차~)으로 진행됩니다.`,
+      () => finalizeInitial(productName),
+      { icon: '✅', confirmText: '최종확정', confirmClass: 'modal-btn-finalize' }
+    );
+  }
+
+  // ─────────────────────────────
+  // 최종확정
+  // ─────────────────────────────
+  async function finalizeInitial(productName) {
+    showLoading(true);
+    try {
+      const docRef = db.collection(COLLECTION).doc(DOC_ID);
+      const docSnap = await docRef.get();
+      let allRecipes = docSnap.exists ? docSnap.data() : {};
+      let recipe = allRecipes[productName];
+      if (!recipe) { showToast('레시피를 찾을 수 없습니다.'); showLoading(false); return; }
+
+      const latestInit = getLatestVer(recipe, 'initial');
+      recipe.initialFinalized = true;
+      recipe.initialFinalVer = latestInit;
+      recipe.updatedAt = new Date().toISOString();
+
+      allRecipes[productName] = recipe;
+      await docRef.set(allRecipes);
+
+      currentRecipeData = recipe;
+      // 확정된 최신 초기 버전 표시 (읽기전용)
+      loadVersionByStage(recipe, 'initial', latestInit);
+
+      showToast(`"${productName}" 초기 배합비 최종 확정 완료!`);
+      await loadRecipeList();
+    } catch (err) {
+      console.error(err);
+      showToast('확정 실패: ' + err.message);
+    }
+    showLoading(false);
+  }
+
+  // ─────────────────────────────
+  // Firebase 저장
+  // ─────────────────────────────
+  async function saveRecipe() {
+    if (isReadonly) { showToast('과거 이력은 수정할 수 없습니다. 최신 버전 탭을 선택해 주세요.'); return; }
+
+    const productName = document.getElementById('productName').value.trim();
+    if (!productName) { showToast('제품명을 입력해 주세요.'); return; }
+
+    const rows = document.querySelectorAll('#tableBody tr');
+    if (rows.length === 0) { showToast('원재료를 추가해 주세요.'); return; }
+
+    const ingredients = [];
+    const dictEntries = {};
+    rows.forEach((tr, i) => {
+      const inputs = tr.querySelectorAll('input');
+      const foodType = inputs[0].value.trim();
+      const materialName = inputs[1].value.trim();
+      ingredients.push({
+        no: i + 1,
+        foodType,
+        materialName,
+        description: inputs[2].value.trim(),
+        amount: parseFloat(inputs[3].value) || 0,
+        allergen: inputs[4].value.trim()
+      });
+      if (materialName && foodType) dictEntries[materialName] = foodType;
+    });
+
+    showLoading(true);
+    try {
+      const docRef = db.collection(COLLECTION).doc(DOC_ID);
+      const docSnap = await docRef.get();
+      let allRecipes = docSnap.exists ? docSnap.data() : {};
+
+      let recipe = allRecipes[productName];
+      if (!recipe) {
+        recipe = { productName, initialVersions: {}, versions: {}, initialFinalized: false };
+      }
+
+      // 구 형식 호환: initialVersions가 없으면 생성
+      if (!recipe.initialVersions) recipe.initialVersions = {};
+      if (recipe.initialFinalized === undefined) recipe.initialFinalized = false;
+
+      const stage = getCurrentStage(recipe);
+      let newVer, stageLabel;
+
+      if (stage === 'initial') {
+        newVer = getLatestVer(recipe, 'initial') + 1;
+        recipe.initialVersions[newVer] = { ingredients, savedAt: new Date().toISOString() };
+        stageLabel = newVer === 1 ? '초기' : `초기 ${newVer - 1}차`;
+      } else {
+        if (!recipe.versions) recipe.versions = {};
+        newVer = getLatestVer(recipe, 'change') + 1;
+        recipe.versions[newVer] = { ingredients, savedAt: new Date().toISOString() };
+        recipe.currentVersion = newVer;
+        stageLabel = `${newVer}차`;
+      }
+
+      recipe.updatedAt = new Date().toISOString();
+      allRecipes[productName] = recipe;
+      await docRef.set(allRecipes);
+
+      await saveMaterialDict(dictEntries);
+
+      currentRecipeData = recipe;
+      currentVersion = { stage, ver: newVer };
+      resetSort();
+      renderVersionTabs(recipe, stage, newVer);
+      setReadonly(false);
+      updateStageUI(recipe);
+
+      showToast(`"${productName}" ${stageLabel} 저장 완료!`);
+      await loadRecipeList();
+    } catch (err) {
+      console.error(err);
+      showToast('저장 실패: ' + err.message);
+    }
+    showLoading(false);
+  }
+
+  // ─────────────────────────────
+  // Firebase 목록 로드
+  // ─────────────────────────────
+  async function loadRecipeList() {
+    try {
+      const docRef = db.collection(COLLECTION).doc(DOC_ID);
+      const docSnap = await docRef.get();
+      const select = document.getElementById('recipeList');
+      const currentVal = select.value;
+      select.innerHTML = '<option value="">-- 저장된 레시피 선택 --</option>';
+
+      if (docSnap.exists) {
+        const data = docSnap.data();
+        const names = Object.keys(data).sort();
+        names.forEach(name => {
+          const recipe = data[name];
+          const opt = document.createElement('option');
+          opt.value = name;
+
+          let info = '';
+          const finalized = isFinalized(recipe);
+
+          if (finalized && recipe.versions) {
+            const changeNums = Object.keys(recipe.versions).map(Number);
+            if (changeNums.length > 0) {
+              const latest = Math.max(...changeNums);
+              const dateStr = recipe.versions[latest].savedAt ? formatDate(recipe.versions[latest].savedAt) : '';
+              info = dateStr ? `${latest}차 · ${dateStr}` : `${latest}차`;
+            } else {
+              info = '확정 완료';
+            }
+          } else if (recipe.initialVersions) {
+            const initNums = Object.keys(recipe.initialVersions).map(Number);
+            if (initNums.length > 0) {
+              const latest = Math.max(...initNums);
+              const label = latest === 1 ? '초기' : `초기 ${latest - 1}차`;
+              const dateStr = recipe.initialVersions[latest].savedAt ? formatDate(recipe.initialVersions[latest].savedAt) : '';
+              info = dateStr ? `${label} · ${dateStr}` : label;
+            }
+          } else if (recipe.versions) {
+            // 구 형식 호환
+            const verNums = Object.keys(recipe.versions).map(Number);
+            if (verNums.length > 0) {
+              const latestVer = Math.max(...verNums);
+              const dateStr = recipe.versions[latestVer].savedAt ? formatDate(recipe.versions[latestVer].savedAt) : '';
+              info = dateStr ? `${latestVer}차 · ${dateStr}` : `${latestVer}차`;
+            }
+          }
+
+          opt.textContent = info ? `${name} (${info})` : name;
+          select.appendChild(opt);
+        });
+        if (currentVal && names.includes(currentVal)) select.value = currentVal;
+      }
+    } catch (err) { console.error('목록 로드 실패:', err); }
+  }
+
+  // ─────────────────────────────
+  // Firebase 불러오기
+  // ─────────────────────────────
+  async function loadRecipe() {
+    const selectedName = document.getElementById('recipeList').value;
+    if (!selectedName) { showToast('불러올 레시피를 선택해 주세요.'); return; }
+
+    showLoading(true);
+    try {
+      const docSnap = await db.collection(COLLECTION).doc(DOC_ID).get();
+      if (docSnap.exists && docSnap.data()[selectedName]) {
+        let recipe = docSnap.data()[selectedName];
+        document.getElementById('productName').value = recipe.productName || selectedName;
+
+        // ─── 구 형식 마이그레이션 ───
+        // 구 형식: versions만 있고 initialVersions가 없는 경우
+        if (recipe.versions && !recipe.initialVersions && recipe.initialFinalized === undefined) {
+          // 구 형식 데이터 → 기존 버전을 변경 이력으로 유지하되
+          // initialVersions를 빈 상태로 생성, 확정된 것으로 표시
+          // (이미 변경 이력이 있으므로 초기는 건너뛴 것으로 간주)
+          recipe.initialVersions = {};
+          recipe.initialFinalized = true;
+          recipe.initialFinalVer = 0;
+        }
+
+        // 구 형식 (ingredients만 있는 경우)
+        if (recipe.ingredients && !recipe.versions && !recipe.initialVersions) {
+          recipe.initialVersions = {
+            1: { ingredients: recipe.ingredients, savedAt: recipe.updatedAt || new Date().toISOString() }
+          };
+          recipe.initialFinalized = false;
+          delete recipe.ingredients;
+        }
+
+        currentRecipeData = recipe;
+        resetSort();
+
+        // 가장 최근 단계의 최신 버전 로드
+        const stage = getCurrentStage(recipe);
+        let targetStage, targetVer;
+
+        if (stage === 'change') {
+          const changeLatest = getLatestVer(recipe, 'change');
+          if (changeLatest > 0) {
+            targetStage = 'change';
+            targetVer = changeLatest;
+          } else {
+            // 확정됐지만 변경 이력이 없으면 확정 초기 표시
+            targetStage = 'initial';
+            targetVer = recipe.initialFinalVer || getLatestVer(recipe, 'initial');
+          }
+        } else {
+          targetStage = 'initial';
+          targetVer = getLatestVer(recipe, 'initial');
+        }
+
+        if (targetVer > 0) {
+          loadVersionByStage(recipe, targetStage, targetVer);
+          const label = targetStage === 'initial'
+            ? (targetVer === 1 ? '초기' : `초기 ${targetVer - 1}차`)
+            : `${targetVer}차`;
+          showToast(`"${selectedName}" ${label} 불러오기 완료!`);
+        } else {
+          // 빈 상태
+          document.getElementById('tableBody').innerHTML = '';
+          rowCounter = 0;
+          setReadonly(false);
+          for (let i = 0; i < 13; i++) addRow();
+          calcRatio();
+          updateStageUI(recipe);
+          renderVersionTabs(recipe, 'initial', 0);
+          showToast(`"${selectedName}" 불러오기 완료! (데이터를 입력 후 저장하세요)`);
+        }
+      } else {
+        showToast('레시피를 찾을 수 없습니다.');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('불러오기 실패: ' + err.message);
+    }
+    showLoading(false);
+  }
+
+  // ─────────────────────────────
+  // Firebase 삭제
+  // ─────────────────────────────
+  async function deleteRecipe(selectedName) {
+    showLoading(true);
+    try {
+      const docRef = db.collection(COLLECTION).doc(DOC_ID);
+      const docSnap = await docRef.get();
+      if (docSnap.exists) {
+        const data = docSnap.data();
+        delete data[selectedName];
+        await docRef.set(data);
+        currentRecipeData = null;
+        currentVersion = null;
+        document.getElementById('versionBar').classList.remove('show');
+        setReadonly(false);
+        resetSort();
+        updateStageUI(null);
+        showToast(`"${selectedName}" 삭제 완료!`);
+        await loadRecipeList();
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('삭제 실패: ' + err.message);
+    }
+    showLoading(false);
+  }
+
+  // ─────────────────────────────
+  // 초기화
+  // ─────────────────────────────
+  function resetAll() {
+    document.getElementById('productName').value = '';
+    document.getElementById('tableBody').innerHTML = '';
+    document.getElementById('recipeList').value = '';
+    document.getElementById('versionBar').classList.remove('show');
+    setReadonly(false);
+    currentRecipeData = null;
+    currentVersion = null;
+    rowCounter = 0;
+    resetSort();
+    calcRatio();
+    updateStageUI(null);
+    for (let i = 0; i < 13; i++) addRow();
+    showToast('초기화 완료!');
+  }
+
+  // ─────────────────────────────
+  // 유틸
+  // ─────────────────────────────
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  function showLoading(show) {
+    document.getElementById('loading').classList.toggle('hidden', !show);
+  }
+
+  // ─────────────────────────────
+  // 초기 실행
+  // ─────────────────────────────
+  window.addEventListener('DOMContentLoaded', async () => {
+    await loadMaterialDict();
+    for (let i = 0; i < 13; i++) addRow();
+    loadRecipeList();
+    updateStageUI(null);
+  });
+
+  document.getElementById('modalOverlay').addEventListener('click', (e) => {
+    // 아무것도 안 함 — X버튼이나 취소로만 닫힘
+  });
+
+  document.getElementById('helpOverlay').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('helpOverlay')) closeHelp();
+  });
+</script>
+
+</body>
+</html>
