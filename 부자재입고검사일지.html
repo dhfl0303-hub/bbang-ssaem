@@ -18,7 +18,7 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
 .tab-bar{display:flex;background:#fff;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:100;}
-.tab{flex:1;padding:14px;text-align:center;font-size:14px;font-weight:700;color:var(--text3);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
+.tab{flex:none;padding:14px 18px;text-align:center;font-size:14px;font-weight:700;color:var(--text3);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;white-space:nowrap;}
 .tab.active{color:var(--primary);border-bottom-color:var(--primary);}
 .page{display:none;padding:16px;}
 .page.active{display:block;}
@@ -120,11 +120,13 @@ async function syncToServer(){
     const db=window._db;
     const a=JSON.parse(localStorage.getItem('subIncomingRecords')||'[]');
     const b=JSON.parse(localStorage.getItem('subsidiaryStock')||'[]');
+    const ts=new Date().toISOString();
     let count=0;
-    // subIncomingRecords는 syncToSubsidiary에서 appData에 저장됨 - 여기서는 전체 배열로 저장
-    await db.collection('appData').doc('subIncomingRecords').set({data:JSON.stringify(a),updatedAt:new Date().toISOString()});count+=a.length;
-    // subsidiaryStock도 appData에 저장
-    if(b.length) await db.collection('appData').doc('subsidiaryStock').set({data:JSON.stringify(b),updatedAt:new Date().toISOString()});
+    await db.collection('appData').doc('subIncomingRecords').set({data:JSON.stringify(a),updatedAt:ts});count+=a.length;
+    if(b.length) await db.collection('appData').doc('subsidiaryStock').set({data:JSON.stringify(b),updatedAt:ts});
+    // 포장재DB/거래처도 동기화
+    await db.collection('appData').doc('sub_packagingDB').set({data:JSON.stringify(packagingDB),updatedAt:ts});
+    await db.collection('appData').doc('sub_suppliers').set({data:JSON.stringify(suppliers),updatedAt:ts});
     btn.textContent='✅ '+count+'건 완료';
     setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2500);
   }catch(e){
@@ -141,7 +143,7 @@ async function syncToServer(){
     <div class="tab active" onclick="switchTab('write')">✏️ 작성</div>
     <div class="tab" onclick="switchTab('history')">📁 저장내역</div>
   </div>
-  <button id="syncBtn" onclick="syncToServer()" style="align-self:center;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 동기화</button>
+  <span style="font-size:10px;color:var(--text3);">v1.2.0 | 2026-07-21</span>
 </div>
 
 <!-- ===== 작성 탭 ===== -->
@@ -165,7 +167,7 @@ async function syncToServer(){
       </div>
       <div class="form-row">
         <span class="form-label">입고검사자</span>
-        <input class="form-input" id="inInspector" value="이광훈" readonly>
+        <input class="form-input" id="inInspector" placeholder="검사자명 입력" onchange="localStorage.setItem('sub_inspector',this.value)">
       </div>
     </div>
   </div>
@@ -411,7 +413,15 @@ const DEFAULT_PACKAGING = {
 };
 let packagingDB = JSON.parse(localStorage.getItem('sub_packagingDB') || JSON.stringify(DEFAULT_PACKAGING));
 
-function savePackagingDB(){ localStorage.setItem('sub_packagingDB', JSON.stringify(packagingDB)); }
+function savePackagingDB(){
+  localStorage.setItem('sub_packagingDB', JSON.stringify(packagingDB));
+  if(window._db) window._db.collection('appData').doc('sub_packagingDB').set({data:JSON.stringify(packagingDB),updatedAt:new Date().toISOString()}).catch(e=>console.warn('포장재DB 동기화 실패',e));
+}
+
+function saveSuppliers(){
+  localStorage.setItem('sub_suppliers',JSON.stringify(suppliers));
+  if(window._db) window._db.collection('appData').doc('sub_suppliers').set({data:JSON.stringify(suppliers),updatedAt:new Date().toISOString()}).catch(e=>console.warn('거래처 동기화 실패',e));
+}
 
 function getNextPkgCode(type){
   const prefix = PKG_PREFIX[type]||'X';
@@ -637,6 +647,9 @@ function addRow(){
 
   const dateVal=getInDateYYMMDD();
   document.getElementById('lot-date-'+id).value=dateVal;
+  buildLot(id);
+  // 관능검사 기본값 O
+  ['vehicle','pack','damage','foreign','specchk','label'].forEach(f=>setOX(f,id,'O'));
 }
 
 function onItemChange(id){
@@ -708,7 +721,6 @@ function saveRecord(){
     const specCode=specSel?.value||'';
     const specName=specSel?.options[specSel.selectedIndex]?.dataset?.name||specCode;
     const spec   =specName;
-    const specLotCode=specCode;
     const lot    =document.getElementById('lot-'+id)?.textContent.trim()||'';
     const mfg    =document.getElementById('mfg-'+id)?.value||'';
     const qty    =document.getElementById('qty-'+id)?.value||'';
@@ -720,14 +732,15 @@ function saveRecord(){
     const specchk=getOX('specchk',id);
     const label  =getOX('label',id);
     if(!supplier&&!item) return;
-    rows.push({supplier,item,spec,lot,mfg,qty,unit,vehicle,pack,damage,foreign,specchk,label});
+    rows.push({supplier,item,spec,specCode,lot,mfg,qty,unit,vehicle,pack,damage,foreign,specchk,label});
   });
 
   if(!rows.length){ alert('입고 항목을 입력해주세요'); return; }
 
+  const inspector = document.getElementById('inInspector')?.value||'-';
   const record={
     id:Date.now(), date,
-    inspector:'이광훈',
+    inspector,
     approval:{write:getCanvasData('write'),approve:getCanvasData('approve')},
     rows,
     nonconformity:document.getElementById('nonconformity').value,
@@ -739,8 +752,9 @@ function saveRecord(){
   syncToSubsidiary(rows, date);
 
   records.unshift(record);
-  localStorage.setItem('subIncomingRecords', JSON.stringify(records)); autoSyncToFirebase('subIncomingRecords', records);
+  localStorage.setItem('subIncomingRecords', JSON.stringify(records));
   alert('저장됐습니다!');
+  resetForm();
   switchTab('history');
 }
 
@@ -750,15 +764,17 @@ async function syncToSubsidiary(rows, isoDate){
   try{
     const snap = await window._db.collection('appData').doc('subIncomingRecords').get();
     let subRecs = (snap.exists && snap.data().data) ? JSON.parse(snap.data().data) : [];
+    const inspector = document.getElementById('inInspector')?.value||'-';
     // 현재 record를 subIncomingRecords 형식으로 추가
     const newRec = {
       id: Date.now(),
       date: isoDate,
-      inspector: '이광훈',
+      inspector,
       rows: rows.map(r=>({
         item: r.spec,       // 포장재명 (수불부 품목명으로 사용)
         category: r.item,   // 포장재구분 (필름포장지/박스 등)
         spec: r.spec,
+        specCode: r.specCode||'',
         lot: r.lot,
         qty: r.qty,
         unit: r.unit,
@@ -766,15 +782,13 @@ async function syncToSubsidiary(rows, isoDate){
         supplier: r.supplier||''
       }))
     };
-    // 중복 방지: 같은 date+lot 조합 제외
-    newRec.rows.forEach(row=>{
-      if(!row.item||!row.qty) return;
-      const dup = subRecs.find(rec=>
+    // 중복 방지: 기존 기록에 이미 있는 lot+item+qty 조합 제외
+    newRec.rows = newRec.rows.filter(row=>{
+      if(!row.item||!row.qty) return false;
+      const isDup = subRecs.some(rec=>
         rec.rows && rec.rows.some(r=>r.lot===row.lot && r.item===row.item && r.qty===row.qty)
       );
-      if(!dup) return;
-      // 중복이면 newRec.rows에서 제거
-      newRec.rows = newRec.rows.filter(r=>!(r.lot===row.lot&&r.item===row.item&&r.qty===row.qty));
+      return !isDup;
     });
     if(newRec.rows.length){
       subRecs.push(newRec);
@@ -784,6 +798,26 @@ async function syncToSubsidiary(rows, isoDate){
       });
     }
   }catch(e){ console.warn('수불부 연동 실패',e); }
+}
+
+// ===== 폼 초기화 =====
+function resetForm(){
+  // 테이블 행 초기화
+  document.getElementById('mainTbody').innerHTML='';
+  rowCount=0;
+  for(let i=0;i<5;i++) addRow();
+  // 결재란 초기화
+  ['write','approve'].forEach(id=>{
+    clearCanvas(id);
+    const hint=document.getElementById('hint-'+id);
+    if(hint) hint.style.display='';
+  });
+  // 부적합/조치 초기화
+  document.getElementById('nonconformity').value='';
+  document.getElementById('corrective').value='';
+  // 날짜 오늘로 리셋
+  document.getElementById('inDateRaw').value=getTodayYYMMDD();
+  onInDateInput();
 }
 
 // ===== 저장내역 =====
@@ -869,7 +903,8 @@ function toggleHistory(i){
 function deleteRecord(i){
   if(!confirm('이 기록을 삭제하시겠습니까?')) return;
   records.splice(i,1);
-  localStorage.setItem('subIncomingRecords', JSON.stringify(records)); autoSyncToFirebase('subIncomingRecords', records);
+  localStorage.setItem('subIncomingRecords', JSON.stringify(records));
+  if(window._db) window._db.collection('appData').doc('subIncomingRecords').set({data:JSON.stringify(records),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
   renderHistory();
 }
 
@@ -1118,14 +1153,14 @@ function addSupplier(){
   if(!name){ alert('거래처명을 입력해주세요'); return; }
   if(suppliers.includes(name)){ alert('이미 존재하는 거래처입니다'); return; }
   suppliers.push(name);
-  localStorage.setItem('sub_suppliers',JSON.stringify(suppliers));
+  saveSuppliers();
   document.getElementById('newSupplierName').value='';
   renderSupplierList(); updateSupplierSelects();
 }
 function deleteSupplier(i){
   if(!confirm(`"${suppliers[i]}"을 삭제하시겠습니까?`)) return;
   suppliers.splice(i,1);
-  localStorage.setItem('sub_suppliers',JSON.stringify(suppliers));
+  saveSuppliers();
   renderSupplierList(); updateSupplierSelects();
 }
 function openEditSupplier(i){
@@ -1138,7 +1173,7 @@ function saveEditSupplier(){
   const name=document.getElementById('editSupplierName').value.trim();
   if(!name) return;
   suppliers[i]=name;
-  localStorage.setItem('sub_suppliers',JSON.stringify(suppliers));
+  saveSuppliers();
   closeModal('editSupplierModal'); renderSupplierList(); updateSupplierSelects();
 }
 function updateSupplierSelects(){
@@ -1164,6 +1199,8 @@ function init(){
   const dd=String(today.getDate()).padStart(2,'0');
   document.getElementById('inDateRaw').value=yy+mm+dd;
   onInDateInput();
+  // 검사자명 복원
+  document.getElementById('inInspector').value=localStorage.getItem('sub_inspector')||'';
   initCanvases();
   initSignModal();
   renderHistory();
@@ -1204,11 +1241,36 @@ async function loadFromFirebaseAuto(){
 async function loadSubItemDB(){
   if(!window._db) return;
   try{
-    const snap = await window._db.collection('appData').doc('subItemDB').get();
-    if(snap.exists && snap.data().data){
-      SUB_ITEM_DB = JSON.parse(snap.data().data);
+    const [itemSnap, pkgSnap, supSnap] = await Promise.all([
+      window._db.collection('appData').doc('subItemDB').get(),
+      window._db.collection('appData').doc('sub_packagingDB').get(),
+      window._db.collection('appData').doc('sub_suppliers').get()
+    ]);
+    if(itemSnap.exists && itemSnap.data().data){
+      SUB_ITEM_DB = JSON.parse(itemSnap.data().data);
     }
-  }catch(e){ console.warn('SUB_ITEM_DB 로드 실패',e); }
+    if(pkgSnap.exists && pkgSnap.data().data){
+      const fbPkg = JSON.parse(pkgSnap.data().data);
+      // Firebase 데이터가 더 최신이면 덮어쓰기
+      const localTs = localStorage.getItem('sub_packagingDB_ts')||'0';
+      const fbTs = pkgSnap.data().updatedAt||'0';
+      if(fbTs >= localTs){
+        packagingDB = fbPkg;
+        localStorage.setItem('sub_packagingDB', JSON.stringify(packagingDB));
+        localStorage.setItem('sub_packagingDB_ts', fbTs);
+      }
+    }
+    if(supSnap.exists && supSnap.data().data){
+      const fbSup = JSON.parse(supSnap.data().data);
+      const localTs = localStorage.getItem('sub_suppliers_ts')||'0';
+      const fbTs = supSnap.data().updatedAt||'0';
+      if(fbTs >= localTs){
+        suppliers = fbSup;
+        localStorage.setItem('sub_suppliers', JSON.stringify(suppliers));
+        localStorage.setItem('sub_suppliers_ts', fbTs);
+      }
+    }
+  }catch(e){ console.warn('Firebase 데이터 로드 실패',e); }
 }
 
 (async ()=>{
