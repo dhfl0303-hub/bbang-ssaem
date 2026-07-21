@@ -176,6 +176,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
+<div style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v1.1.0 | 2026-07-21</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -349,7 +350,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <div id="bulkWrap" class="row" style="margin-top:10px;position:relative;">
           <div>
             <div class="field-label">벌크비닐LOT</div>
-            <select class="field-input" id="bulkLot" onchange="checkPackTypeConflict('bulk')">
+            <select class="field-input" id="bulkLot" onchange="onSubLotSelect('bulkLot');checkPackTypeConflict('bulk')">
               <option value="">-- 선택 --</option>
             </select>
           </div>
@@ -403,7 +404,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <div class="row" style="margin-top:10px;">
           <div>
             <div class="field-label">박스LOT</div>
-            <select class="field-input" id="boxLot">
+            <select class="field-input" id="boxLot" onchange="onSubLotSelect('boxLot')">
               <option value="">-- 선택 --</option>
             </select>
           </div>
@@ -417,7 +418,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <div class="row" style="margin-top:10px;">
           <div>
             <div class="field-label">패키지박스LOT</div>
-            <select class="field-input" id="pkgBoxLot">
+            <select class="field-input" id="pkgBoxLot" onchange="onSubLotSelect('pkgBoxLot')">
               <option value="">-- 선택 --</option>
             </select>
           </div>
@@ -651,6 +652,34 @@ function onBatchLotSelect(){
   }
 }
 
+// 세션 내 부자재 사용량 합산 (S.todayRecords 기준)
+function getSessionSubUsage(){
+  const usage={};
+  (S.todayRecords||[]).forEach(r=>{
+    if(r.bulkLot && r.bulkLot!=='-') usage[r.bulkLot]=(usage[r.bulkLot]||0)+(parseFloat(r.bulkQty)||0);
+    if(r.boxLot && r.boxLot!=='-') usage[r.boxLot]=(usage[r.boxLot]||0)+(parseFloat(r.boxQty)||0);
+    if(r.pkgBoxLot && r.pkgBoxLot!=='-') usage[r.pkgBoxLot]=(usage[r.pkgBoxLot]||0)+(parseFloat(r.pkgBoxQty)||0);
+    if(r.filmLot && r.filmLot!=='-'){
+      const filmTotal=(parseFloat(r.filmQty)||0)+(parseFloat(r.filmWaste)||0);
+      usage[r.filmLot]=(usage[r.filmLot]||0)+filmTotal;
+    }
+  });
+  return usage;
+}
+
+// 특정 LOT의 실재고 계산 (Firebase 잔량 - 세션 사용량)
+function getRealRemaining(lot){
+  const subRecs=window._subLedgerRecords||[];
+  let inQ=0, outQ=0;
+  subRecs.forEach(r=>{
+    if(r.lot!==lot) return;
+    if(r.type==='init'||r.type==='in') inQ+=parseFloat(r.qty)||0;
+    if(r.type==='out'||r.type==='dispose') outQ+=parseFloat(r.qty)||0;
+  });
+  const sessionUsage=getSessionSubUsage();
+  return Math.round((inQ - outQ - (sessionUsage[lot]||0))*1000)/1000;
+}
+
 // 부자재 LOT 셀렉트 채우기 (잔여재고 표시)
 function loadSubLots(){
   const recs=window._subLedgerRecords||[];
@@ -668,6 +697,11 @@ function loadSubLots(){
     if(!r.lot) return;
     if(r.type==='init'||r.type==='in') inQty[r.lot]=(inQty[r.lot]||0)+(parseFloat(r.qty)||0);
     if(r.type==='out'||r.type==='dispose') outQty[r.lot]=(outQty[r.lot]||0)+(parseFloat(r.qty)||0);
+  });
+  // 세션 내 사용량도 출고로 합산
+  const sessionUsage=getSessionSubUsage();
+  Object.entries(sessionUsage).forEach(([lot,qty])=>{
+    outQty[lot]=(outQty[lot]||0)+qty;
   });
   Object.entries(catMap).forEach(([selId,cats])=>{
     const sel=document.getElementById(selId);
@@ -704,6 +738,57 @@ function loadSubLots(){
         return `<option value="${r.lot||r.name}" style="${style}">${label}</option>`;
       }).join('');
   });
+}
+
+// 부자재 LOT 선택 시 재고 체크
+function onSubLotSelect(selId){
+  const sel=document.getElementById(selId);
+  if(!sel||!sel.value) return;
+  const lot=sel.value;
+  const remaining=getRealRemaining(lot);
+  if(remaining<=0){
+    alert('⚠️ 재고가 없습니다.\n\nLOT: '+lot+'\n잔량: '+remaining);
+    sel.selectedIndex=0;
+  }
+}
+
+// 포장 완료 전 부자재 재고 초과 검증
+function validateSubStock(){
+  const checks=[];
+  // 벌크비닐
+  const bulkLot=document.getElementById('bulkLot')?.value||'';
+  const bulkQty=parseFloat(document.getElementById('bulkQty')?.value)||0;
+  if(bulkLot && bulkLot!=='-' && bulkQty>0){
+    const rem=getRealRemaining(bulkLot);
+    if(bulkQty>rem) checks.push({name:'벌크비닐',lot:bulkLot,use:bulkQty,rem});
+  }
+  // 박스
+  const boxLot=document.getElementById('boxLot')?.value||'';
+  const boxQty=parseFloat(document.getElementById('boxQty')?.value)||0;
+  if(boxLot && boxLot!=='-' && boxQty>0){
+    const rem=getRealRemaining(boxLot);
+    if(boxQty>rem) checks.push({name:'박스',lot:boxLot,use:boxQty,rem});
+  }
+  // 패키지박스
+  const pkgBoxLot=document.getElementById('pkgBoxLot')?.value||'';
+  const pkgBoxQty=parseFloat(document.getElementById('pkgBoxQty')?.value)||0;
+  if(pkgBoxLot && pkgBoxLot!=='-' && pkgBoxQty>0){
+    const rem=getRealRemaining(pkgBoxLot);
+    if(pkgBoxQty>rem) checks.push({name:'패키지박스',lot:pkgBoxLot,use:pkgBoxQty,rem});
+  }
+  // 필름
+  const filmLot=document.getElementById('filmLot')?.value||'';
+  const filmQty=(parseFloat(document.getElementById('filmQty')?.value)||0)+(parseFloat(document.getElementById('filmWaste')?.value)||0);
+  if(filmLot && filmLot!=='-' && filmQty>0){
+    const rem=getRealRemaining(filmLot);
+    if(filmQty>rem) checks.push({name:'필름포장지',lot:filmLot,use:Math.round(filmQty*1000)/1000,rem});
+  }
+  if(checks.length){
+    const msg=checks.map(c=>`• ${c.name}\n  LOT: ${c.lot}\n  입력: ${c.use} / 잔량: ${c.rem}`).join('\n\n');
+    alert('❌ 재고가 부족하여 포장을 완료할 수 없습니다.\n\n'+msg+'\n\n사용량을 확인하거나 부자재를 추가 입고해주세요.');
+    return false;
+  }
+  return true;
 }
 
 // 설비세팅 입력 시 자동저장
@@ -1077,11 +1162,17 @@ function selectProduct(code){
   document.querySelectorAll('.month-btn').forEach(b=>b.classList.remove('active'));
 
   // 입력 초기화
-  ['workers','perBox','itemWeight','startTime','endTime','qtyPcs','remaining','bulkQty','bulkDate','boxQty'].forEach(id=>{
+  ['workers','perBox','itemWeight','startTime','endTime','qtyPcs','remaining','bulkQty','bulkDate','boxQty','pkgBoxQty'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.value='';
   });
   document.getElementById('qtyBoxes').value='';
+  // select 필드 초기화
+  ['batchLotSel','bulkLot','boxLot','pkgBoxLot'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.selectedIndex=0;
+  });
+  S.batchLot=null; S.batchLotType=null; S.allBatchLots=[];
   // 필름 hidden 필드 초기화
   ['filmLot','filmQty','filmWaste','filmItemCode','filmUnitLen','filmRollLen','filmWastePcs'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value=id==='filmQty'||id==='filmWaste'||id==='filmWastePcs'?'0':'';
@@ -1211,6 +1302,11 @@ function populateFilmLots(){
     if(r.type==='init'||r.type==='in') inQty[r.lot]=(inQty[r.lot]||0)+(parseFloat(r.qty)||0);
     if(r.type==='out'||r.type==='dispose') outQty[r.lot]=(outQty[r.lot]||0)+(parseFloat(r.qty)||0);
   });
+  // 세션 내 필름 사용량도 출고로 합산
+  const sessionUsage=getSessionSubUsage();
+  Object.entries(sessionUsage).forEach(([lot,qty])=>{
+    outQty[lot]=(outQty[lot]||0)+qty;
+  });
   const seen=new Set();
   const lots=[];
   subRecs.filter(r=>(r.type==='in'||r.type==='init')&&r.name===itemName).forEach(r=>{
@@ -1289,6 +1385,14 @@ function applyFilmPopup(){
   const usageRl=(prodQty*unitLen)/rollLenMm;
   const wasteRl=(wastePcs*unitLen)/rollLenMm;
   const totalQty=usageRl+wasteRl;
+  // 필름 재고 체크
+  if(lot && totalQty>0){
+    const rem=getRealRemaining(lot);
+    if(totalQty>rem){
+      alert('❌ 필름 재고가 부족합니다.\n\nLOT: '+lot+'\n필요량: '+totalQty.toFixed(3)+'Rl / 잔량: '+rem+'Rl\n\n사용량을 확인하거나 부자재를 추가 입고해주세요.');
+      return;
+    }
+  }
   // hidden 필드에 저장
   document.getElementById('filmLot').value=lot;
   document.getElementById('filmQty').value=parseFloat(usageRl.toFixed(4));
@@ -1566,6 +1670,8 @@ function completeWithSign(){
 
 // 포장 완료
 function completePackaging(signImg=''){
+  // 부자재 재고 초과 검증
+  if(!validateSubStock()) return;
   const code=S.product;
   const p=RECIPE_DB[code];
   const today=getWorkDateKey();
@@ -1931,7 +2037,7 @@ async function verifyTestMode(){
       <!-- 4. LOT 선택 -->
       <div style="margin-bottom:14px;">
         <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">필름 LOT</div>
-        <select class="field-input" id="fpLot">
+        <select class="field-input" id="fpLot" onchange="onSubLotSelect('fpLot')">
           <option value="">-- LOT 선택 --</option>
         </select>
       </div>
