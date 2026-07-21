@@ -84,7 +84,10 @@ tr:hover td{background:var(--bg);}
 <div class="topbar">
   <button class="topbar-back" onclick="location.href='통합관리.html'">← 통합관리</button>
   <div class="topbar-title">📦 부자재수불부</div>
-  <div id="topbarDate" style="color:rgba(255,255,255,0.7);font-size:12px;"></div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span style="color:rgba(255,255,255,0.4);font-size:10px;">v1.1.0 | 2026-07-21</span>
+    <div id="topbarDate" style="color:rgba(255,255,255,0.7);font-size:12px;"></div>
+  </div>
 </div>
 <div class="content">
   <div class="filter-row">
@@ -282,10 +285,11 @@ tr:hover td{background:var(--bg);}
     <div class="modal-bd">
       <input type="hidden" id="recName"><input type="hidden" id="recCode">
       <div class="form-grid">
-        <div class="form-row"><label class="form-label">유형</label><select class="form-input" id="recType"><option value="in">입고</option><option value="out">출고</option><option value="dispose">폐기</option></select></div>
+        <div class="form-row"><label class="form-label">유형</label><select class="form-input" id="recType" onchange="onRecTypeChange()"><option value="in">입고</option><option value="out">출고</option><option value="dispose">폐기</option></select></div>
         <div class="form-row"><label class="form-label">수량</label><input class="form-input" id="recQty" type="number" placeholder="0" step="0.001"></div>
         <div class="form-row"><label class="form-label">날짜 YYMMDD</label><input class="form-input" id="recDate" placeholder="260701" maxlength="6" inputmode="numeric" oninput="fmtYYMMDD(this)"></div>
         <div class="form-row"><label class="form-label">제조일자 YYMMDD</label><input class="form-input" id="recMfg" placeholder="260101" maxlength="6" inputmode="numeric" oninput="fmtYYMMDD(this)"></div>
+        <div class="form-row" id="recLotWrap" style="grid-column:1/-1;display:none;"><label class="form-label">출고 LOT 선택</label><select class="form-input" id="recLot"><option value="">-- LOT 선택 --</option></select></div>
         <div class="form-row" style="grid-column:1/-1"><label class="form-label">비고</label><input class="form-input" id="recNote" placeholder="비고"></div>
       </div>
     </div>
@@ -417,15 +421,17 @@ async function initLedger(){
       (rec.rows||[]).forEach(row=>{
         if(!row.item||!row.qty)return;
         const lot=row.lot||'';
-        if(ledgerRecords.find(r=>r.lot===lot&&r.type==='in'))return;
         const isoDate=rec.date||getTodayISO2();
+        const rowQty=parseFloat(row.qty)||0;
+        // 중복 체크: lot+name+qty+date 조합
+        if(ledgerRecords.find(r=>r.type==='in'&&r.lot===lot&&r.name===row.item&&r.qty===rowQty&&r.date===isoDate))return;
         const rawCat=row.category==='벌크비닐'?'비닐':row.category;
         const subCat=rawCat||SUB_CATEGORIES.find(k=>row.item.includes(k))||'기타';
-        ledgerRecords.push({date:isoDate,name:row.item,qty:parseFloat(row.qty)||0,mfg:row.mfg||'',lot,supplier:row.supplier||'',type:'in'});
+        ledgerRecords.push({date:isoDate,name:row.item,qty:rowQty,mfg:row.mfg||'',lot,supplier:row.supplier||'',type:'in'});
         // SUB_ITEM_DB 자동등록
         if(!SUB_ITEM_DB.find(i=>i.name===row.item)){
           const code=autoCode(subCat);
-          SUB_ITEM_DB.push({code,name:row.item,category:subCat,spec:'',unit:'EA',supplier:row.supplier||''});
+          SUB_ITEM_DB.push({code,name:row.item,category:subCat,spec:'',unit:row.unit||'EA',supplier:row.supplier||''});
         }
         added=true;
       });
@@ -636,18 +642,68 @@ function openAddRecord(name,code){
   document.getElementById('recNote').value='';
   const d=new Date();document.getElementById('recDate').value=String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
   document.getElementById('recordModalTitle').textContent=`수불 등록 - ${name}`;
+  onRecTypeChange();
   document.getElementById('recordModal').classList.add('open');
+}
+function onRecTypeChange(){
+  const type=document.getElementById('recType').value;
+  const lotWrap=document.getElementById('recLotWrap');
+  if(type==='out'||type==='dispose'){
+    lotWrap.style.display='block';
+    populateRecLots();
+  } else {
+    lotWrap.style.display='none';
+  }
+}
+function populateRecLots(){
+  const name=document.getElementById('recName').value;
+  const sel=document.getElementById('recLot');
+  const selDate=getLedgerDateISO();
+  // LOT별 잔량 계산
+  const recs=ledgerRecords.filter(r=>r.name===name);
+  const lotMap={};
+  recs.forEach(r=>{
+    if(r.type==='init'||(r.type==='in'&&r.date<=selDate)){
+      const key=r.lot||'_none';
+      if(!lotMap[key])lotMap[key]={lot:r.lot||'',inQty:0,outQty:0};
+      lotMap[key].inQty+=r.qty;
+    }
+  });
+  recs.forEach(r=>{
+    if((r.type==='out'||r.type==='dispose')&&r.date<=selDate){
+      const key=r.lot||'_none';
+      if(lotMap[key])lotMap[key].outQty+=r.qty;
+    }
+  });
+  const item=getItemByName(name);
+  const isRl=item?.unit==='Rl';
+  const fmt=v=>isRl?v.toFixed(3):(Number.isInteger(v)?String(v):v.toFixed(1));
+  const lots=Object.values(lotMap).filter(l=>(l.inQty-l.outQty)>0.0005);
+  sel.innerHTML='<option value="">-- LOT 선택 --</option>'+
+    lots.map(l=>`<option value="${l.lot}">${l.lot||'LOT 미지정'} [잔량: ${fmt(l.inQty-l.outQty)}]</option>`).join('');
 }
 async function saveRecord(){
   const name=document.getElementById('recName').value;
   const code=document.getElementById('recCode').value;
   const type=document.getElementById('recType').value;
   const qty=parseFloat(document.getElementById('recQty').value)||0;
-  const date=yymmddToISO(document.getElementById('recDate').value);
-  const mfg=yymmddToISO(document.getElementById('recMfg').value)||'';
+  const dateRaw=document.getElementById('recDate').value;
+  const date=yymmddToISO(dateRaw);
+  const mfgRaw=document.getElementById('recMfg').value;
+  const mfg=yymmddToISO(mfgRaw)||'';
   const note=document.getElementById('recNote').value.trim();
   if(!qty){alert('수량을 입력해주세요');return;}
-  ledgerRecords.push({date,name,code,qty,mfg,note,type});
+  let lot='';
+  if(type==='in'){
+    // 입고: LOT 자동생성 (코드-OF-날짜-제조일)
+    const dateKey=dateRaw.length===6?dateRaw:isoToYYMMDD(date);
+    const mfgKey=mfgRaw.length===6?mfgRaw:'000000';
+    lot=code+'-OF-'+dateKey+'-'+mfgKey;
+  } else {
+    // 출고/폐기: 선택된 LOT
+    lot=document.getElementById('recLot')?.value||'';
+  }
+  ledgerRecords.push({date,name,code,qty,mfg,lot,note,type});
   await saveLedger();closeModal('recordModal');renderLedger();
 }
 
