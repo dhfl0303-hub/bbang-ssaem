@@ -200,6 +200,7 @@ tr:hover td{background:var(--bg);}
 </script>
 </head>
 <body>
+<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.1 · 2026.07.23</div>
 <!-- 로그인 화면 -->
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0d3f75;z-index:9999;align-items:center;justify-content:center;">
   <div style="width:340px;">
@@ -3570,14 +3571,45 @@ function saveRecipe(){
     '3':ings3.length?{weight:w3||ings3.reduce((s,i)=>s+i.amount,0),ingredients:ings3}:null,
     '4':ings4.length?{weight:w4||ings4.reduce((s,i)=>s+i.amount,0),ingredients:ings4}:null,
   }};
-  saveData('recipeDB',DB);
-  closeModal('recipeModal'); renderRecipe(); alert('저장됐습니다');
+  const removedCode=(editingCode&&editingCode!==code)?editingCode:null;
+  saveRecipeMerged(code,removedCode).then(ok=>{
+    if(ok){ closeModal('recipeModal'); renderRecipe(); alert('저장됐습니다'); }
+  });
 }
 function deleteRecipe(){
   if(!editingCode)return;
   if(!confirm(`"${DB[editingCode].name}"을 삭제하시겠습니까?`))return;
-  delete DB[editingCode]; saveData('recipeDB',DB);
-  closeModal('recipeModal'); renderRecipe();
+  const delCode=editingCode;
+  delete DB[delCode];
+  saveRecipeMerged(null,delCode).then(ok=>{
+    if(ok){ closeModal('recipeModal'); renderRecipe(); }
+  });
+}
+// 배합비 병합 저장: 서버 최신본을 먼저 읽고 변경된 품목만 반영 (전체 덮어쓰기 금지 — 신규품목 유실 방지)
+async function saveRecipeMerged(changedCode,removedCode){
+  if(window._fbLoadFailed){
+    alert('⚠️ 서버 연결 실패 상태입니다.\n네트워크 확인 후 새로고침해 주세요.');
+    return false;
+  }
+  if(!window._db){
+    try{ localStorage.setItem('backup_recipeDB',JSON.stringify(DB)); }catch(e){}
+    return true;
+  }
+  try{
+    const snap=await window._db.collection('appData').doc('recipeDB').get();
+    const server=(snap.exists&&snap.data().data)?JSON.parse(snap.data().data):{};
+    const merged={...server};
+    if(removedCode) delete merged[removedCode];
+    if(changedCode) merged[changedCode]=DB[changedCode];
+    DB=merged;
+    try{ localStorage.setItem('backup_recipeDB',JSON.stringify(DB)); }catch(e){}
+    await window._db.collection('appData').doc('recipeDB').set({data:JSON.stringify(DB),updatedAt:new Date().toISOString()});
+    return true;
+  }catch(e){
+    console.error('배합비 병합 저장 실패',e);
+    alert('서버 저장 실패: 네트워크 확인 후 다시 시도해주세요');
+    return false;
+  }
 }
 
 // ===== ② 원료 재고 현황 =====

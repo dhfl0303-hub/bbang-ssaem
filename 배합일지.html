@@ -193,6 +193,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </script>
 </head>
 <body>
+<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.1 · 2026.07.23</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -488,6 +489,16 @@ function initDB(){
   const s=localStorage.getItem('recipeDB');
   DB = s ? JSON.parse(s) : JSON.parse(JSON.stringify(RECIPE_DB_INIT));
   if(!s) localStorage.setItem('recipeDB',JSON.stringify(DB));
+  // 시작 시 배합비 자동 다운로드 (온라인일 때만 성공, 오프라인이면 기존 localStorage 유지)
+  if(window._db){
+    window._db.collection('appData').doc('recipeDB').get().then(snap=>{
+      if(snap.exists && snap.data().data){
+        DB = JSON.parse(snap.data().data);
+        localStorage.setItem('recipeDB', JSON.stringify(DB));
+        try{ renderProductList(Object.keys(DB)); }catch(e){}
+      }
+    }).catch(()=>{});
+  }
   // inputDB Firebase에서 로드 (투입비 관리)
   if(window._db){
     window._db.collection('appData').doc('inputDB').get().then(snap=>{
@@ -2223,8 +2234,14 @@ async function syncToServer(){
       await db.collection('appData').doc('disposeLog').set({ data:JSON.stringify(disposeLog), updatedAt:new Date().toISOString() });
     }catch(e){ console.warn('폐기대장 저장 실패',e); }
 
-    // 4. 배합비(recipeDB) Firebase 업로드
-    await db.collection('appData').doc('recipeDB').set({ data: JSON.stringify(DB), updatedAt: new Date().toISOString() });
+    // 4. 배합비(recipeDB) 서버 최신본 다운로드 — 업로드 금지 (통합관리 신규품목 유실 방지)
+    try{
+      const rSnap = await db.collection('appData').doc('recipeDB').get();
+      if(rSnap.exists && rSnap.data().data){
+        DB = JSON.parse(rSnap.data().data);
+        localStorage.setItem('recipeDB', JSON.stringify(DB));
+      }
+    }catch(e){ console.warn('배합비 다운로드 실패(기존 데이터 유지)', e); }
 
     // 5. 동기화 후 ledgerRecords 재로드 (최신 재고 반영)
     window._ledgerRecords = ledgerRecords;
@@ -2309,8 +2326,14 @@ async function syncSingleBatch(idx){
     const dayRecs=JSON.parse(localStorage.getItem(todayKey)||'[]').filter(r=>!r._isTest);
     if(dayRecs.length) await db.collection('appData').doc(todayKey).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
 
-    // 5. 배합비 업로드
-    await db.collection('appData').doc('recipeDB').set({data:JSON.stringify(DB),updatedAt:new Date().toISOString()});
+    // 5. 배합비 서버 최신본 다운로드 — 업로드 금지 (통합관리 신규품목 유실 방지)
+    try{
+      const rSnap2 = await db.collection('appData').doc('recipeDB').get();
+      if(rSnap2.exists && rSnap2.data().data){
+        DB = JSON.parse(rSnap2.data().data);
+        localStorage.setItem('recipeDB', JSON.stringify(DB));
+      }
+    }catch(e){ console.warn('배합비 다운로드 실패(기존 데이터 유지)', e); }
 
     // 6. _synced 표시
     rec._synced=true;
