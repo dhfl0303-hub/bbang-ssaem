@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>표시사항 작업 관리 시스템</title>
+<link rel="stylesheet" as="style" crossorigin
+  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+  :root{
+    --bg:#F4F6F7;
+    --surface:#FFFFFF;
+    --surface-alt:#EEF2F1;
+    --text:#1C2420;
+    --text-muted:#5C6B65;
+    --border:#DCE3E0;
+    --primary:#2F6B57;
+    --primary-dark:#204A3D;
+    --primary-light:#E4EFEA;
+    --amber:#C07A2B;
+    --status-pending:#8A97A6;
+    --status-draft:#3B72C9;
+    --status-submitted:#C07A2B;
+    --status-approved:#2F8F5B;
+    --status-rejected:#C0392B;
+    --radius:10px;
+    --shadow:0 1px 3px rgba(20,30,25,0.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app-shell{
+    max-width:640px;
+    margin:0 auto;
+    min-height:100vh;
+    background:var(--bg);
+    display:flex;
+    flex-direction:column;
+  }
+  header.top-bar{
+    position:sticky; top:0; z-index:10;
+    background:var(--primary-dark);
+    color:#fff;
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+  }
+  header.top-bar .title{
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:-0.2px;
+  }
+  header.top-bar .version-badge{
+    font-size:11px;
+    color:#D7E6DF;
+    background:rgba(255,255,255,0.12);
+    border-radius:999px;
+    padding:3px 9px;
+    white-space:nowrap;
+  }
+  main{flex:1; padding:16px; padding-bottom:40px;}
+  .view{display:none;}
+  .view.active{display:block; animation:fadeIn .15s ease-out;}
+  @keyframes fadeIn{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:18px;
+    margin-bottom:14px;
+  }
+  .card-title{
+    font-size:15px;
+    font-weight:700;
+    margin:0 0 4px;
+  }
+  .card-sub{
+    font-size:12.5px;
+    color:var(--text-muted);
+    margin:0 0 14px;
+  }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:100%;
+    padding:13px 16px;
+    border-radius:8px;
+    border:none;
+    font-size:15px;
+    font-weight:600;
+    cursor:pointer;
+    text-align:center;
+    transition:opacity .1s;
+  }
+  .btn:active{opacity:.85;}
+  .btn-primary{background:var(--primary); color:#fff;}
+  .btn-secondary{background:var(--surface-alt); color:var(--primary-dark); border:1px solid var(--border);}
+  .btn-danger{background:#FDECEA; color:var(--status-rejected); border:1px solid #F4C7C1;}
+  .btn-approve{background:var(--status-approved); color:#fff;}
+  .btn-reject{background:var(--status-rejected); color:#fff;}
+  .btn-block-gap{margin-top:10px;}
+  .btn-sm{width:auto; padding:8px 14px; font-size:13px;}
+  .row-gap{display:flex; gap:10px;}
+  .row-gap .btn{flex:1;}
+
+  label{display:block; font-size:13px; font-weight:600; color:var(--text); margin:14px 0 6px;}
+  label:first-child{margin-top:0;}
+  input[type=text], input[type=password], input[type=date], select, textarea{
+    width:100%;
+    padding:11px 12px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:#fff;
+    font-size:15px;
+    font-family:inherit;
+    color:var(--text);
+  }
+  input:focus, select:focus, textarea:focus{
+    outline:2px solid var(--primary);
+    outline-offset:1px;
+    border-color:var(--primary);
+  }
+  textarea{min-height:70px; resize:vertical;}
+  .hint{font-size:12px; color:var(--text-muted); margin-top:4px;}
+  fieldset{border:none; padding:0; margin:0;}
+  fieldset legend{
+    font-size:13.5px; font-weight:700; color:var(--primary-dark);
+    padding:0; margin:18px 0 2px;
+    border-top:1px solid var(--border);
+    padding-top:14px;
+    width:100%;
+  }
+  fieldset:first-of-type legend{border-top:none; padding-top:0; margin-top:0;}
+
+  .back-link{
+    display:inline-flex; align-items:center; gap:4px;
+    background:none; border:none; color:var(--primary-dark);
+    font-size:13.5px; font-weight:600; padding:6px 0 12px; cursor:pointer;
+  }
+
+  .item-list{list-style:none; margin:0; padding:0;}
+  .item-row{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:14px;
+    margin-bottom:10px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    cursor:pointer;
+  }
+  .item-row:active{background:var(--surface-alt);}
+  .item-row .name{font-size:14.5px; font-weight:600;}
+  .item-row .meta{font-size:11.5px; color:var(--text-muted); margin-top:2px;}
+  .badge{
+    font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:999px; white-space:nowrap; color:#fff;
+  }
+  .badge-대기{background:var(--status-pending);}
+  .badge-작성중{background:var(--status-draft);}
+  .badge-제출됨{background:var(--status-submitted);}
+  .badge-승인{background:var(--status-approved);}
+  .badge-반려{background:var(--status-rejected);}
+
+  .filter-tabs{display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; padding-bottom:2px;}
+  .filter-tab{
+    flex:none; padding:7px 13px; border-radius:999px; border:1px solid var(--border);
+    background:#fff; font-size:12.5px; font-weight:600; color:var(--text-muted); cursor:pointer; white-space:nowrap;
+  }
+  .filter-tab.active{background:var(--primary); border-color:var(--primary); color:#fff;}
+
+  .field-view-row{padding:9px 0; border-bottom:1px solid var(--border); display:flex; gap:10px;}
+  .field-view-row:last-child{border-bottom:none;}
+  .field-view-row .k{width:120px; flex:none; font-size:12.5px; color:var(--text-muted); font-weight:600;}
+  .field-view-row .v{font-size:14px; white-space:pre-wrap; word-break:break-word;}
+
+  .empty-state{
+    text-align:center; padding:36px 16px; color:var(--text-muted); font-size:13.5px;
+  }
+
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    background:#1C2420; color:#fff; padding:11px 18px; border-radius:8px; font-size:13.5px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.2); z-index:100; opacity:0; pointer-events:none; transition:opacity .2s;
+  }
+  .toast.show{opacity:1;}
+
+  .notice{
+    background:#FFF7EC; border:1px solid #F0D6A8; color:#7A5416;
+    border-radius:8px; padding:10px 12px; font-size:12.5px; margin-bottom:14px;
+  }
+  .pin-dots{display:flex; gap:8px; justify-content:center; margin:6px 0 16px;}
+  .pin-dots .dot{width:14px; height:14px; border-radius:50%; border:1.5px solid var(--border); background:#fff;}
+  .pin-dots .dot.filled{background:var(--primary); border-color:var(--primary);}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="top-bar">
+    <span class="title">표시사항 작업 관리</span>
+    <span class="version-badge">v1.0 · 2026-07-24</span>
+  </header>
+  <main id="main"></main>
+</div>
+<div id="toast" class="toast"></div>
+
+<!-- ============================================================
+  Firebase 설정: 아래 firebaseConfig 값을 본인 Firebase 프로젝트의
+  콘솔(프로젝트 설정 > 일반 > SDK 설정 및 구성)에서 복사해 그대로
+  교체하세요. 값을 넣지 않으면 앱이 동작하지 않습니다.
+============================================================= -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "여기에_API_KEY_입력",
+  authDomain: "여기에_AUTH_DOMAIN_입력",
+  projectId: "여기에_PROJECT_ID_입력",
+  storageBucket: "여기에_STORAGE_BUCKET_입력",
+  messagingSenderId: "여기에_SENDER_ID_입력",
+  appId: "여기에_APP_ID_입력"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const FieldValue = firebase.firestore.FieldValue;
+const Timestamp = firebase.firestore.Timestamp;
+
+/* ============================================================
+   작업자 / 검수자 계정 (Firebase Auth 없이 이름 선택 + PIN 방식)
+   실제 배포 전 아래 이름과 PIN을 회사 상황에 맞게 반드시 변경하세요.
+   보안 수준: 이 PIN은 암호화되지 않고 코드에 그대로 노출되므로
+   외부에 공개되지 않는 내부용 URL로만 배포하는 것을 권장합니다.
+============================================================= */
+const WORKERS = [
+  { id: "worker1", name: "근로자1", pin: "1111" },
+  { id: "worker2", name: "근로자2", pin: "2222" },
+  { id: "worker3", name: "근로자3", pin: "3333" }
+];
+const REVIEWER = { id: "reviewer", name: "검수담당자", pin: "9999" };
+
+const STATUS = ["대기","작성중","제출됨","승인","반려"];
+
+const FIELD_DEFS = [
+  { group: "기본 정보", key: "foodType", label: "식품유형", placeholder: "예: 빵류(가열하지 않고 섭취하는 냉동식품)" },
+  { group: "기본 정보", key: "reportNo", label: "품목보고번호", placeholder: "예: 20210395253-164" },
+  { group: "기본 정보", key: "manufacturer", label: "제조원", placeholder: "예: (주)OOO / 경기도 OO시 OO로 28" },
+  { group: "기본 정보", key: "netWeight", label: "내용량", placeholder: "예: 1.2 kg (3,084 kcal) (100 g x 12개)" },
+  { group: "기본 정보", key: "expiryDate", label: "소비기한", placeholder: "예: 2027년 04월 21일까지" },
+  { group: "원재료", key: "ingredients", label: "원재료명 및 함량", placeholder: "예: 밀가루(밀/미국,캐나다산), 정제수 ...", textarea: true },
+  { group: "포장/보관", key: "packageMaterial", label: "포장재질", placeholder: "예: 폴리프로필렌(내면)" },
+  { group: "포장/보관", key: "storageMethod", label: "보관방법", placeholder: "예: -18℃ 이하 냉동보관" },
+  { group: "영양정보 (1회 제공량 기준)", key: "n_sodium", label: "나트륨", placeholder: "예: 796 mg" },
+  { group: "영양정보 (1회 제공량 기준)", key: "n_carbs", label: "탄수화물", placeholder: "예: 47 g" },
+  { group: "영양정보 (1회 제공량 기준)", key: "n_sugar", label: "당류", placeholder: "예: 1.0 g" },
+  { group: "영양정보 (1회 제공량 기준)", key: "n_fat", label: "지방", placeholder: "예: 3.9 g" },
+  { group: "영양정보 (1회 제공량 기준)", key: "n_transFat", label: "트랜스지방", placeholder: "예: 0 g" },
+  { group: "영양정보 (1회 제공량 기준)", key: "n_satFat", label: "포화지방", placeholder: "예: 3 g" },
+  { group: "영양정보 (1회 제공량 기준)", key: "n_cholesterol", label: "콜레스테롤", placeholder: "예: 0 mg" },
+  { group: "영양정보 (1회 제공량 기준)", key: "n_protein", label: "단백질", placeholder: "예: 9 g" }
+];
+const FIELD_LABEL = Object.fromEntries(FIELD_DEFS.map(f => [f.key, f.label]));
+
+/* ---------------- 전역 상태 ---------------- */
+let state = {
+  view: "role",
+  currentWorker: null,   // { id, name }
+  isReviewer: false,
+  items: [],
+  unsub: null,
+  activeItem: null,      // 현재 열람/편집 중인 문서(id 포함)
+  activeItemSnapshot: null, // 폼 진입 시점의 fields 값(변경분 비교용)
+  reviewerFilter: "제출됨"
+};
+
+const main = document.getElementById("main");
+
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._h);
+  toast._h = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+function stopListening(){
+  if (state.unsub) { state.unsub(); state.unsub = null; }
+}
+
+function fmtDate(ts){
+  if (!ts) return "-";
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleString("ko-KR", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" });
+}
+
+/* ============================================================
+   화면 렌더링
+============================================================= */
+function render(){
+  if (state.view === "role") return renderRole();
+  if (state.view === "workerLogin") return renderWorkerLogin();
+  if (state.view === "workerList") return renderWorkerList();
+  if (state.view === "workerForm") return renderWorkerForm();
+  if (state.view === "reviewerLogin") return renderReviewerLogin();
+  if (state.view === "reviewerList") return renderReviewerList();
+  if (state.view === "reviewerDetail") return renderReviewerDetail();
+  if (state.view === "export") return renderExport();
+}
+
+function goto(view){
+  state.view = view;
+  render();
+}
+
+/* ---- 0. 역할 선택 ---- */
+function renderRole(){
+  stopListening();
+  main.innerHTML = `
+    <div class="card">
+      <p class="card-title">시작하기</p>
+      <p class="card-sub">본인의 역할을 선택해 주세요.</p>
+      <button class="btn btn-primary" id="btn-worker">작업자로 시작</button>
+      <button class="btn btn-secondary btn-block-gap" id="btn-reviewer">검수자로 시작</button>
+    </div>
+  `;
+  document.getElementById("btn-worker").onclick = () => goto("workerLogin");
+  document.getElementById("btn-reviewer").onclick = () => goto("reviewerLogin");
+}
+
+/* ---- 1. 작업자 로그인 ---- */
+function renderWorkerLogin(){
+  let pin = "";
+  main.innerHTML = `
+    <button class="back-link" id="back">← 역할 선택으로</button>
+    <div class="card">
+      <p class="card-title">작업자 로그인</p>
+      <label for="sel-name">이름</label>
+      <select id="sel-name">
+        ${WORKERS.map(w => `<option value="${w.id}">${w.name}</option>`).join("")}
+      </select>
+      <label>PIN 4자리</label>
+      <div class="pin-dots" id="pin-dots">
+        ${[0,1,2,3].map(() => `<span class="dot"></span>`).join("")}
+      </div>
+      <input type="password" id="pin-input" inputmode="numeric" maxlength="4" style="text-align:center; letter-spacing:6px; font-size:20px;">
+      <button class="btn btn-primary btn-block-gap" id="btn-login">확인</button>
+    </div>
+  `;
+  document.getElementById("back").onclick = () => goto("role");
+  const pinInput = document.getElementById("pin-input");
+  const dots = document.querySelectorAll("#pin-dots .dot");
+  pinInput.addEventListener("input", () => {
+    pinInput.value = pinInput.value.replace(/\D/g, "").slice(0,4);
+    dots.forEach((d,i) => d.classList.toggle("filled", i < pinInput.value.length));
+  });
+  document.getElementById("btn-login").onclick = () => {
+    const worker = WORKERS.find(w => w.id === document.getElementById("sel-name").value);
+    if (pinInput.value !== worker.pin){
+      toast("PIN이 일치하지 않습니다.");
+      return;
+    }
+    state.currentWorker = { id: worker.id, name: worker.name };
+    goto("workerList");
+  };
+}
+
+/* ---- 2. 작업자: 제품 목록 ---- */
+function renderWorkerList(){
+  main.innerHTML = `
+    <button class="back-link" id="back">← 로그아웃</button>
+    <div class="card" style="padding-bottom:8px;">
+      <p class="card-title">${state.currentWorker.name}님, 작업할 제품을 선택하세요</p>
+      <p class="card-sub">대기·작성중·반려 상태의 제품을 눌러 표시사항을 입력할 수 있습니다.</p>
+    </div>
+    <ul class="item-list" id="list"><li class="empty-state">불러오는 중...</li></ul>
+  `;
+  document.getElementById("back").onclick = () => { state.currentWorker = null; goto("role"); };
+
+  stopListening();
+  state.unsub = db.collection("labelItems").orderBy("createdAt", "desc")
+    .onSnapshot(snap => {
+      state.items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const list = document.getElementById("list");
+      if (!list) return;
+      if (state.items.length === 0){
+        list.innerHTML = `<li class="empty-state">등록된 제품이 없습니다. 검수자에게 제품 등록을 요청하세요.</li>`;
+        return;
+      }
+      list.innerHTML = state.items.map(it => `
+        <li class="item-row" data-id="${it.id}">
+          <div>
+            <div class="name">${escapeHtml(it.productName || "(제품명 미입력)")}</div>
+            <div class="meta">${it.lastEditedAt ? "최근 수정: " + fmtDate(it.lastEditedAt) : "등록: " + fmtDate(it.createdAt)}</div>
+          </div>
+          <span class="badge badge-${it.status}">${it.status}</span>
+        </li>
+      `).join("");
+      list.querySelectorAll(".item-row").forEach(row => {
+        row.onclick = () => {
+          const item = state.items.find(i => i.id === row.dataset.id);
+          state.activeItem = item;
+          state.activeItemSnapshot = JSON.parse(JSON.stringify(item.fields || {}));
+          goto("workerForm");
+        };
+      });
+    }, err => toast("목록을 불러오지 못했습니다: " + err.message));
+}
+
+/* ---- 3. 작업자: 입력 폼 ---- */
+function renderWorkerForm(){
+  const item = state.activeItem;
+  const readOnly = item.status === "승인";
+  const groups = [...new Set(FIELD_DEFS.map(f => f.group))];
+
+  main.innerHTML = `
+    <button class="back-link" id="back">← 목록으로</button>
+    <div class="card">
+      <p class="card-title">${escapeHtml(item.productName)}</p>
+      <p class="card-sub">
+        <span class="badge badge-${item.status}">${item.status}</span>
+        ${item.status === "반려" && item.reviewComment ? `&nbsp; 반려 사유: ${escapeHtml(item.reviewComment)}` : ""}
+      </p>
+      ${readOnly ? `<div class="notice">승인된 항목은 수정할 수 없습니다. 수정이 필요하면 검수자에게 문의하세요.</div>` : ""}
+      <form id="item-form">
+        ${groups.map(g => `
+          <fieldset>
+            <legend>${g}</legend>
+            ${FIELD_DEFS.filter(f => f.group === g).map(f => `
+              <label for="f-${f.key}">${f.label}</label>
+              ${f.textarea
+                ? `<textarea id="f-${f.key}" ${readOnly?"disabled":""} placeholder="${f.placeholder}">${escapeHtml((item.fields||{})[f.key] || "")}</textarea>`
+                : `<input type="text" id="f-${f.key}" ${readOnly?"disabled":""} placeholder="${f.placeholder}" value="${escapeHtml((item.fields||{})[f.key] || "")}">`
+              }
+            `).join("")}
+          </fieldset>
+        `).join("")}
+      </form>
+      ${!readOnly ? `
+        <div class="row-gap btn-block-gap">
+          <button class="btn btn-secondary" id="btn-draft">임시저장</button>
+          <button class="btn btn-primary" id="btn-submit">제출</button>
+        </div>
+      ` : ""}
+    </div>
+  `;
+  document.getElementById("back").onclick = () => goto("workerList");
+  if (!readOnly){
+    document.getElementById("btn-draft").onclick = () => saveWork(false);
+    document.getElementById("btn-submit").onclick = () => saveWork(true);
+  }
+}
+
+function collectFormFields(){
+  const fields = {};
+  FIELD_DEFS.forEach(f => {
+    const el = document.getElementById("f-" + f.key);
+    fields[f.key] = el.value.trim();
+  });
+  return fields;
+}
+
+async function saveWork(isSubmit){
+  const item = state.activeItem;
+  const newFields = collectFormFields();
+
+  if (isSubmit){
+    const filled = Object.values(newFields).some(v => v);
+    if (!filled){ toast("최소 한 개 항목 이상 입력 후 제출해 주세요."); return; }
+  }
+
+  const before = state.activeItemSnapshot || {};
+  const diffs = FIELD_DEFS.filter(f => (before[f.key] || "") !== (newFields[f.key] || ""));
+
+  const newStatus = isSubmit ? "제출됨" : (item.status === "대기" ? "작성중" : item.status);
+  const now = FieldValue.serverTimestamp();
+
+  const update = {
+    fields: newFields,
+    status: newStatus,
+    lastEditedBy: state.currentWorker.name,
+    lastEditedAt: now
+  };
+  if (isSubmit){
+    update.submittedBy = state.currentWorker.name;
+    update.submittedAt = now;
+  }
+
+  try{
+    await db.collection("labelItems").doc(item.id).update(update);
+
+    const batchWrites = diffs.map(f => db.collection("history").add({
+      itemId: item.id,
+      productName: item.productName,
+      action: "수정",
+      field: f.label,
+      oldValue: before[f.key] || "",
+      newValue: newFields[f.key] || "",
+      actor: state.currentWorker.name,
+      at: FieldValue.serverTimestamp()
+    }));
+    if (isSubmit){
+      batchWrites.push(db.collection("history").add({
+        itemId: item.id,
+        productName: item.productName,
+        action: "제출",
+        field: "",
+        oldValue: "",
+        newValue: "",
+        actor: state.currentWorker.name,
+        at: FieldValue.serverTimestamp()
+      }));
+    }
+    await Promise.all(batchWrites);
+
+    toast(isSubmit ? "제출되었습니다." : "임시저장되었습니다.");
+    goto("workerList");
+  }catch(err){
+    toast("저장 실패: " + err.message);
+  }
+}
+
+/* ---- 4. 검수자 로그인 ---- */
+function renderReviewerLogin(){
+  let dots;
+  main.innerHTML = `
+    <button class="back-link" id="back">← 역할 선택으로</button>
+    <div class="card">
+      <p class="card-title">검수자 로그인</p>
+      <label>PIN 4자리</label>
+      <div class="pin-dots" id="pin-dots">${[0,1,2,3].map(() => `<span class="dot"></span>`).join("")}</div>
+      <input type="password" id="pin-input" inputmode="numeric" maxlength="4" style="text-align:center; letter-spacing:6px; font-size:20px;">
+      <button class="btn btn-primary btn-block-gap" id="btn-login">확인</button>
+    </div>
+  `;
+  document.getElementById("back").onclick = () => goto("role");
+  const pinInput = document.getElementById("pin-input");
+  dots = document.querySelectorAll("#pin-dots .dot");
+  pinInput.addEventListener("input", () => {
+    pinInput.value = pinInput.value.replace(/\D/g, "").slice(0,4);
+    dots.forEach((d,i) => d.classList.toggle("filled", i < pinInput.value.length));
+  });
+  document.getElementById("btn-login").onclick = () => {
+    if (pinInput.value !== REVIEWER.pin){ toast("PIN이 일치하지 않습니다."); return; }
+    state.isReviewer = true;
+    goto("reviewerList");
+  };
+}
+
+/* ---- 5. 검수자: 목록 ---- */
+function renderReviewerList(){
+  main.innerHTML = `
+    <button class="back-link" id="back">← 로그아웃</button>
+    <div class="card">
+      <p class="card-title">신규 제품 등록</p>
+      <label for="new-name">제품명</label>
+      <input type="text" id="new-name" placeholder="예: 올리브소금치아바타">
+      <button class="btn btn-secondary btn-block-gap" id="btn-add">등록</button>
+    </div>
+    <div class="card">
+      <p class="card-title">제품 목록</p>
+      <div class="filter-tabs" id="tabs">
+        ${["전체", ...STATUS].map(s => `<button class="filter-tab ${state.reviewerFilter===s?"active":""}" data-f="${s}">${s}</button>`).join("")}
+      </div>
+      <ul class="item-list" id="list"><li class="empty-state">불러오는 중...</li></ul>
+      <button class="btn btn-secondary btn-block-gap" id="btn-export">기간별 CSV 내보내기</button>
+    </div>
+  `;
+  document.getElementById("back").onclick = () => { state.isReviewer = false; goto("role"); };
+  document.getElementById("btn-export").onclick = () => goto("export");
+  document.getElementById("btn-add").onclick = async () => {
+    const name = document.getElementById("new-name").value.trim();
+    if (!name){ toast("제품명을 입력해 주세요."); return; }
+    try{
+      const ref = await db.collection("labelItems").add({
+        productName: name,
+        status: "대기",
+        fields: {},
+        createdAt: FieldValue.serverTimestamp(),
+        createdBy: REVIEWER.name
+      });
+      await db.collection("history").add({
+        itemId: ref.id, productName: name, action: "등록", field: "", oldValue: "", newValue: "",
+        actor: REVIEWER.name, at: FieldValue.serverTimestamp()
+      });
+      document.getElementById("new-name").value = "";
+      toast("등록되었습니다.");
+    }catch(err){ toast("등록 실패: " + err.message); }
+  };
+  document.getElementById("tabs").querySelectorAll(".filter-tab").forEach(btn => {
+    btn.onclick = () => { state.reviewerFilter = btn.dataset.f; renderReviewerList(); };
+  });
+
+  stopListening();
+  state.unsub = db.collection("labelItems").orderBy("createdAt", "desc")
+    .onSnapshot(snap => {
+      state.items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const list = document.getElementById("list");
+      if (!list) return;
+      const filtered = state.reviewerFilter === "전체"
+        ? state.items
+        : state.items.filter(i => i.status === state.reviewerFilter);
+      if (filtered.length === 0){
+        list.innerHTML = `<li class="empty-state">해당 상태의 제품이 없습니다.</li>`;
+        return;
+      }
+      list.innerHTML = filtered.map(it => `
+        <li class="item-row" data-id="${it.id}">
+          <div>
+            <div class="name">${escapeHtml(it.productName || "(제품명 미입력)")}</div>
+            <div class="meta">${it.submittedAt ? "제출: " + fmtDate(it.submittedAt) : "등록: " + fmtDate(it.createdAt)}</div>
+          </div>
+          <span class="badge badge-${it.status}">${it.status}</span>
+        </li>
+      `).join("");
+      list.querySelectorAll(".item-row").forEach(row => {
+        row.onclick = () => {
+          state.activeItem = state.items.find(i => i.id === row.dataset.id);
+          goto("reviewerDetail");
+        };
+      });
+    }, err => toast("목록을 불러오지 못했습니다: " + err.message));
+}
+
+/* ---- 6. 검수자: 상세/승인/반려 ---- */
+function renderReviewerDetail(){
+  const item = state.activeItem;
+  const fields = item.fields || {};
+  main.innerHTML = `
+    <button class="back-link" id="back">← 목록으로</button>
+    <div class="card">
+      <p class="card-title">${escapeHtml(item.productName)}</p>
+      <p class="card-sub"><span class="badge badge-${item.status}">${item.status}</span></p>
+      ${FIELD_DEFS.map(f => `
+        <div class="field-view-row">
+          <div class="k">${f.label}</div>
+          <div class="v">${escapeHtml(fields[f.key] || "-")}</div>
+        </div>
+      `).join("")}
+    </div>
+    ${item.status === "제출됨" ? `
+      <div class="card">
+        <p class="card-title">검수 처리</p>
+        <button class="btn btn-approve" id="btn-approve">승인</button>
+        <label>반려 사유 (반려 시 필수)</label>
+        <textarea id="reject-reason" placeholder="반려 사유를 입력하세요"></textarea>
+        <button class="btn btn-reject btn-block-gap" id="btn-reject">반려</button>
+      </div>
+    ` : ""}
+    ${item.status === "반려" && item.reviewComment ? `
+      <div class="card"><p class="card-title">반려 사유</p><p>${escapeHtml(item.reviewComment)}</p></div>
+    ` : ""}
+  `;
+  document.getElementById("back").onclick = () => goto("reviewerList");
+  const approveBtn = document.getElementById("btn-approve");
+  const rejectBtn = document.getElementById("btn-reject");
+  if (approveBtn){
+    approveBtn.onclick = async () => {
+      try{
+        await db.collection("labelItems").doc(item.id).update({
+          status: "승인", reviewedBy: REVIEWER.name, reviewedAt: FieldValue.serverTimestamp(), reviewComment: ""
+        });
+        await db.collection("history").add({
+          itemId: item.id, productName: item.productName, action: "승인", field: "", oldValue: "", newValue: "",
+          actor: REVIEWER.name, at: FieldValue.serverTimestamp()
+        });
+        toast("승인되었습니다.");
+        goto("reviewerList");
+      }catch(err){ toast("처리 실패: " + err.message); }
+    };
+  }
+  if (rejectBtn){
+    rejectBtn.onclick = async () => {
+      const reason = document.getElementById("reject-reason").value.trim();
+      if (!reason){ toast("반려 사유를 입력해 주세요."); return; }
+      try{
+        await db.collection("labelItems").doc(item.id).update({
+          status: "반려", reviewedBy: REVIEWER.name, reviewedAt: FieldValue.serverTimestamp(), reviewComment: reason
+        });
+        await db.collection("history").add({
+          itemId: item.id, productName: item.productName, action: "반려", field: "", oldValue: "", newValue: reason,
+          actor: REVIEWER.name, at: FieldValue.serverTimestamp()
+        });
+        toast("반려 처리되었습니다.");
+        goto("reviewerList");
+      }catch(err){ toast("처리 실패: " + err.message); }
+    };
+  }
+}
+
+/* ---- 7. 검수자: 기간별 CSV 내보내기 ---- */
+function renderExport(){
+  const today = new Date().toISOString().slice(0,10);
+  main.innerHTML = `
+    <button class="back-link" id="back">← 목록으로</button>
+    <div class="card">
+      <p class="card-title">기간별 이력 내보내기</p>
+      <p class="card-sub">선택한 기간의 등록·수정·제출·승인·반려 이력을 CSV로 내려받습니다. 재택근무 실태조사 등 증빙 자료로 활용할 수 있습니다.</p>
+      <label for="start-date">시작일</label>
+      <input type="date" id="start-date" value="${today}">
+      <label for="end-date">종료일</label>
+      <input type="date" id="end-date" value="${today}">
+      <button class="btn btn-primary btn-block-gap" id="btn-download">CSV 다운로드</button>
+    </div>
+  `;
+  document.getElementById("back").onclick = () => goto("reviewerList");
+  document.getElementById("btn-download").onclick = async () => {
+    const startStr = document.getElementById("start-date").value;
+    const endStr = document.getElementById("end-date").value;
+    if (!startStr || !endStr){ toast("시작일과 종료일을 선택해 주세요."); return; }
+    const start = Timestamp.fromDate(new Date(startStr + "T00:00:00"));
+    const end = Timestamp.fromDate(new Date(endStr + "T23:59:59"));
+    try{
+      const snap = await db.collection("history")
+        .where("at", ">=", start).where("at", "<=", end)
+        .orderBy("at", "asc").get();
+      if (snap.empty){ toast("해당 기간에 이력이 없습니다."); return; }
+      const rows = [["시각","제품명","처리자","구분","필드","이전값","새값","비고"]];
+      snap.forEach(doc => {
+        const d = doc.data();
+        rows.push([
+          fmtDate(d.at), d.productName || "", d.actor || "", d.action || "",
+          d.field || "", d.oldValue || "", d.newValue || "", ""
+        ]);
+      });
+      downloadCsv(rows, `표시사항_작업이력_${startStr}_${endStr}.csv`);
+      toast("다운로드되었습니다.");
+    }catch(err){
+      toast("내보내기 실패: " + err.message);
+    }
+  };
+}
+
+function downloadCsv(rows, filename){
+  const csv = rows.map(r => r.map(escapeCsv).join(",")).join("\r\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function escapeCsv(v){
+  const s = String(v ?? "");
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function escapeHtml(s){
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+
+render();
+</script>
+</body>
+</html>
