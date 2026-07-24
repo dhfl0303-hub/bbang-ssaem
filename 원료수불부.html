@@ -397,106 +397,6 @@ function getIngByName(name){ return INGREDIENT_DB.find(i=>i.name===name||i.name.
 
 function getIngByCode(code){ return INGREDIENT_DB.find(i=>i.code===code); }
 
-// ===== LOT 재매칭 (빈 LOT 출고를 FIFO로 입고 LOT에 자동 배분) =====
-async function rematchEmptyLots(){
-  // 1. LOT가 비어있는 출고 레코드 수집 (원료별 그룹핑)
-  const emptyOuts={};
-  ledgerRecords.forEach((r,i)=>{
-    if((r.type==='out'||r.type==='dispose'||r.type==='return') && !r.lot){
-      if(!emptyOuts[r.name]) emptyOuts[r.name]=[];
-      emptyOuts[r.name].push({idx:i, rec:r});
-    }
-  });
-
-  const ingNames=Object.keys(emptyOuts);
-  if(!ingNames.length){ alert('LOT가 비어있는 출고 레코드가 없습니다.'); return; }
-
-  const totalCount=ingNames.reduce((s,n)=>s+emptyOuts[n].length, 0);
-  if(!confirm(`LOT가 비어있는 출고 레코드 ${totalCount}건 (${ingNames.length}개 원료)을 FIFO 순서로 자동 매칭합니다.\n\n진행하시겠습니까?`)) return;
-
-  let matched=0, failed=0;
-
-  ingNames.forEach(name=>{
-    // 2. 해당 원료의 입고 LOT 목록 (init+in, 날짜순)
-    const inRecs=ledgerRecords.filter(r=>r.name===name&&(r.type==='init'||r.type==='in'));
-    if(!inRecs.length){ failed+=emptyOuts[name].length; return; }
-
-    // LOT별 입고량 합산
-    const lotIn={};
-    const lotOrder=[];
-    const lotInfo={};
-    inRecs.forEach(r=>{
-      if(!r.lot) return;
-      if(!lotIn[r.lot]){ lotIn[r.lot]=0; lotOrder.push(r.lot); lotInfo[r.lot]={exp:r.exp||'',mfg:r.mfg||'',date:r.date||''}; }
-      lotIn[r.lot]+=r.qty;
-      if(r.exp&&!lotInfo[r.lot].exp) lotInfo[r.lot].exp=r.exp;
-    });
-
-    // LOT별 기존 출고량 합산 (LOT가 있는 것만)
-    const lotOut={};
-    ledgerRecords.forEach(r=>{
-      if(r.name===name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.lot){
-        lotOut[r.lot]=(lotOut[r.lot]||0)+r.qty;
-      }
-    });
-
-    // LOT별 잔여량 = 입고-출고
-    const lotRemain={};
-    lotOrder.forEach(lot=>{ lotRemain[lot]=(lotIn[lot]||0)-(lotOut[lot]||0); });
-
-    // 3. 빈 LOT 출고를 날짜순 정렬 후 FIFO 배분
-    const outs=emptyOuts[name].sort((a,b)=>(a.rec.date||'').localeCompare(b.rec.date||''));
-
-    outs.forEach(({idx,rec})=>{
-      let qty=rec.qty;
-      // 재고 있는 LOT부터 배분
-      for(const lot of lotOrder){
-        if(qty<=0.0005) break;
-        const avail=lotRemain[lot]||0;
-        if(avail<=0.0005) continue;
-        const use=Math.min(avail, qty);
-        if(Math.abs(use-qty)<0.0005){
-          // 전량 하나의 LOT에서 소화
-          ledgerRecords[idx].lot=lot;
-          ledgerRecords[idx].exp=lotInfo[lot].exp||rec.exp||'';
-          lotRemain[lot]-=use;
-          matched++;
-          qty=0;
-        } else {
-          // 분할: 현재 레코드에 일부 배분, 나머지는 새 레코드
-          ledgerRecords[idx].lot=lot;
-          ledgerRecords[idx].exp=lotInfo[lot].exp||rec.exp||'';
-          ledgerRecords[idx].qty=use;
-          lotRemain[lot]-=use;
-          qty-=use;
-          matched++;
-          // 잔여분을 다음 LOT로 계속 분배
-          while(qty>0.0005){
-            let assigned=false;
-            for(const lot2 of lotOrder){
-              if(qty<=0.0005) break;
-              const avail2=lotRemain[lot2]||0;
-              if(avail2<=0.0005) continue;
-              const use2=Math.min(avail2, qty);
-              ledgerRecords.push({...rec, lot:lot2, exp:lotInfo[lot2].exp||'', qty:use2});
-              lotRemain[lot2]-=use2;
-              qty-=use2;
-              assigned=true;
-            }
-            if(!assigned) break;
-          }
-          qty=0;
-        }
-      }
-      if(qty>0.0005) failed++;
-    });
-  });
-
-  await saveLedger();
-  renderLedger();
-  alert(`LOT 재매칭 완료!\n\n✅ 매칭 성공: ${matched}건\n${failed?'⚠️ 매칭 실패 (입고 LOT 부족): '+failed+'건':''}`);
-}
-
 function findEmptyCodes(){
   const nums = INGREDIENT_DB.map(i=>parseInt((i.code||'').replace('M',''))||0);
   const maxNum = Math.max(...nums);
@@ -513,170 +413,94 @@ function findEmptyCodes(){
   }
 }
 
-// ===== 미매칭 출고 일괄삭제 =====
-async function deleteUnmatchedOuts(){
-  // 원료별 LOT별 입고/출고 합산
-  const ingLotIn={};   // {원료명: {LOT: 입고합계}}
-  const ingLotOut={};   // {원료명: {LOT: [{idx, qty}]}}
-
+// ===== LOT 재매칭 =====
+async function rematchEmptyLots(){
+  const emptyOuts={};
   ledgerRecords.forEach((r,i)=>{
-    if(r.type==='init'||r.type==='in'){
-      if(!r.lot) return;
-      if(!ingLotIn[r.name]) ingLotIn[r.name]={};
-      ingLotIn[r.name][r.lot]=(ingLotIn[r.name][r.lot]||0)+r.qty;
-    }
-    if(r.type==='out'||r.type==='dispose'||r.type==='return'){
-      const key=r.lot||'_empty_';
-      if(!ingLotOut[r.name]) ingLotOut[r.name]={};
-      if(!ingLotOut[r.name][key]) ingLotOut[r.name][key]=[];
-      ingLotOut[r.name][key].push({idx:i, qty:r.qty, date:r.date||''});
+    if((r.type==='out'||r.type==='dispose'||r.type==='return')&&!r.lot){
+      if(!emptyOuts[r.name]) emptyOuts[r.name]=[];
+      emptyOuts[r.name].push({idx:i,rec:r});
     }
   });
-
-  // 삭제 대상 인덱스 수집
-  const toDelete=new Set();
-  const summary={};
-
-  Object.keys(ingLotOut).forEach(name=>{
-    const lotInMap=ingLotIn[name]||{};
-    Object.keys(ingLotOut[name]).forEach(lot=>{
-      const inQty=lotInMap[lot]||0;
-      const outRecs=ingLotOut[name][lot];
-      const outTotal=outRecs.reduce((s,r)=>s+r.qty,0);
-
-      if(lot==='_empty_'){
-        // LOT 비어있는 출고 → 전부 삭제 대상
-        outRecs.forEach(r=>{
-          toDelete.add(r.idx);
-          if(!summary[name]) summary[name]={count:0, qty:0};
-          summary[name].count++;
-          summary[name].qty+=r.qty;
-        });
-      } else if(outTotal>inQty+0.0005){
-        // 출고가 입고보다 많은 LOT → 초과분만 삭제 (최신 출고부터)
-        const excess=outTotal-inQty;
-        let remaining=excess;
-        // 날짜 내림차순 (최신 먼저 삭제)
-        const sorted=[...outRecs].sort((a,b)=>b.date.localeCompare(a.date));
-        for(const r of sorted){
-          if(remaining<=0.0005) break;
-          const del=Math.min(r.qty, remaining);
-          if(Math.abs(del-r.qty)<0.0005){
-            // 레코드 전체 삭제
-            toDelete.add(r.idx);
-            remaining-=r.qty;
-          } else {
-            // 부분 삭제 → 수량만 줄임
-            ledgerRecords[r.idx].qty=r.qty-del;
-            remaining-=del;
-          }
-          if(!summary[name]) summary[name]={count:0, qty:0};
-          summary[name].count++;
-          summary[name].qty+=del;
-        }
-      }
+  const ingNames=Object.keys(emptyOuts);
+  if(!ingNames.length){alert('LOT가 비어있는 출고 레코드가 없습니다.');return;}
+  const totalCount=ingNames.reduce((s,n)=>s+emptyOuts[n].length,0);
+  if(!confirm(`빈 LOT 출고 ${totalCount}건을 FIFO 매칭합니다.\n진행하시겠습니까?`))return;
+  let matched=0,failed=0;
+  ingNames.forEach(name=>{
+    const inRecs=ledgerRecords.filter(r=>r.name===name&&(r.type==='init'||r.type==='in'));
+    if(!inRecs.length){failed+=emptyOuts[name].length;return;}
+    const lotIn={},lotOrder=[],lotInfo={};
+    inRecs.forEach(r=>{if(!r.lot)return;if(!lotIn[r.lot]){lotIn[r.lot]=0;lotOrder.push(r.lot);lotInfo[r.lot]={exp:r.exp||''};}lotIn[r.lot]+=r.qty;if(r.exp&&!lotInfo[r.lot].exp)lotInfo[r.lot].exp=r.exp;});
+    const lotOut={};
+    ledgerRecords.forEach(r=>{if(r.name===name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.lot)lotOut[r.lot]=(lotOut[r.lot]||0)+r.qty;});
+    const lotRemain={};
+    lotOrder.forEach(lot=>{lotRemain[lot]=(lotIn[lot]||0)-(lotOut[lot]||0);});
+    emptyOuts[name].sort((a,b)=>(a.rec.date||'').localeCompare(b.rec.date||'')).forEach(({idx,rec})=>{
+      for(const lot of lotOrder){if((lotRemain[lot]||0)<=0.0005)continue;ledgerRecords[idx].lot=lot;ledgerRecords[idx].exp=lotInfo[lot].exp||rec.exp||'';lotRemain[lot]-=rec.qty;matched++;return;}
+      failed++;
     });
   });
-
-  if(!toDelete.size&&!Object.keys(summary).length){ alert('미매칭 출고 레코드가 없습니다.'); return; }
-
-  const totalCount=Object.values(summary).reduce((s,v)=>s+v.count,0);
-  const summaryText=Object.entries(summary).map(([name,v])=>`  ${name}: ${v.count}건 (${v.qty.toFixed(3)}kg)`).join('\n');
-
-  if(!confirm(`미매칭/초과 출고 ${totalCount}건을 정리합니다.\n\n${summaryText}\n\n삭제하면 해당 출고량만큼 재고가 복원됩니다.\n(삭제된 배합의 잔여 출고이므로 복원이 정상입니다)\n\n진행하시겠습니까?`)) return;
-
-  // 인덱스 내림차순으로 삭제
-  [...toDelete].sort((a,b)=>b-a).forEach(idx=>{
-    ledgerRecords.splice(idx,1);
-  });
-
-  await saveLedger();
-  renderLedger();
-  alert(`미매칭/초과 출고 정리 완료!\n\n${totalCount}건 처리됨`);
+  await saveLedger();renderLedger();
+  alert(`LOT 재매칭 완료!\n✅ 성공: ${matched}건\n${failed?'⚠️ 실패: '+failed+'건':''}`);
 }
 
-// ===== 재동기화: 출고 정리 + 전체 배합기록 기준 입고 차감 (원버튼) =====
-async function resyncAllBatches(){
-  if(!window._db){ alert('인터넷 연결을 확인해주세요'); return; }
+// ===== 미매칭 출고 삭제 =====
+async function deleteUnmatchedOuts(){
+  const ingLotIn={};
+  ledgerRecords.forEach(r=>{if((r.type==='init'||r.type==='in')&&r.lot){if(!ingLotIn[r.name])ingLotIn[r.name]={};ingLotIn[r.name][r.lot]=(ingLotIn[r.name][r.lot]||0)+r.qty;}});
+  const ingLotOut={};
+  ledgerRecords.forEach((r,i)=>{if(r.type!=='out'&&r.type!=='dispose'&&r.type!=='return')return;const key=r.lot||'_empty_';if(!ingLotOut[r.name])ingLotOut[r.name]={};if(!ingLotOut[r.name][key])ingLotOut[r.name][key]=[];ingLotOut[r.name][key].push({idx:i,qty:r.qty,date:r.date||''});});
+  const toDelete=new Set();const summary={};
+  Object.keys(ingLotOut).forEach(name=>{const lotInMap=ingLotIn[name]||{};Object.keys(ingLotOut[name]).forEach(lot=>{const inQty=lotInMap[lot]||0;const outRecs=ingLotOut[name][lot];const outTotal=outRecs.reduce((s,r)=>s+r.qty,0);
+    if(lot==='_empty_'){outRecs.forEach(r=>{toDelete.add(r.idx);if(!summary[name])summary[name]={count:0,qty:0};summary[name].count++;summary[name].qty+=r.qty;});}
+    else if(outTotal>inQty+0.0005){let remaining=outTotal-inQty;[...outRecs].sort((a,b)=>b.date.localeCompare(a.date)).forEach(r=>{if(remaining<=0.0005)return;const del=Math.min(r.qty,remaining);if(Math.abs(del-r.qty)<0.0005)toDelete.add(r.idx);else ledgerRecords[r.idx].qty=r.qty-del;remaining-=del;if(!summary[name])summary[name]={count:0,qty:0};summary[name].count++;summary[name].qty+=del;});}
+  });});
+  if(!toDelete.size&&!Object.keys(summary).length){alert('미매칭 출고가 없습니다.');return;}
+  const totalCount=Object.values(summary).reduce((s,v)=>s+v.count,0);
+  const summaryText=Object.entries(summary).map(([n,v])=>`  ${n}: ${v.count}건 (${v.qty.toFixed(3)}kg)`).join('\n');
+  if(!confirm(`미매칭/초과 출고 ${totalCount}건 정리\n\n${summaryText}\n\n진행하시겠습니까?`))return;
+  [...toDelete].sort((a,b)=>b-a).forEach(idx=>ledgerRecords.splice(idx,1));
+  await saveLedger();renderLedger();
+  alert(`정리 완료! ${totalCount}건 처리됨`);
+}
 
-  // 1. Firebase에서 전체 배합기록 로드
+// ===== 재동기화: 출고 레코드 재생성 =====
+async function resyncAllBatches(){
+  if(!window._db){alert('인터넷 연결을 확인해주세요');return;}
   let allBatches=[];
   try{
     const snapshot=await window._db.collection('appData').get();
-    snapshot.forEach(doc=>{
-      if(!doc.id.startsWith('batchRecords_')) return;
-      const d=doc.data();
-      if(!d||!d.data) return;
-      const recs=JSON.parse(d.data);
-      allBatches.push(...recs.filter(r=>!r._isTest));
-    });
-  }catch(e){ alert('배합기록 로드 실패: '+e.message); return; }
-
-  if(!allBatches.length){ alert('동기화할 배합기록이 없습니다.'); return; }
-
-  if(!confirm(`재동기화를 실행합니다.\n\n1단계: 기존 출고 레코드 전체 삭제\n2단계: 배합 ${allBatches.length}건의 사용량을 입고에서 차감\n\n⚠️ 이 작업은 1회만 실행하세요.\n진행하시겠습니까?`)) return;
-
-  // 2. ledgerRecords 최신 로드
-  const ledgerSnap=await window._db.collection('appData').doc('ledgerRecords').get();
-  ledgerRecords=(ledgerSnap.exists&&ledgerSnap.data().data)?JSON.parse(ledgerSnap.data().data):[];
-
-  // 3. 1단계 - 출고/폐기/반품 레코드 전체 삭제
+    snapshot.forEach(doc=>{if(!doc.id.startsWith('batchRecords_'))return;const d=doc.data();if(!d||!d.data)return;allBatches.push(...JSON.parse(d.data).filter(r=>!r._isTest));});
+  }catch(e){alert('배합기록 로드 실패: '+e.message);return;}
+  if(!allBatches.length){alert('배합기록이 없습니다.');return;}
+  if(!confirm(`재동기화를 실행합니다.\n\n1단계: 기존 출고 레코드 전체 삭제\n2단계: 배합 ${allBatches.length}건에서 출고 레코드 재생성\n\n⚠️ 1회만 실행하세요.\n진행하시겠습니까?`))return;
+  const lSnap=await window._db.collection('appData').doc('ledgerRecords').get();
+  ledgerRecords=(lSnap.exists&&lSnap.data().data)?JSON.parse(lSnap.data().data):[];
+  // 입고 레코드 원래 수량 복원 (아까 콘솔 스크립트로 깎인 것 되돌리기 위해 init/in만 원본에서 로드)
   const outCount=ledgerRecords.filter(r=>r.type==='out'||r.type==='dispose'||r.type==='return').length;
   ledgerRecords=ledgerRecords.filter(r=>r.type!=='out'&&r.type!=='dispose'&&r.type!=='return');
-
-  // 이름→코드 맵
   const nameToCode={};
-  INGREDIENT_DB.forEach(i=>{ nameToCode[i.name]=i.code; });
-
-  // 4. 2단계 - 각 배합의 사용량 차감
-  let subtracted=0, skipped=0;
+  INGREDIENT_DB.forEach(i=>{nameToCode[i.name]=i.code;});
+  let created=0,skipped=0;
   allBatches.forEach(rec=>{
+    const rawDate=rec.date||'';
+    const isoDate=rawDate.length===6?'20'+rawDate.slice(0,2)+'-'+rawDate.slice(2,4)+'-'+rawDate.slice(4,6):rawDate;
     (rec.batchRecords||[]).forEach(br=>{
       (br.ingredients||[]).forEach(ing=>{
         const code=nameToCode[ing.name]||'';
-        if(code==='M000') return;
+        if(code==='M000')return;
         (ing.exps||[]).forEach(e=>{
-          const qty=(e.amount||0)/1000;
-          if(!qty) return;
-          const lot=e.lot||'';
-          if(!lot){ skipped++; return; }
-          const inRec=ledgerRecords.find(r=>(r.type==='in'||r.type==='init')&&r.name===ing.name&&r.lot===lot);
-          if(inRec){
-            inRec.qty=Math.round(Math.max(0, inRec.qty-qty)*1000)/1000;
-            subtracted++;
-          } else { skipped++; }
+          const qty=(e.amount||0)/1000;if(!qty)return;
+          const lot=e.lot||'';if(!lot){skipped++;return;}
+          ledgerRecords.push({date:isoDate,name:ing.name,code:code,qty:qty,lot:lot,exp:e.exp||'',batchLot:br.lot,type:'out'});
+          created++;
         });
       });
     });
-    (rec.extraIngredients||[]).forEach(ing=>{
-      if(!ing.name) return;
-      const code=nameToCode[ing.name]||'';
-      if(code==='M000') return;
-      const dists=ing.distributions||[];
-      if(dists.length){
-        dists.filter(d=>parseFloat(d.qty)>0).forEach(d=>{
-          const lot=d.lot||''; if(!lot){ skipped++; return; }
-          const inRec=ledgerRecords.find(r=>(r.type==='in'||r.type==='init')&&r.name===ing.name&&r.lot===lot);
-          if(inRec){ inRec.qty=Math.round(Math.max(0, inRec.qty-parseFloat(d.qty))*1000)/1000; subtracted++; }
-          else skipped++;
-        });
-      }
-    });
-    (rec.disposeIngredients||[]).forEach(d=>{
-      if(!d.name||!(parseFloat(d.qty)>0)) return;
-      const code=nameToCode[d.name]||'';
-      if(code==='M000') return;
-      const lot=d.lot||''; if(!lot){ skipped++; return; }
-      const inRec=ledgerRecords.find(r=>(r.type==='in'||r.type==='init')&&r.name===d.name&&r.lot===lot);
-      if(inRec){ inRec.qty=Math.round(Math.max(0, inRec.qty-parseFloat(d.qty))*1000)/1000; subtracted++; }
-      else skipped++;
-    });
   });
-
-  // 5. 저장
-  await saveLedger();
-  renderLedger();
-  alert(`재동기화 완료!\n\n🗑️ 출고 레코드 ${outCount}건 삭제\n✅ 차감 성공: ${subtracted}건\n${skipped?'⚠️ LOT 미매칭 스킵: '+skipped+'건':''}`);
+  await saveLedger();renderLedger();
+  alert(`재동기화 완료!\n\n🗑️ 기존 출고 ${outCount}건 삭제\n✅ 출고 ${created}건 재생성\n${skipped?'⚠️ LOT 없어서 스킵: '+skipped+'건':''}`);
 }
 
 function yymmddToISO(v){
@@ -868,11 +692,10 @@ function buildAccordionContent(ing,selDate){
 
   if(!lots.length)return '<div class="acc-inner"><div class="acc-empty">현재 잔여 재고가 없습니다</div></div>';
 
-  // 양수 LOT(재고 있음)를 먼저, 음수(미매칭)는 맨 뒤로
+  // 양수(재고 있음) 먼저, 음수(미매칭) 뒤로
   const posLots=lots.filter(l=>l.remain>0);
   const negLots=lots.filter(l=>l.remain<0);
 
-  // 양수: 입고일 빠른순(1순위) + 소비기한 빠른순(2순위) 정렬
   posLots.sort((a,b)=>{
     const ia=a.inDate||'', ib=b.inDate||'';
     if(ia&&ib&&ia!==ib) return ia<ib?-1:1;
@@ -903,40 +726,42 @@ function buildAccordionContent(ing,selDate){
 
   const totalRemain=lots.reduce((s,l)=>s+l.remain,0);
 
-  // 출고 기록: 날짜별 합계로 간소화
+  // 출고 기록 목록 (다중 삭제 기능 추가)
   const outRecs=recs.filter(r=>(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date<=selDate);
   let outHtml='';
   if(outRecs.length){
-    // 날짜별 합계 집계
-    const byDate={};
-    outRecs.forEach(r=>{
-      const d=r.date||'날짜없음';
-      if(!byDate[d]) byDate[d]={qty:0,count:0};
-      byDate[d].qty+=r.qty||0;
-      byDate[d].count++;
-    });
-    const dateKeys=Object.keys(byDate).sort();
-    const outTotal=outRecs.reduce((s,r)=>s+(r.qty||0),0);
     outHtml=`<div style="margin-top:10px;">
       <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
         <div onclick="toggleOutRecs('out-${ing.code}')" style="cursor:pointer;font-size:11px;font-weight:700;color:var(--warning);">
-          ▶ 출고내역 (${outRecs.length}건 · ${outTotal.toFixed(3)}kg)
+          ▶ 출고내역 보기/정리 (${outRecs.length}건)
         </div>
-        <button class="btn btn-sm btn-danger" onclick="deleteAllOutRecords('${ing.code}')" style="padding:4px 10px; font-size:11px;">전체 삭제</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteMultiOutRecords('${ing.code}')" style="padding:4px 10px; font-size:11px;">선택 삭제</button>
       </div>
       <div id="out-${ing.code}" style="display:none; margin-top:6px;">
         <table class="acc-table" style="font-size:11px;">
-          <thead><tr><th style="text-align:left">날짜</th><th style="text-align:right">건수</th><th style="text-align:right">합계(kg)</th></tr></thead>
-          <tbody>${dateKeys.map(d=>`<tr>
-            <td style="font-size:11px;">${d}</td>
-            <td style="text-align:right;">${byDate[d].count}건</td>
-            <td style="text-align:right;font-weight:600;">${byDate[d].qty.toFixed(3)}</td>
-          </tr>`).join('')}
-          <tr style="background:var(--bg);font-weight:700;">
-            <td>합계</td>
-            <td style="text-align:right;">${outRecs.length}건</td>
-            <td style="text-align:right;color:var(--danger)">${outTotal.toFixed(3)}</td>
-          </tr></tbody>
+          <thead>
+            <tr>
+              <th style="width:30px; text-align:center;"><input type="checkbox" onchange="toggleAllOutChk(this, '${ing.code}')"></th>
+              <th style="text-align:left">날짜</th>
+              <th style="text-align:left">LOT</th>
+              <th>배합LOT</th>
+              <th>유형</th>
+              <th style="text-align:right">수량</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>${outRecs.map((r,i)=>{
+            const idx=ledgerRecords.indexOf(r);
+            return `<tr>
+              <td style="text-align:center;"><input type="checkbox" class="chk-out-${ing.code}" value="${idx}"></td>
+              <td style="font-size:10px;">${r.date||'-'}</td>
+              <td style="font-size:10px;font-family:monospace;">${r.lot||'-'}</td>
+              <td style="font-size:10px;">${r.batchLot||'-'}</td>
+              <td style="font-size:10px;color:${r.type==='dispose'?'var(--danger)':'var(--text2)'}">${r.type==='out'?'출고':r.type==='dispose'?'폐기':'반품'}</td>
+              <td style="text-align:right;font-size:10px;">${(r.qty||0).toFixed(3)}</td>
+              <td><button onclick="event.stopPropagation();deleteOutRecord(${idx})" style="background:#fff0f0;color:#d63031;border:1px solid #f5a0a0;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;">삭제</button></td>
+            </tr>`;
+          }).join('')}</tbody>
         </table>
       </div>
     </div>`;
@@ -1475,20 +1300,6 @@ async function deleteMultiOutRecords(code) {
   }, 50);
 
   alert(`${checkboxes.length}건 삭제 완료! 재고가 원상복귀 되었습니다.`);
-}
-
-// 특정 원료의 출고 레코드 전체 삭제
-async function deleteAllOutRecords(code){
-  const ing=getIngByCode(code);
-  if(!ing) return;
-  const name=ing.name;
-  const outCount=ledgerRecords.filter(r=>r.name===name&&(r.type==='out'||r.type==='dispose'||r.type==='return')).length;
-  if(!outCount){ alert('삭제할 출고 내역이 없습니다.'); return; }
-  if(!confirm(`${name}의 출고 내역 ${outCount}건을 전체 삭제하시겠습니까?\n\n⚠️ 미매칭 출고 삭제 후 실행하세요.\n잔여 출고는 이미 삭제된 배합의 잔여물이므로 삭제해도 됩니다.`)) return;
-  ledgerRecords=ledgerRecords.filter(r=>!(r.name===name&&(r.type==='out'||r.type==='dispose'||r.type==='return')));
-  await saveLedger();
-  renderLedger();
-  alert(`${name} 출고 내역 ${outCount}건 삭제 완료`);
 }
 
 // ===== Firebase 직접 읽기/쓰기 =====

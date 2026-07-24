@@ -1381,36 +1381,51 @@ function completeBatch(){
   else goSign();
 }
 
-// 원료수불부 사용량 자동반영 (입고 레코드에서 직접 차감)
+// 원료수불부 출고 자동반영
 function syncBatchToLedger(){
   try{
     let ledgerRecords=JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
+    const today=getWorkDateKey();
+    const isoDate=`20${today.slice(0,2)}-${today.slice(2,4)}-${today.slice(4,6)}`;
+    const INGREDIENT_DB_LOCAL=JSON.parse(localStorage.getItem('customIngredients')||'[]');
+    const lastLot = S.batchRecords.length ? S.batchRecords[S.batchRecords.length-1].lot : ('배합-'+S.product+'-'+today);
 
-    // 배합 원료 → 입고 레코드에서 차감
+    // 배합 원료 출고
     S.batchRecords.forEach(br=>{
       br.ingredients.forEach(ing=>{
-        const ingCode = INGREDIENT_DB_STATIC[ing.name]||'';
-        if(ingCode==='M000') return;
         ing.exps.forEach(e=>{
           if(!e.amount) return;
-          const qty=e.amount/1000;
-          const lot=e.lot||''; if(!lot) return;
-          const inRec=ledgerRecords.find(r=>(r.type==='in'||r.type==='init')&&r.name===ing.name&&r.lot===lot);
-          if(inRec) inRec.qty=Math.round(Math.max(0, inRec.qty-qty)*1000)/1000;
+          const ingCode = INGREDIENT_DB_STATIC[ing.name]||'';
+          if(ingCode==='M000') return;
+          const exists=ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===br.lot&&r.exp===e.exp);
+          if(!exists){
+            const dbIng=INGREDIENT_DB_LOCAL.find(i=>i.name===ing.name)||{code:''};
+            ledgerRecords.push({
+              date:isoDate, name:ing.name, code:dbIng.code||ingCode||'',
+              qty:e.amount/1000,
+              exp:e.exp||'', lot:e.lot||'', batchLot:br.lot, type:'out'
+            });
+          }
         });
       });
     });
 
-    // 기타사용원재료 → 입고 레코드에서 차감
+    // 기타사용원재료(투입량) 출고 - FIFO 분배 형식
     (S.inputIngredients||[]).filter(ing=>ing.name).forEach(ing=>{
       const ingCode = INGREDIENT_DB_STATIC[ing.name]||'';
       if(ingCode==='M000') return;
       const dists = ing.distributions||[];
       if(dists.length){
         dists.filter(d=>parseFloat(d.qty)>0).forEach(d=>{
-          const lot=d.lot||''; if(!lot) return;
-          const inRec=ledgerRecords.find(r=>(r.type==='in'||r.type==='init')&&r.name===ing.name&&r.lot===lot);
-          if(inRec) inRec.qty=Math.round(Math.max(0, inRec.qty-parseFloat(d.qty))*1000)/1000;
+          const exists=ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===lastLot&&r.lot===d.lot);
+          if(!exists){
+            const dbIng=INGREDIENT_DB_LOCAL.find(i=>i.name===ing.name)||{code:''};
+            ledgerRecords.push({
+              date:isoDate, name:ing.name, code:dbIng.code||ingCode||'',
+              qty:parseFloat(d.qty)||0,
+              exp:d.exp||'', lot:d.lot||'', batchLot:lastLot, type:'out'
+            });
+          }
         });
       }
     });
@@ -2084,56 +2099,32 @@ initMain();
 async function deleteBatchRecord(idx){
   const r=S.todayRecords[idx];
   if(!r) return;
-  if(!confirm(`"${r.product||''} (${r.productCode}-${r.date})" 배합 기록을 삭제하시겠습니까?\n\n원료수불부 재고가 사용량만큼 복원됩니다.`)) return;
+  if(!confirm(`"${r.product||''} (${r.productCode}-${r.date})" 배합 기록을 삭제하시겠습니까?\n\n원료수불부 출고 기록도 함께 삭제됩니다.`)) return;
 
-  // 원료수불부 입고 레코드에 사용량 복원
-  try{
-    let ledger=window._ledgerRecords||JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
-    // 배합 원료 복원
-    (r.batchRecords||[]).forEach(br=>{
-      (br.ingredients||[]).forEach(ing=>{
-        const ingCode=INGREDIENT_DB_STATIC[ing.name]||'';
-        if(ingCode==='M000') return;
-        (ing.exps||[]).forEach(e=>{
-          const qty=(e.amount||0)/1000;
-          if(!qty) return;
-          const lot=e.lot||''; if(!lot) return;
-          const inRec=ledger.find(rec=>(rec.type==='in'||rec.type==='init')&&rec.name===ing.name&&rec.lot===lot);
-          if(inRec) inRec.qty=Math.round((inRec.qty+qty)*1000)/1000;
-        });
+  // 이 배합의 batchLot 목록 수집
+  const batchLots=new Set();
+  (r.batchRecords||[]).forEach(br=>{ if(br.lot) batchLots.add(br.lot); });
+
+  // 원료수불부에서 해당 batchLot의 출고/폐기 레코드 삭제
+  if(batchLots.size>0){
+    try{
+      let ledger=window._ledgerRecords||JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
+      const before=ledger.length;
+      ledger=ledger.filter(rec=>{
+        if((rec.type==='out'||rec.type==='dispose')&&rec.batchLot&&batchLots.has(rec.batchLot)) return false;
+        return true;
       });
-    });
-    // 기타사용원재료 복원
-    (r.extraIngredients||[]).forEach(ing=>{
-      if(!ing.name) return;
-      const ingCode=INGREDIENT_DB_STATIC[ing.name]||'';
-      if(ingCode==='M000') return;
-      const dists=ing.distributions||[];
-      if(dists.length){
-        dists.filter(d=>parseFloat(d.qty)>0).forEach(d=>{
-          const lot=d.lot||''; if(!lot) return;
-          const inRec=ledger.find(rec=>(rec.type==='in'||rec.type==='init')&&rec.name===ing.name&&rec.lot===lot);
-          if(inRec) inRec.qty=Math.round((inRec.qty+parseFloat(d.qty))*1000)/1000;
-        });
+      const removed=before-ledger.length;
+      if(removed>0){
+        window._ledgerRecords=ledger;
+        localStorage.setItem('ledgerRecords',JSON.stringify(ledger));
+        if(window._db){
+          try{ await window._db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledger),updatedAt:new Date().toISOString()}); }
+          catch(e){ console.warn('수불부 출고삭제 Firebase 반영 실패',e); }
+        }
       }
-    });
-    // 폐기 원재료 복원
-    (r.disposeIngredients||[]).forEach(d=>{
-      if(!d.name||!(parseFloat(d.qty)>0)) return;
-      const ingCode=INGREDIENT_DB_STATIC[d.name]||'';
-      if(ingCode==='M000') return;
-      const lot=d.lot||''; if(!lot) return;
-      const inRec=ledger.find(rec=>(rec.type==='in'||rec.type==='init')&&rec.name===d.name&&rec.lot===lot);
-      if(inRec) inRec.qty=Math.round((inRec.qty+parseFloat(d.qty))*1000)/1000;
-    });
-
-    window._ledgerRecords=ledger;
-    localStorage.setItem('ledgerRecords',JSON.stringify(ledger));
-    if(window._db){
-      try{ await window._db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledger),updatedAt:new Date().toISOString()}); }
-      catch(e){ console.warn('수불부 복원 Firebase 반영 실패',e); }
-    }
-  }catch(e){ console.warn('수불부 재고 복원 오류',e); }
+    }catch(e){ console.warn('수불부 출고 정리 오류',e); }
+  }
 
   S.todayRecords.splice(idx,1);
   localStorage.setItem('batchRecords_'+getWorkDateKey(),JSON.stringify(S.todayRecords));
@@ -2325,7 +2316,7 @@ async function syncSingleBatch(idx){
     let ledgerSnap=await db.collection('appData').doc('ledgerRecords').get();
     let ledgerRecords=(ledgerSnap.exists&&ledgerSnap.data().data)?JSON.parse(ledgerSnap.data().data):[];
 
-    // 2. 이 레코드의 사용량을 입고 레코드에서 직접 차감
+    // 2. 이 레코드의 출고만 반영
     (rec.batchRecords||[]).forEach(br=>{
       br.ingredients.forEach(ing=>{
         const ingCode=INGREDIENT_DB_STATIC[ing.name]||'';
@@ -2333,10 +2324,9 @@ async function syncSingleBatch(idx){
         (ing.exps||[ing]).forEach(e=>{
           const qty=(e.amount||0)/1000;
           if(!qty) return;
-          const lot=e.lot||'';
-          if(!lot) return;
-          const inRec=ledgerRecords.find(r=>(r.type==='in'||r.type==='init')&&r.name===ing.name&&r.lot===lot);
-          if(inRec) inRec.qty=Math.round(Math.max(0, inRec.qty-qty)*1000)/1000;
+          const exists=ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===br.lot&&r.exp===e.exp);
+          if(exists){ if(!exists.qty||exists.qty===0) exists.qty=qty; }
+          else{ ledgerRecords.push({date:isoDate,name:ing.name,code:ingCode,qty,lot:e.lot||'',exp:e.exp||'',batchLot:br.lot,type:'out'}); }
         });
       });
     });
@@ -2344,26 +2334,18 @@ async function syncSingleBatch(idx){
       if(!ing.name||!(parseFloat(ing.qty)>0)) return;
       const ingCode=INGREDIENT_DB_STATIC[ing.name]||'';
       if(ingCode==='M000') return;
-      const dists=ing.distributions||[];
-      if(dists.length){
-        dists.filter(d=>parseFloat(d.qty)>0).forEach(d=>{
-          const lot=d.lot||''; if(!lot) return;
-          const inRec=ledgerRecords.find(r=>(r.type==='in'||r.type==='init')&&r.name===ing.name&&r.lot===lot);
-          if(inRec) inRec.qty=Math.round(Math.max(0, inRec.qty-parseFloat(d.qty))*1000)/1000;
-        });
-      } else {
-        const lot=ing.lot||''; if(!lot) return;
-        const inRec=ledgerRecords.find(r=>(r.type==='in'||r.type==='init')&&r.name===ing.name&&r.lot===lot);
-        if(inRec) inRec.qty=Math.round(Math.max(0, inRec.qty-parseFloat(ing.qty))*1000)/1000;
-      }
+      const qty=parseFloat(ing.qty)||0;
+      const exists=ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===lastBatchLot&&r.lot===ing.lot);
+      if(exists){ if(!exists.qty||exists.qty===0) exists.qty=qty; }
+      else{ ledgerRecords.push({date:isoDate,name:ing.name,code:ingCode,qty,lot:ing.lot||'',exp:ing.exp||'',batchLot:lastBatchLot,type:'out'}); }
     });
     (rec.disposeIngredients||[]).forEach(d=>{
       if(!d.name||!(parseFloat(d.qty)>0)) return;
       const ingCode=INGREDIENT_DB_STATIC[d.name]||'';
       if(ingCode==='M000') return;
-      const lot=d.lot||''; if(!lot) return;
-      const inRec=ledgerRecords.find(r=>(r.type==='in'||r.type==='init')&&r.name===d.name&&r.lot===lot);
-      if(inRec) inRec.qty=Math.round(Math.max(0, inRec.qty-parseFloat(d.qty))*1000)/1000;
+      const qty=parseFloat(d.qty)||0;
+      const exists=ledgerRecords.find(r=>r.type==='dispose'&&r.name===d.name&&r.batchLot===lastBatchLot&&r.lot===d.lot);
+      if(!exists){ ledgerRecords.push({date:isoDate,name:d.name,code:ingCode,qty,lot:d.lot||'',exp:d.exp||'',batchLot:lastBatchLot,type:'dispose',reason:d.reason||'공정중 잔량폐기'}); }
     });
 
     // 3. Firebase 저장
