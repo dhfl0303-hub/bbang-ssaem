@@ -818,42 +818,40 @@ function buildAccordionContent(ing,selDate){
 
   const totalRemain=lots.reduce((s,l)=>s+l.remain,0);
 
-  // 출고 기록 목록 (다중 삭제 기능 추가)
+  // 출고 기록: 날짜별 합계로 간소화
   const outRecs=recs.filter(r=>(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date<=selDate);
   let outHtml='';
   if(outRecs.length){
+    // 날짜별 합계 집계
+    const byDate={};
+    outRecs.forEach(r=>{
+      const d=r.date||'날짜없음';
+      if(!byDate[d]) byDate[d]={qty:0,count:0};
+      byDate[d].qty+=r.qty||0;
+      byDate[d].count++;
+    });
+    const dateKeys=Object.keys(byDate).sort();
+    const outTotal=outRecs.reduce((s,r)=>s+(r.qty||0),0);
     outHtml=`<div style="margin-top:10px;">
       <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
         <div onclick="toggleOutRecs('out-${ing.code}')" style="cursor:pointer;font-size:11px;font-weight:700;color:var(--warning);">
-          ▶ 출고내역 보기/정리 (${outRecs.length}건)
+          ▶ 출고내역 (${outRecs.length}건 · ${outTotal.toFixed(3)}kg)
         </div>
-        <button class="btn btn-sm btn-danger" onclick="deleteMultiOutRecords('${ing.code}')" style="padding:4px 10px; font-size:11px;">선택 삭제</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteAllOutRecords('${ing.code}')" style="padding:4px 10px; font-size:11px;">전체 삭제</button>
       </div>
       <div id="out-${ing.code}" style="display:none; margin-top:6px;">
         <table class="acc-table" style="font-size:11px;">
-          <thead>
-            <tr>
-              <th style="width:30px; text-align:center;"><input type="checkbox" onchange="toggleAllOutChk(this, '${ing.code}')"></th>
-              <th style="text-align:left">날짜</th>
-              <th style="text-align:left">LOT</th>
-              <th>배합LOT</th>
-              <th>유형</th>
-              <th style="text-align:right">수량</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>${outRecs.map((r,i)=>{
-            const idx=ledgerRecords.indexOf(r);
-            return `<tr>
-              <td style="text-align:center;"><input type="checkbox" class="chk-out-${ing.code}" value="${idx}"></td>
-              <td style="font-size:10px;">${r.date||'-'}</td>
-              <td style="font-size:10px;font-family:monospace;">${r.lot||'-'}</td>
-              <td style="font-size:10px;">${r.batchLot||'-'}</td>
-              <td style="font-size:10px;color:${r.type==='dispose'?'var(--danger)':'var(--text2)'}">${r.type==='out'?'출고':r.type==='dispose'?'폐기':'반품'}</td>
-              <td style="text-align:right;font-size:10px;">${(r.qty||0).toFixed(3)}</td>
-              <td><button onclick="event.stopPropagation();deleteOutRecord(${idx})" style="background:#fff0f0;color:#d63031;border:1px solid #f5a0a0;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;">삭제</button></td>
-            </tr>`;
-          }).join('')}</tbody>
+          <thead><tr><th style="text-align:left">날짜</th><th style="text-align:right">건수</th><th style="text-align:right">합계(kg)</th></tr></thead>
+          <tbody>${dateKeys.map(d=>`<tr>
+            <td style="font-size:11px;">${d}</td>
+            <td style="text-align:right;">${byDate[d].count}건</td>
+            <td style="text-align:right;font-weight:600;">${byDate[d].qty.toFixed(3)}</td>
+          </tr>`).join('')}
+          <tr style="background:var(--bg);font-weight:700;">
+            <td>합계</td>
+            <td style="text-align:right;">${outRecs.length}건</td>
+            <td style="text-align:right;color:var(--danger)">${outTotal.toFixed(3)}</td>
+          </tr></tbody>
         </table>
       </div>
     </div>`;
@@ -1392,6 +1390,20 @@ async function deleteMultiOutRecords(code) {
   }, 50);
 
   alert(`${checkboxes.length}건 삭제 완료! 재고가 원상복귀 되었습니다.`);
+}
+
+// 특정 원료의 출고 레코드 전체 삭제
+async function deleteAllOutRecords(code){
+  const ing=getIngByCode(code);
+  if(!ing) return;
+  const name=ing.name;
+  const outCount=ledgerRecords.filter(r=>r.name===name&&(r.type==='out'||r.type==='dispose'||r.type==='return')).length;
+  if(!outCount){ alert('삭제할 출고 내역이 없습니다.'); return; }
+  if(!confirm(`${name}의 출고 내역 ${outCount}건을 전체 삭제하시겠습니까?\n\n⚠️ 미매칭 출고 삭제 후 실행하세요.\n잔여 출고는 이미 삭제된 배합의 잔여물이므로 삭제해도 됩니다.`)) return;
+  ledgerRecords=ledgerRecords.filter(r=>!(r.name===name&&(r.type==='out'||r.type==='dispose'||r.type==='return')));
+  await saveLedger();
+  renderLedger();
+  alert(`${name} 출고 내역 ${outCount}건 삭제 완료`);
 }
 
 // ===== Firebase 직접 읽기/쓰기 =====
