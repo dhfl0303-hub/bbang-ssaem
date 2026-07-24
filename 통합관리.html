@@ -200,7 +200,7 @@ tr:hover td{background:var(--bg);}
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.1 · 2026.07.23</div>
+<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.2 · 2026.07.24</div>
 <!-- 로그인 화면 -->
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0d3f75;z-index:9999;align-items:center;justify-content:center;">
   <div style="width:340px;">
@@ -983,25 +983,37 @@ tr:hover td{background:var(--bg);}
       <div id="batch-b1">
         <div class="form-row" style="margin-bottom:8px"><label class="form-label">반죽중량(g)</label><input class="form-input" id="rW1" type="number" placeholder="0" style="max-width:160px"></div>
         <div id="ingRows1"></div>
-        <button class="btn btn-sm btn-outline" onclick="addIngRowAll()">+ 원료 추가</button>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn btn-sm btn-outline" onclick="addIngRowAll()">+ 원료 추가</button>
+          <button class="btn btn-sm btn-outline" onclick="sortIngRows(1)" title="가나다순 정렬">↕ 정렬</button>
+        </div>
       </div>
       <!-- 배합2 -->
       <div id="batch-b2" style="display:none">
         <div class="form-row" style="margin-bottom:8px"><label class="form-label">반죽중량(g)</label><input class="form-input" id="rW2" type="number" placeholder="0" style="max-width:160px"></div>
         <div id="ingRows2"></div>
-        <button class="btn btn-sm btn-outline" onclick="addIngRowN(2)">+ 원료 추가</button>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn btn-sm btn-outline" onclick="addIngRowN(2)">+ 원료 추가</button>
+          <button class="btn btn-sm btn-outline" onclick="sortIngRows(2)" title="가나다순 정렬">↕ 정렬</button>
+        </div>
       </div>
       <!-- 배합3 -->
       <div id="batch-b3" style="display:none">
         <div class="form-row" style="margin-bottom:8px"><label class="form-label">반죽중량(g)</label><input class="form-input" id="rW3" type="number" placeholder="0" style="max-width:160px"></div>
         <div id="ingRows3"></div>
-        <button class="btn btn-sm btn-outline" onclick="addIngRowN(3)">+ 원료 추가</button>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn btn-sm btn-outline" onclick="addIngRowN(3)">+ 원료 추가</button>
+          <button class="btn btn-sm btn-outline" onclick="sortIngRows(3)" title="가나다순 정렬">↕ 정렬</button>
+        </div>
       </div>
       <!-- 배합4 -->
       <div id="batch-b4" style="display:none">
         <div class="form-row" style="margin-bottom:8px"><label class="form-label">반죽중량(g)</label><input class="form-input" id="rW4" type="number" placeholder="0" style="max-width:160px"></div>
         <div id="ingRows4"></div>
-        <button class="btn btn-sm btn-outline" onclick="addIngRowN(4)">+ 원료 추가</button>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn btn-sm btn-outline" onclick="addIngRowN(4)">+ 원료 추가</button>
+          <button class="btn btn-sm btn-outline" onclick="sortIngRows(4)" title="가나다순 정렬">↕ 정렬</button>
+        </div>
       </div>
     </div>
     <div class="modal-ft">
@@ -3493,6 +3505,25 @@ function syncBatch1Name(grp, name){
       if(inp) inp.value = name;
     }
   });
+}
+
+const _sortDir={1:'asc',2:'asc',3:'asc',4:'asc'};
+function sortIngRows(n){
+  const container=document.getElementById('ingRows'+n);
+  if(!container) return;
+  const rows=[...container.querySelectorAll('.ing-row')];
+  if(rows.length<2) return;
+  const dir=_sortDir[n]||'asc';
+  rows.sort((a,b)=>{
+    const va=parseFloat(a.querySelector('input[type="number"]')?.value)||0;
+    const vb=parseFloat(b.querySelector('input[type="number"]')?.value)||0;
+    if(!va&&!vb) return 0;
+    if(!va) return 1;
+    if(!vb) return -1;
+    return dir==='asc'? va-vb : vb-va;
+  });
+  rows.forEach(r=>container.appendChild(r));
+  _sortDir[n]=dir==='asc'?'desc':'asc';
 }
 
 function delIngRow(el, n, grp){
