@@ -193,7 +193,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.1 · 2026.07.23</div>
+<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.2 · 2026.07.24</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -538,6 +538,7 @@ async function cleanDeletedFromFirebase(){
     if(!dkSnap.exists || !dkSnap.data().data) return;
     const deletedKeys = JSON.parse(dkSnap.data().data);
     const batchDeleted = deletedKeys.filter(k=>k.startsWith('batchRecords_'));
+    if(!batchDeleted.length) return;
     batchDeleted.forEach(k=>{
       localStorage.removeItem(k);
       const dateKey = k.replace('batchRecords_','');
@@ -546,6 +547,9 @@ async function cleanDeletedFromFirebase(){
         updateStats(); renderTodayList();
       }
     });
+    // 처리 완료된 batchRecords 키를 deletedKeys에서 제거 (반복 삭제 방지)
+    const remaining = deletedKeys.filter(k=>!k.startsWith('batchRecords_'));
+    await window._db.collection('appData').doc('deletedKeys').set({data:JSON.stringify(remaining),updatedAt:new Date().toISOString()});
   }catch(e){ console.warn('정리 오류',e); }
 }
 
@@ -2092,10 +2096,37 @@ initDB();
 initMain();
 
 // ===== 개별 배합 기록 삭제 =====
-function deleteBatchRecord(idx){
+async function deleteBatchRecord(idx){
   const r=S.todayRecords[idx];
   if(!r) return;
-  if(!confirm(`"${r.product||''} (${r.productCode}-${r.date})" 배합 기록을 삭제하시겠습니까?`)) return;
+  if(!confirm(`"${r.product||''} (${r.productCode}-${r.date})" 배합 기록을 삭제하시겠습니까?\n\n원료수불부 출고 기록도 함께 삭제됩니다.`)) return;
+
+  // 이 배합의 batchLot 목록 수집
+  const batchLots=new Set();
+  (r.batchRecords||[]).forEach(br=>{ if(br.lot) batchLots.add(br.lot); });
+
+  // 원료수불부에서 해당 batchLot의 출고/폐기 레코드 삭제
+  if(batchLots.size>0){
+    try{
+      let ledger=window._ledgerRecords||JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
+      const before=ledger.length;
+      ledger=ledger.filter(rec=>{
+        if((rec.type==='out'||rec.type==='dispose')&&rec.batchLot&&batchLots.has(rec.batchLot)) return false;
+        return true;
+      });
+      const removed=before-ledger.length;
+      if(removed>0){
+        window._ledgerRecords=ledger;
+        localStorage.setItem('ledgerRecords',JSON.stringify(ledger));
+        // Firebase에도 반영 (온라인일 때)
+        if(window._db){
+          try{ await window._db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledger),updatedAt:new Date().toISOString()}); }
+          catch(e){ console.warn('수불부 출고삭제 Firebase 반영 실패',e); }
+        }
+      }
+    }catch(e){ console.warn('수불부 출고 정리 오류',e); }
+  }
+
   S.todayRecords.splice(idx,1);
   localStorage.setItem('batchRecords_'+getWorkDateKey(),JSON.stringify(S.todayRecords));
   renderTodayList();
