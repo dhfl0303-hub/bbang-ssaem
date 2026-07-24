@@ -110,6 +110,7 @@ tr:hover td{background:var(--bg);}
     <button class="btn btn-sm" style="background:#f0e6ff;color:#7c3aed;border:1px solid #c4b5fd;" onclick="findEmptyCodes()">🔍 빈 코드 조회</button>
     <button class="btn btn-sm" style="background:#fff7e6;color:#b8860b;border:1px solid #daa520;" onclick="rematchEmptyLots()">🔗 LOT 재매칭</button>
     <button class="btn btn-sm" style="background:#fff0f0;color:#d63031;border:1px solid #f5a0a0;" onclick="deleteUnmatchedOuts()">🧹 미매칭 출고 삭제</button>
+    <button class="btn btn-sm" style="background:#e8f5e9;color:#2e7d32;border:1px solid #81c784;" onclick="resyncAllBatches()">♻️ 재동기화</button>
 
   </div>
   <div class="card">
@@ -592,6 +593,90 @@ async function deleteUnmatchedOuts(){
   await saveLedger();
   renderLedger();
   alert(`미매칭/초과 출고 정리 완료!\n\n${totalCount}건 처리됨`);
+}
+
+// ===== 재동기화: 출고 정리 + 전체 배합기록 기준 입고 차감 (원버튼) =====
+async function resyncAllBatches(){
+  if(!window._db){ alert('인터넷 연결을 확인해주세요'); return; }
+
+  // 1. Firebase에서 전체 배합기록 로드
+  let allBatches=[];
+  try{
+    const snapshot=await window._db.collection('appData').get();
+    snapshot.forEach(doc=>{
+      if(!doc.id.startsWith('batchRecords_')) return;
+      const d=doc.data();
+      if(!d||!d.data) return;
+      const recs=JSON.parse(d.data);
+      allBatches.push(...recs.filter(r=>!r._isTest));
+    });
+  }catch(e){ alert('배합기록 로드 실패: '+e.message); return; }
+
+  if(!allBatches.length){ alert('동기화할 배합기록이 없습니다.'); return; }
+
+  if(!confirm(`재동기화를 실행합니다.\n\n1단계: 기존 출고 레코드 전체 삭제\n2단계: 배합 ${allBatches.length}건의 사용량을 입고에서 차감\n\n⚠️ 이 작업은 1회만 실행하세요.\n진행하시겠습니까?`)) return;
+
+  // 2. ledgerRecords 최신 로드
+  const ledgerSnap=await window._db.collection('appData').doc('ledgerRecords').get();
+  ledgerRecords=(ledgerSnap.exists&&ledgerSnap.data().data)?JSON.parse(ledgerSnap.data().data):[];
+
+  // 3. 1단계 - 출고/폐기/반품 레코드 전체 삭제
+  const outCount=ledgerRecords.filter(r=>r.type==='out'||r.type==='dispose'||r.type==='return').length;
+  ledgerRecords=ledgerRecords.filter(r=>r.type!=='out'&&r.type!=='dispose'&&r.type!=='return');
+
+  // 이름→코드 맵
+  const nameToCode={};
+  INGREDIENT_DB.forEach(i=>{ nameToCode[i.name]=i.code; });
+
+  // 4. 2단계 - 각 배합의 사용량 차감
+  let subtracted=0, skipped=0;
+  allBatches.forEach(rec=>{
+    (rec.batchRecords||[]).forEach(br=>{
+      (br.ingredients||[]).forEach(ing=>{
+        const code=nameToCode[ing.name]||'';
+        if(code==='M000') return;
+        (ing.exps||[]).forEach(e=>{
+          const qty=(e.amount||0)/1000;
+          if(!qty) return;
+          const lot=e.lot||'';
+          if(!lot){ skipped++; return; }
+          const inRec=ledgerRecords.find(r=>(r.type==='in'||r.type==='init')&&r.name===ing.name&&r.lot===lot);
+          if(inRec){
+            inRec.qty=Math.round(Math.max(0, inRec.qty-qty)*1000)/1000;
+            subtracted++;
+          } else { skipped++; }
+        });
+      });
+    });
+    (rec.extraIngredients||[]).forEach(ing=>{
+      if(!ing.name) return;
+      const code=nameToCode[ing.name]||'';
+      if(code==='M000') return;
+      const dists=ing.distributions||[];
+      if(dists.length){
+        dists.filter(d=>parseFloat(d.qty)>0).forEach(d=>{
+          const lot=d.lot||''; if(!lot){ skipped++; return; }
+          const inRec=ledgerRecords.find(r=>(r.type==='in'||r.type==='init')&&r.name===ing.name&&r.lot===lot);
+          if(inRec){ inRec.qty=Math.round(Math.max(0, inRec.qty-parseFloat(d.qty))*1000)/1000; subtracted++; }
+          else skipped++;
+        });
+      }
+    });
+    (rec.disposeIngredients||[]).forEach(d=>{
+      if(!d.name||!(parseFloat(d.qty)>0)) return;
+      const code=nameToCode[d.name]||'';
+      if(code==='M000') return;
+      const lot=d.lot||''; if(!lot){ skipped++; return; }
+      const inRec=ledgerRecords.find(r=>(r.type==='in'||r.type==='init')&&r.name===d.name&&r.lot===lot);
+      if(inRec){ inRec.qty=Math.round(Math.max(0, inRec.qty-parseFloat(d.qty))*1000)/1000; subtracted++; }
+      else skipped++;
+    });
+  });
+
+  // 5. 저장
+  await saveLedger();
+  renderLedger();
+  alert(`재동기화 완료!\n\n🗑️ 출고 레코드 ${outCount}건 삭제\n✅ 차감 성공: ${subtracted}건\n${skipped?'⚠️ LOT 미매칭 스킵: '+skipped+'건':''}`);
 }
 
 function yymmddToISO(v){
