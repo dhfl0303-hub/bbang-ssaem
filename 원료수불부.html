@@ -514,46 +514,84 @@ function findEmptyCodes(){
 
 // ===== 미매칭 출고 일괄삭제 =====
 async function deleteUnmatchedOuts(){
-  // 원료별 입고 LOT 목록 구축
-  const inLots={};
-  ledgerRecords.forEach(r=>{
-    if((r.type==='init'||r.type==='in')&&r.lot){
-      if(!inLots[r.name]) inLots[r.name]=new Set();
-      inLots[r.name].add(r.lot);
-    }
-  });
+  // 원료별 LOT별 입고/출고 합산
+  const ingLotIn={};   // {원료명: {LOT: 입고합계}}
+  const ingLotOut={};   // {원료명: {LOT: [{idx, qty}]}}
 
-  // 미매칭 출고 찾기: LOT가 있지만 해당 원료의 입고 LOT에 없는 출고 + LOT가 비어있는 출고
-  const unmatched=[];
   ledgerRecords.forEach((r,i)=>{
-    if(r.type!=='out'&&r.type!=='dispose'&&r.type!=='return') return;
-    const ingInLots=inLots[r.name]||new Set();
-    if(!r.lot || !ingInLots.has(r.lot)){
-      unmatched.push({idx:i, rec:r});
+    if(r.type==='init'||r.type==='in'){
+      if(!r.lot) return;
+      if(!ingLotIn[r.name]) ingLotIn[r.name]={};
+      ingLotIn[r.name][r.lot]=(ingLotIn[r.name][r.lot]||0)+r.qty;
+    }
+    if(r.type==='out'||r.type==='dispose'||r.type==='return'){
+      const key=r.lot||'_empty_';
+      if(!ingLotOut[r.name]) ingLotOut[r.name]={};
+      if(!ingLotOut[r.name][key]) ingLotOut[r.name][key]=[];
+      ingLotOut[r.name][key].push({idx:i, qty:r.qty, date:r.date||''});
     }
   });
 
-  if(!unmatched.length){ alert('미매칭 출고 레코드가 없습니다.'); return; }
-
-  // 원료별 요약 생성
+  // 삭제 대상 인덱스 수집
+  const toDelete=new Set();
   const summary={};
-  unmatched.forEach(({rec})=>{
-    if(!summary[rec.name]) summary[rec.name]={count:0, qty:0};
-    summary[rec.name].count++;
-    summary[rec.name].qty+=rec.qty||0;
+
+  Object.keys(ingLotOut).forEach(name=>{
+    const lotInMap=ingLotIn[name]||{};
+    Object.keys(ingLotOut[name]).forEach(lot=>{
+      const inQty=lotInMap[lot]||0;
+      const outRecs=ingLotOut[name][lot];
+      const outTotal=outRecs.reduce((s,r)=>s+r.qty,0);
+
+      if(lot==='_empty_'){
+        // LOT 비어있는 출고 → 전부 삭제 대상
+        outRecs.forEach(r=>{
+          toDelete.add(r.idx);
+          if(!summary[name]) summary[name]={count:0, qty:0};
+          summary[name].count++;
+          summary[name].qty+=r.qty;
+        });
+      } else if(outTotal>inQty+0.0005){
+        // 출고가 입고보다 많은 LOT → 초과분만 삭제 (최신 출고부터)
+        const excess=outTotal-inQty;
+        let remaining=excess;
+        // 날짜 내림차순 (최신 먼저 삭제)
+        const sorted=[...outRecs].sort((a,b)=>b.date.localeCompare(a.date));
+        for(const r of sorted){
+          if(remaining<=0.0005) break;
+          const del=Math.min(r.qty, remaining);
+          if(Math.abs(del-r.qty)<0.0005){
+            // 레코드 전체 삭제
+            toDelete.add(r.idx);
+            remaining-=r.qty;
+          } else {
+            // 부분 삭제 → 수량만 줄임
+            ledgerRecords[r.idx].qty=r.qty-del;
+            remaining-=del;
+          }
+          if(!summary[name]) summary[name]={count:0, qty:0};
+          summary[name].count++;
+          summary[name].qty+=del;
+        }
+      }
+    });
   });
+
+  if(!toDelete.size&&!Object.keys(summary).length){ alert('미매칭 출고 레코드가 없습니다.'); return; }
+
+  const totalCount=Object.values(summary).reduce((s,v)=>s+v.count,0);
   const summaryText=Object.entries(summary).map(([name,v])=>`  ${name}: ${v.count}건 (${v.qty.toFixed(3)}kg)`).join('\n');
 
-  if(!confirm(`미매칭 출고 ${unmatched.length}건을 삭제합니다.\n\n${summaryText}\n\n삭제하면 해당 출고량만큼 재고가 복원됩니다.\n(삭제된 배합의 잔여 출고이므로 복원이 정상입니다)\n\n진행하시겠습니까?`)) return;
+  if(!confirm(`미매칭/초과 출고 ${totalCount}건을 정리합니다.\n\n${summaryText}\n\n삭제하면 해당 출고량만큼 재고가 복원됩니다.\n(삭제된 배합의 잔여 출고이므로 복원이 정상입니다)\n\n진행하시겠습니까?`)) return;
 
-  // 인덱스 내림차순으로 삭제 (배열 순서 꼬임 방지)
-  unmatched.sort((a,b)=>b.idx-a.idx).forEach(({idx})=>{
+  // 인덱스 내림차순으로 삭제
+  [...toDelete].sort((a,b)=>b-a).forEach(idx=>{
     ledgerRecords.splice(idx,1);
   });
 
   await saveLedger();
   renderLedger();
-  alert(`미매칭 출고 ${unmatched.length}건 삭제 완료!`);
+  alert(`미매칭/초과 출고 정리 완료!\n\n${totalCount}건 처리됨`);
 }
 
 function yymmddToISO(v){
