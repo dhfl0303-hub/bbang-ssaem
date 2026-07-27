@@ -1289,12 +1289,13 @@ function onFilmItemChange(){
 
 function populateFilmLots(){
   const sel=document.getElementById('fpItem');
-  const itemName=sel.options[sel.selectedIndex]?.text?.replace(/^\[.*?\]\s*/,'').replace(/\s*\(.*\)$/,'')||'';
+  const itemCode=sel.value||'';
+  const itemDB=window._subItemDB||[];
+  const item=itemDB.find(i=>i.code===itemCode);
+  const itemName=item?.name||'';
+  const unit=item?.unit||'Rl';
   const lotSel=document.getElementById('fpLot');
   const subRecs=window._subLedgerRecords||[];
-  const itemDB=window._subItemDB||[];
-  const item=itemDB.find(i=>i.name===itemName);
-  const unit=item?.unit||'Rl';
   // LOT별 입고/출고 합산
   const inQty={}, outQty={};
   subRecs.forEach(r=>{
