@@ -659,7 +659,10 @@ function getSessionSubUsage(){
     if(r.bulkLot && r.bulkLot!=='-') usage[r.bulkLot]=(usage[r.bulkLot]||0)+(parseFloat(r.bulkQty)||0);
     if(r.boxLot && r.boxLot!=='-') usage[r.boxLot]=(usage[r.boxLot]||0)+(parseFloat(r.boxQty)||0);
     if(r.pkgBoxLot && r.pkgBoxLot!=='-') usage[r.pkgBoxLot]=(usage[r.pkgBoxLot]||0)+(parseFloat(r.pkgBoxQty)||0);
-    if(r.filmLot && r.filmLot!=='-'){
+    // 필름 FIFO 분배
+    if(r.filmLots && r.filmLots.length){
+      r.filmLots.forEach(fd=>{ if(fd.lot) usage[fd.lot]=(usage[fd.lot]||0)+(fd.qty||0); });
+    } else if(r.filmLot && r.filmLot!=='-'){
       const filmTotal=(parseFloat(r.filmQty)||0)+(parseFloat(r.filmWaste)||0);
       usage[r.filmLot]=(usage[r.filmLot]||0)+filmTotal;
     }
@@ -1372,7 +1375,6 @@ function calcFilmUsage(){
 
 function applyFilmPopup(){
   const sel=document.getElementById('fpItem');
-  const lot=document.getElementById('fpLot').value;
   const spec=sel.options[sel.selectedIndex]?.dataset?.spec||'';
   const parsed=parseFilmSpec(spec);
   const prodQty=parseInt(document.getElementById('fpProdQty').value)||0;
@@ -1386,28 +1388,65 @@ function applyFilmPopup(){
   const usageRl=(prodQty*unitLen)/rollLenMm;
   const wasteRl=(wastePcs*unitLen)/rollLenMm;
   const totalQty=usageRl+wasteRl;
-  // 필름 재고 체크
-  if(lot && totalQty>0){
-    const rem=getRealRemaining(lot);
-    if(totalQty>rem){
-      alert('❌ 필름 재고가 부족합니다.\n\nLOT: '+lot+'\n필요량: '+totalQty.toFixed(3)+'Rl / 잔량: '+rem+'Rl\n\n사용량을 확인하거나 부자재를 추가 입고해주세요.');
-      return;
-    }
+  if(totalQty<=0){ alert('사용량이 없습니다.'); return; }
+
+  // FIFO 자동 분배
+  const itemCode=sel.value||'';
+  const itemDB=window._subItemDB||[];
+  const item=itemDB.find(i=>i.code===itemCode);
+  const itemName=item?.name||'';
+  const subRecs=window._subLedgerRecords||[];
+  const inQty={}, outQty={};
+  subRecs.forEach(r=>{
+    if(!r.lot) return;
+    if(r.type==='init'||r.type==='in') inQty[r.lot]=(inQty[r.lot]||0)+(parseFloat(r.qty)||0);
+    if(r.type==='out'||r.type==='dispose') outQty[r.lot]=(outQty[r.lot]||0)+(parseFloat(r.qty)||0);
+  });
+  const sessionUsage=getSessionSubUsage();
+  Object.entries(sessionUsage).forEach(([lot,qty])=>{ outQty[lot]=(outQty[lot]||0)+qty; });
+
+  const lots=[];
+  const seen=new Set();
+  subRecs.filter(r=>(r.type==='in'||r.type==='init')&&r.name===itemName).forEach(r=>{
+    if(!r.lot||seen.has(r.lot)) return;
+    seen.add(r.lot);
+    const remaining=Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
+    if(remaining>0) lots.push({lot:r.lot,remaining,date:r.date||''});
+  });
+  lots.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+
+  // FIFO 분배
+  let remain=totalQty;
+  const dist=[];
+  lots.forEach(l=>{
+    if(remain<=0.0005) return;
+    const use=Math.round(Math.min(l.remaining, remain)*1000)/1000;
+    dist.push({lot:l.lot, qty:use});
+    remain-=use;
+  });
+  if(remain>0.0005){
+    alert('❌ 필름 재고가 부족합니다.\n\n필요량: '+totalQty.toFixed(3)+'Rl\n부족량: '+remain.toFixed(3)+'Rl\n\n부자재를 추가 입고해주세요.');
+    return;
   }
-  // hidden 필드에 저장
-  document.getElementById('filmLot').value=lot;
+
+  // hidden 필드에 저장 (첫 번째 LOT는 기존 호환, 전체는 JSON으로)
+  document.getElementById('filmLot').value=dist[0]?.lot||'';
   document.getElementById('filmQty').value=parseFloat(usageRl.toFixed(4));
   document.getElementById('filmWaste').value=parseFloat(wasteRl.toFixed(4));
   document.getElementById('filmItemCode').value=sel.value;
   document.getElementById('filmUnitLen').value=unitLen;
   document.getElementById('filmRollLen').value=rollLen;
   document.getElementById('filmWastePcs').value=wastePcs;
-  // 요약 표시 업데이트
+  // FIFO 분배 결과 저장
+  window._filmFifoDist=dist;
+
+  // 요약 표시
   const itemText=sel.options[sel.selectedIndex]?.text||'';
+  const distHtml=dist.map(d=>`<div style="font-size:11px;color:var(--text2);">LOT: ${d.lot} → ${d.qty.toFixed(3)}Rl</div>`).join('');
   document.getElementById('filmSummary').innerHTML=`
     <div style="flex:1;">
       <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:2px;">${itemText}</div>
-      <div style="font-size:11px;color:var(--text2);">LOT: ${lot||'-'}</div>
+      ${distHtml}
       <div style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px;">
         사용: ${usageRl.toFixed(3)}Rl
         ${wasteRl?' / 폐기: '+wasteRl.toFixed(3)+'Rl':''}
@@ -1711,6 +1750,7 @@ function completePackaging(signImg=''){
     sealerTemp:document.getElementById('sealerTemp').value||0,
     // 부자재 LOT
     filmLot:document.getElementById('filmLot')?.value||'-',
+    filmLots:window._filmFifoDist||[],
     filmQty:parseFloat(document.getElementById('filmQty')?.value)||0,
     filmWaste:parseFloat(document.getElementById('filmWaste')?.value)||0,
     filmItemCode:document.getElementById('filmItemCode')?.value||'',
@@ -1830,11 +1870,32 @@ async function syncToServer(){
     let subSnap = await db.collection('appData').doc('subLedgerRecords').get();
     let subRecs = (subSnap.exists && subSnap.data().data) ? JSON.parse(subSnap.data().data) : [];
     recs.forEach(rec=>{
-      const filmLot=rec.filmLot||''; const bulkLot=rec.bulkLot||''; const boxLot=rec.boxLot||''; const pkgBoxLot=rec.pkgBoxLot||'';
+      const bulkLot=rec.bulkLot||''; const boxLot=rec.boxLot||''; const pkgBoxLot=rec.pkgBoxLot||'';
       const rawDate=rec.date||'';
       const isoDate=rawDate.length===6?'20'+rawDate.slice(0,2)+'-'+rawDate.slice(2,4)+'-'+rawDate.slice(4,6):(rawDate||new Date().toISOString().slice(0,10));
-      [{lot:filmLot,cat:'필름포장지',qty:getFilmQtyFromRecord(rec)},
-       {lot:bulkLot,cat:'비닐',qty:parseFloat(rec.bulkQty)||0},
+      // 필름 FIFO 분배 출고
+      const filmLots=rec.filmLots||[];
+      if(filmLots.length){
+        filmLots.forEach(fd=>{
+          if(!fd.lot||!fd.qty) return;
+          const exists=subRecs.find(r=>r.type==='out'&&r.lot===fd.lot&&r.packLot===rec.lot);
+          if(!exists){
+            const matched=subRecs.find(r=>r.lot===fd.lot&&(r.type==='in'||r.type==='init'));
+            subRecs.push({date:isoDate,name:matched?matched.name:'필름포장지',lot:fd.lot,qty:fd.qty,packLot:rec.lot,type:'out'});
+          }
+        });
+      } else if(rec.filmLot && rec.filmLot!=='-'){
+        // 기존 단일 LOT 호환
+        const filmQty=getFilmQtyFromRecord(rec);
+        if(filmQty>0){
+          const exists=subRecs.find(r=>r.type==='out'&&r.lot===rec.filmLot&&r.packLot===rec.lot);
+          if(!exists){
+            const matched=subRecs.find(r=>r.lot===rec.filmLot&&(r.type==='in'||r.type==='init'));
+            subRecs.push({date:isoDate,name:matched?matched.name:'필름포장지',lot:rec.filmLot,qty:filmQty,packLot:rec.lot,type:'out'});
+          }
+        }
+      }
+      [{lot:bulkLot,cat:'비닐',qty:parseFloat(rec.bulkQty)||0},
        {lot:boxLot,cat:'박스',qty:parseFloat(rec.boxQty)||0},
        {lot:pkgBoxLot,cat:'패키지박스',qty:parseFloat(rec.pkgBoxQty)||0}]
         .filter(x=>x.lot&&x.qty>0)
@@ -1847,12 +1908,13 @@ async function syncToServer(){
           }
         });
       // 필름 폐기량 반영
-      if(filmLot && parseFloat(rec.filmWaste)>0){
-        const wasteExists=subRecs.find(r=>r.type==='dispose'&&r.lot===filmLot&&r.packLot===rec.lot);
+      const filmWasteLot=(filmLots.length?filmLots[0].lot:rec.filmLot)||'';
+      if(filmWasteLot && parseFloat(rec.filmWaste)>0){
+        const wasteExists=subRecs.find(r=>r.type==='dispose'&&r.lot===filmWasteLot&&r.packLot===rec.lot);
         if(!wasteExists){
-          const matched=subRecs.find(r=>r.lot===filmLot&&(r.type==='in'||r.type==='init'));
+          const matched=subRecs.find(r=>r.lot===filmWasteLot&&(r.type==='in'||r.type==='init'));
           const itemName=matched?matched.name:'필름포장지';
-          subRecs.push({date:isoDate,name:itemName,lot:filmLot,qty:parseFloat(rec.filmWaste),packLot:rec.lot,type:'dispose',reason:'초기접합확인'});
+          subRecs.push({date:isoDate,name:itemName,lot:filmWasteLot,qty:parseFloat(rec.filmWaste),packLot:rec.lot,type:'dispose',reason:'초기접합확인'});
         }
       }
     });
@@ -2035,10 +2097,11 @@ async function verifyTestMode(){
         <input class="field-input" type="number" id="fpManualLen" placeholder="예: 220" min="0" step="1" oninput="calcFilmUsage()">
       </div>
 
-      <!-- 4. LOT 선택 -->
+      <!-- 4. LOT 자동 배분 (FIFO) -->
       <div style="margin-bottom:14px;">
         <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">필름 LOT</div>
-        <select class="field-input" id="fpLot" onchange="onSubLotSelect('fpLot')">
+        <div id="fpLotFifoInfo" style="background:var(--primary-light);border:1px solid #b3cef0;border-radius:8px;padding:10px 12px;font-size:12px;color:var(--primary-dark);">✅ FIFO 자동 배분 (적용 시 재고 순서대로 자동 배정)</div>
+        <select class="field-input" id="fpLot" style="display:none;">
           <option value="">-- LOT 선택 --</option>
         </select>
       </div>
