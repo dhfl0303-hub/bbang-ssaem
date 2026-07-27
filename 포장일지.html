@@ -779,12 +779,20 @@ function validateSubStock(){
     const rem=getRealRemaining(pkgBoxLot);
     if(pkgBoxQty>rem) checks.push({name:'패키지박스',lot:pkgBoxLot,use:pkgBoxQty,rem});
   }
-  // 필름
-  const filmLot=document.getElementById('filmLot')?.value||'';
-  const filmQty=(parseFloat(document.getElementById('filmQty')?.value)||0)+(parseFloat(document.getElementById('filmWaste')?.value)||0);
-  if(filmLot && filmLot!=='-' && filmQty>0){
-    const rem=getRealRemaining(filmLot);
-    if(filmQty>rem) checks.push({name:'필름포장지',lot:filmLot,use:Math.round(filmQty*1000)/1000,rem});
+  // 필름 (FIFO 분배 기준)
+  const filmDist=window._filmFifoDist||[];
+  if(filmDist.length){
+    filmDist.forEach(fd=>{
+      const rem=getRealRemaining(fd.lot);
+      if(fd.qty>rem+0.001) checks.push({name:'필름포장지',lot:fd.lot,use:Math.round(fd.qty*1000)/1000,rem});
+    });
+  } else {
+    const filmLot=document.getElementById('filmLot')?.value||'';
+    const filmQty=(parseFloat(document.getElementById('filmQty')?.value)||0)+(parseFloat(document.getElementById('filmWaste')?.value)||0);
+    if(filmLot && filmLot!=='-' && filmQty>0){
+      const rem=getRealRemaining(filmLot);
+      if(filmQty>rem) checks.push({name:'필름포장지',lot:filmLot,use:Math.round(filmQty*1000)/1000,rem});
+    }
   }
   if(checks.length){
     const msg=checks.map(c=>`• ${c.name}\n  LOT: ${c.lot}\n  입력: ${c.use} / 잔량: ${c.rem}`).join('\n\n');
@@ -1234,12 +1242,28 @@ function parseFilmSpec(spec){
 }
 
 function openFilmPopup(){
-  // 필름 품목 목록 채우기
+  // 필름 품목 목록 채우기 (재고 표시)
   const sel=document.getElementById('fpItem');
   const filmItems=(window._subItemDB||[]).filter(i=>i.category==='필름포장지');
-  sel.innerHTML='<option value="">-- 품목 선택 --</option>'+filmItems.map(i=>
-    `<option value="${i.code}" data-spec="${i.spec||''}">[${i.code}] ${i.name} (${i.spec||'규격없음'})</option>`
-  ).join('');
+  const subRecs=window._subLedgerRecords||[];
+  const sessionUsage=getSessionSubUsage();
+  sel.innerHTML='<option value="">-- 품목 선택 --</option>'+filmItems.map(i=>{
+    // 이 품목의 전체 재고 합산
+    let totalStock=0;
+    subRecs.forEach(r=>{
+      if(r.name!==i.name) return;
+      if(r.type==='init'||r.type==='in') totalStock+=parseFloat(r.qty)||0;
+      if(r.type==='out'||r.type==='dispose') totalStock-=parseFloat(r.qty)||0;
+    });
+    // 세션 사용량 차감
+    subRecs.filter(r=>r.name===i.name&&(r.type==='init'||r.type==='in')&&r.lot).forEach(r=>{
+      totalStock-=(sessionUsage[r.lot]||0);
+    });
+    totalStock=Math.round(totalStock*1000)/1000;
+    const stockLabel=totalStock>0?` [재고:${totalStock}Rl]`:' [재고없음]';
+    const style=totalStock<=0?'color:#999;':'';
+    return `<option value="${i.code}" data-spec="${i.spec||''}" style="${style}">[${i.code}] ${i.name} (${i.spec||'규격없음'})${stockLabel}</option>`;
+  }).join('');
   // 기존 선택값 복원
   const prevCode=document.getElementById('filmItemCode').value;
   if(prevCode) sel.value=prevCode;
