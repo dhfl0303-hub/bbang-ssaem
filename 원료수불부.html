@@ -313,17 +313,12 @@ let initRows = [];
 let ingStock = [];
 
 async function initLedger(){
-  // incomingRecords → ledgerRecords 자동 동기화 (중복 제거)
+  // 입고검사 행별 증분 동기화: 수동 입고/조정/출고는 보존하고 해당 입고 행만 추가·수정·삭제
   try{
+    if(!window._incomingLoadOk) return;
     const recs = window._incomingRecords||[];
-    if(!recs.length) return;
-
-    // 1) 기존 type='in' 레코드 수 확인 후 제거
-    const beforeIn = JSON.stringify(ledgerRecords.filter(r=>r.type==='in'));
-    ledgerRecords = ledgerRecords.filter(r=>r.type!=='in');
-
-    // 2) incomingRecords 기반으로 type='in' 재생성 (날짜+원료명+LOT 기준 중복 제거)
-    const seen = new Set();
+    const before = JSON.stringify(ledgerRecords);
+    const activeIds = new Set();
     const skipped = [];
     recs.forEach((rec,recIdx)=>{
       const date = rec.date||'';
@@ -332,30 +327,23 @@ async function initLedger(){
         if(!row.product || qty<=0) return;
         const ing = (row.code&&INGREDIENT_DB.find(i=>i.code===row.code))||getIngByName(row.product);
         if(!ing||!ing.code){ skipped.push(row.product); return; }
-        const dedupKey = (rec.syncId||('REC-'+recIdx))+'|'+(row.syncId||rowIdx);
-        if(seen.has(dedupKey)) return;
-        seen.add(dedupKey);
-        ledgerRecords.push({
-          date: date,
-          name: row.product,
-          code: ing.code,
-          qty: qty,
-          exp: row.exp||'',
-          mfg: row.mfg||'',
-          dateType: row.dateType||(row.lot&&row.lot.endsWith('*')?'mfg':(row.mfg&&!row.exp?'mfg':'exp')),
-          lot: row.lot||'',
-          type: 'in'
-        });
+        const sourceLineId=row.syncId||((rec.syncId||('INCOMING-LEGACY-'+(rec.id||rec.date||recIdx)))+'-ROW-'+String(rowIdx+1).padStart(3,'0'));
+        activeIds.add(sourceLineId);
+        let target=ledgerRecords.find(r=>r.type==='in'&&r.sourceType==='incoming'&&r.sourceLineId===sourceLineId);
+        // 최초 전환 시 기존 자동생성 입고를 찾아 ID만 부여하여 중복 생성을 방지
+        if(!target) target=ledgerRecords.find(r=>r.type==='in'&&!r.sourceType&&r.date===date&&r.name===row.product&&(r.lot||'')===(row.lot||'')&&Math.abs((parseFloat(r.qty)||0)-qty)<0.0005);
+        const next={date,name:row.product,code:ing.code,qty,exp:row.exp||'',mfg:row.mfg||'',dateType:row.dateType||(row.lot&&row.lot.endsWith('*')?'mfg':(row.mfg&&!row.exp?'mfg':'exp')),lot:row.lot||'',type:'in',sourceType:'incoming',sourceId:rec.syncId||'',sourceLineId};
+        if(target) Object.assign(target,next); else ledgerRecords.push(next);
       });
     });
+    // 입고검사에서 삭제된 행은 자동연결 입고만 삭제. 수동 입고는 절대 건드리지 않음.
+    ledgerRecords=ledgerRecords.filter(r=>!(r.type==='in'&&r.sourceType==='incoming'&&r.sourceLineId&&!activeIds.has(r.sourceLineId)));
     if(skipped.length){
       const unique = [...new Set(skipped)];
       alert('⚠️ 원료DB에 코드가 없어 동기화에서 제외된 원료:\n\n' + unique.join(', ') + '\n\n해당 원료를 신규 등록 후 다시 확인해주세요.');
     }
 
-    // 3) 변경이 있을 때만 저장
-    const afterIn = JSON.stringify(ledgerRecords.filter(r=>r.type==='in'));
-    if(beforeIn !== afterIn) await saveLedger();
+    if(before !== JSON.stringify(ledgerRecords)) await saveLedger();
   }catch(e){ console.warn('initLedger 오류', e); }
 }
 
@@ -1179,6 +1167,7 @@ function saveIngredientDB(){
     .catch(e=>console.warn('ingredientDB 저장 실패', e));
 }
 async function loadFromFirebase(){
+  window._incomingLoadOk=false;
   if(!window._db) return;
   try{
     const [ledgerSnap, incomingSnap, ingSnap] = await Promise.all([
@@ -1189,6 +1178,7 @@ async function loadFromFirebase(){
     if(ledgerSnap.exists && ledgerSnap.data().data) ledgerRecords = JSON.parse(ledgerSnap.data().data);
     if(incomingSnap.exists && incomingSnap.data().data) window._incomingRecords = JSON.parse(incomingSnap.data().data);
     else window._incomingRecords = [];
+    window._incomingLoadOk=true;
     if(ingSnap.exists && ingSnap.data().data) INGREDIENT_DB = JSON.parse(ingSnap.data().data);
     else saveIngredientDB(); // 최초 1회 Firebase에 업로드
   }catch(e){ console.warn('Firebase 로드 실패', e); }

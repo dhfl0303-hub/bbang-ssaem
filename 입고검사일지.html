@@ -1245,6 +1245,7 @@ function addEditRow(data=null){
   tr.id = 'edit-row-'+id;
 
   const d = data || {};
+  tr.dataset.syncId = d.syncId||('INROW-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+id)));
   // 로트 파싱 (M001-260522-270504)
   const lotParts = (d.lot||'').split('-');
   const lotCode = lotParts[0]||'';
@@ -1361,7 +1362,8 @@ async function saveEditRecord(){
     const cert    = getEditOX('cert',id);
     const temp    = document.getElementById('edit-temp-'+id)?.value||'';
     if(!supplier && !product) return;
-    rows.push({supplier,product,lot,qty,mfg,exp,ss,label,pack,vehicle,cert,temp});
+    const oldRow=records[i]?.rows?.find(r=>r.syncId===tr.dataset.syncId)||{};
+    rows.push({syncId:tr.dataset.syncId,code:lotCode||oldRow.code||'',supplier,product,lot,qty,mfg,exp,ss,label,pack,vehicle,cert,temp});
   });
 
   if(!rows.length){ alert('입고 항목을 입력해주세요'); return; }
@@ -1648,7 +1650,18 @@ async function loadFromFirebase(){
       window._db.collection('appData').doc('suppliers_incoming').get(),
       window._db.collection('appData').doc('ingredientDB').get()
     ]);
-    if(recSnap.exists && recSnap.data().data) records = JSON.parse(recSnap.data().data);
+    if(recSnap.exists && recSnap.data().data){
+      records = JSON.parse(recSnap.data().data);
+      let migrated=false;
+      records.forEach((rec,ri)=>{
+        if(!rec.syncId){ rec.syncId='INCOMING-LEGACY-'+(rec.id||rec.savedAt||rec.date||ri); migrated=true; }
+        (rec.rows||[]).forEach((row,ii)=>{
+          if(!row.syncId){ row.syncId=rec.syncId+'-ROW-'+String(ii+1).padStart(3,'0'); migrated=true; }
+          if(!row.code&&row.lot){ row.code=String(row.lot).split('-')[0]||''; migrated=true; }
+        });
+      });
+      if(migrated) await saveRecordsToFirebase();
+    }
     if(supSnap.exists && supSnap.data().data) suppliers = JSON.parse(supSnap.data().data);
     if(ingSnap.exists && ingSnap.data().data) INGREDIENT_DB = JSON.parse(ingSnap.data().data);
   }catch(e){ console.warn('Firebase 로드 실패', e); }

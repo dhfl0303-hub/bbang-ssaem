@@ -695,7 +695,7 @@ tr:hover td{background:var(--bg);}
         <div class="card-bd" id="returnAccBody" style="padding:0;display:none;">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>반품일</th><th>코드</th><th>원료명</th><th>반품량</th><th>LOT</th><th>사유</th></tr></thead>
+              <thead><tr><th>반품일</th><th>코드</th><th>원료명</th><th>반품량</th><th>LOT</th><th>사유</th><th></th></tr></thead>
               <tbody id="returnTbody"></tbody>
             </table>
           </div>
@@ -3682,7 +3682,7 @@ function syncIngStockFromLedger(){
           _syncKey:key
         };
       }
-      stockMap[key].qty += r.qty||0;
+      stockMap[key].qty += parseFloat(r.qty)||0;
       if(!stockMap[key].code && r.code) stockMap[key].code = r.code;
     });
     // 2. out, dispose, return → LOT 기준으로 정확히 차감
@@ -3690,17 +3690,19 @@ function syncIngStockFromLedger(){
       if(r.type!=='out' && r.type!=='dispose' && r.type!=='return') return;
       const name = (r.name||'').replace(/\n/g,' ');
       const lot = r.lot||'';
-      let remain = r.qty||0;
-      // LOT가 있으면 해당 LOT에서 먼저 차감
+      let remain = parseFloat(r.qty)||0;
+      // LOT가 있으면 정확히 해당 LOT에서만 전량 차감 (다른 LOT로 넘기지 않음)
       if(lot){
-        const matched = Object.values(stockMap).find(s=>s.name===name && s.lot===lot && s.qty>0);
+        let matched = Object.values(stockMap).find(s=>s.name===name && s.lot===lot);
         if(matched){
-          const deduct = Math.min(matched.qty, remain);
-          matched.qty -= deduct;
-          remain -= deduct;
+          matched.qty -= remain;
+        }else{
+          const key=name+'_'+lot;
+          stockMap[key]={name,code:r.code||'',qty:-remain,expiry:r.exp||'',mfg:r.mfg||'',lot,_syncKey:key,_anomaly:true};
         }
+        remain=0;
       }
-      // 남은 수량은 같은 원료의 오래된 것부터 차감 (LOT 미매칭분)
+      // LOT가 없는 구버전 출고만 같은 원료의 오래된 LOT부터 차감
       if(remain>0.001){
         Object.values(stockMap)
           .filter(s=>s.name===name && s.qty>0)
@@ -3713,8 +3715,8 @@ function syncIngStockFromLedger(){
           });
       }
     });
-    // 3. 재고 0 이하 제거
-    ingStock = Object.values(stockMap).filter(s=>s.qty>0.001);
+    // 3. 음수 LOT도 재고 이상 확인을 위해 숨기지 않음
+    ingStock = Object.values(stockMap).filter(s=>Math.abs(s.qty)>0.001);
     // 4. 소비기한 형식 변환 (YY.MM.DD → ISO for daysDiff)
     ingStock.forEach(s=>{
       if(s.expiry && /^\d{2}\.\d{2}\.\d{2}$/.test(s.expiry)){
@@ -3735,6 +3737,7 @@ function renderIngStock(){
   let expired=0,near=0,normal=0;
   const alerts=[];
   ingStock.forEach(s=>{
+    if(s.qty<0){ alerts.push({...s,diff:NaN,type:'anomaly'}); return; }
     if(!s.expiry || s.expiry==='-'){
       normal++; // 소비기한 없음(제조일자만) → 정상 처리
       return;
@@ -3755,17 +3758,19 @@ function renderIngStock(){
     alertCard.style.display='';
     document.getElementById('alertList').innerHTML=alerts.map(a=>{
       const aIdx=ingStock.findIndex(s=>s._syncKey===a._syncKey);
-      return `<div class="alert-item ${a.type==='expired'?'alert-red':'alert-orange'}">
+      const isAnomaly=a.type==='anomaly';
+      return `<div class="alert-item ${a.type==='expired'||isAnomaly?'alert-red':'alert-orange'}">
         <div style="flex:1">
-          <div class="alert-name">${a.name}</div>
-          <div class="alert-sub">소비기한: ${a.expiry} · 재고: ${Number(a.qty).toLocaleString()}kg</div>
+          <div class="alert-name">${a.name} <span style="font-family:monospace;font-size:11px;color:var(--primary)">${a.lot||'LOT 미지정'}</span></div>
+          <div class="alert-sub">소비기한: ${a.expiry||'-'} · LOT 잔량: ${Number(a.qty).toLocaleString()}kg</div>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
-          <span class="badge ${a.type==='expired'?'badge-red':'badge-orange'}" style="font-size:15px;padding:6px 14px;font-weight:800">
-            ${a.type==='expired'?'초과':'D-'+a.diff}
+          <span class="badge ${a.type==='expired'||isAnomaly?'badge-red':'badge-orange'}" style="font-size:15px;padding:6px 14px;font-weight:800">
+            ${isAnomaly?'재고 이상':a.type==='expired'?'초과':'D-'+a.diff}
           </span>
-          <button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;font-size:11px;padding:4px 8px;" onclick="event.stopPropagation();openDispose(${aIdx})">폐기</button>
-          <button class="btn btn-sm" style="background:#4a2800;color:#ffa64d;border:1px solid #a06000;font-size:11px;padding:4px 8px;" onclick="event.stopPropagation();openReturn(${aIdx})">반품</button>
+          <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();showLotHistory(${aIdx})">출고내역</button>
+          ${isAnomaly?'':`<button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;font-size:11px;padding:4px 8px;" onclick="event.stopPropagation();openDispose(${aIdx})">폐기</button>
+          <button class="btn btn-sm" style="background:#4a2800;color:#ffa64d;border:1px solid #a06000;font-size:11px;padding:4px 8px;" onclick="event.stopPropagation();openReturn(${aIdx})">반품</button>`}
         </div>
       </div>`;
     }).join('');
@@ -3805,9 +3810,10 @@ function renderIngStock(){
     const totalQty=g.items.reduce((s,i)=>s+Number(i.qty),0);
     const expanded=ingExpandedSet.has(code);
     // 그룹 내 상태 중 가장 심각한 것
-    const worstDiff=Math.min(...g.items.map(i=>{const d=daysDiff(i.expiry);return isNaN(d)?999:d;}));
-    const gBadge=worstDiff<0?'badge-red':worstDiff<=7?'badge-orange':'badge-green';
-    const gLabel=worstDiff<0?'초과':worstDiff<=7?'D-'+worstDiff:'정상';
+    const hasAnomaly=g.items.some(i=>Number(i.qty)<0);
+    const worstDiff=Math.min(...g.items.filter(i=>Number(i.qty)>=0).map(i=>{const d=daysDiff(i.expiry);return isNaN(d)?999:d;}),999);
+    const gBadge=hasAnomaly||worstDiff<0?'badge-red':worstDiff<=7?'badge-orange':'badge-green';
+    const gLabel=hasAnomaly?'재고 이상':worstDiff<0?'초과':worstDiff<=7?'D-'+worstDiff:'정상';
     html+=`<tr style="cursor:pointer;background:var(--bg2)" onclick="toggleIngGroup('${code}')">
       <td><span class="badge badge-blue" style="font-size:10px">${code}</span></td>
       <td style="font-weight:700">${g.name} <span style="font-size:11px;color:var(--text3)">(${g.items.length}건)</span></td>
@@ -3821,19 +3827,20 @@ function renderIngStock(){
         const origIdx=ingStock.findIndex(x=>x._syncKey===s._syncKey);
         const diff=daysDiff(s.expiry);
         const hasExp=s.expiry&&s.expiry!=='-'&&!isNaN(diff);
-        const badge=!hasExp?'badge-gray':diff<0?'badge-red':diff<=7?'badge-orange':'badge-green';
-        const label=!hasExp?'-':diff<0?'초과':diff<=7?'D-'+diff:'정상';
+        const isAnomaly=Number(s.qty)<0;
+        const badge=isAnomaly?'badge-red':!hasExp?'badge-gray':diff<0?'badge-red':diff<=7?'badge-orange':'badge-green';
+        const label=isAnomaly?'재고 이상':!hasExp?'-':diff<0?'초과':diff<=7?'D-'+diff:'정상';
         const dateLabel=s.expiry&&s.expiry!=='-'?`소비: ${s.expiry}`:(s.mfg&&s.mfg!=='-'?`제조: ${s.mfg}`:'-');
         html+=`<tr style="background:var(--bg);font-size:12px">
           <td></td>
-          <td style="padding-left:24px;color:var(--text2)">${s.name}</td>
-          <td>${Number(s.qty).toLocaleString()}kg</td>
+          <td style="padding-left:24px;color:var(--text2)">${s.name}<div style="font-family:monospace;font-size:10px;color:var(--primary)">${s.lot||'LOT 미지정'}</div></td>
+          <td style="font-weight:700;color:${isAnomaly?'var(--danger)':'inherit'}">${Number(s.qty).toLocaleString()}kg</td>
           <td>${dateLabel}</td>
           <td><span class="badge ${badge}">${label}</span></td>
           <td style="white-space:nowrap">
-            <button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;margin-right:4px" onclick="openDispose(${origIdx})">폐기</button>
-            <button class="btn btn-sm" style="background:#4a2800;color:#ffa64d;border:1px solid #a06000;margin-right:4px" onclick="openReturn(${origIdx})">반품</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteIngStock(${origIdx})">삭제</button>
+            <button class="btn btn-sm btn-outline" onclick="showLotHistory(${origIdx})">출고내역</button>
+            ${isAnomaly?'':`<button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;margin-right:4px" onclick="openDispose(${origIdx})">폐기</button>
+            <button class="btn btn-sm" style="background:#4a2800;color:#ffa64d;border:1px solid #a06000;margin-right:4px" onclick="openReturn(${origIdx})">반품</button>`}
           </td>
         </tr>`;
       });
@@ -3858,6 +3865,15 @@ function saveIngStock(){
   closeModal('ingStockModal'); renderIngStock();
 }
 function deleteIngStock(i){ if(!confirm('삭제하시겠습니까?'))return; ingStock.splice(i,1); saveData('ingStock',ingStock); renderIngStock(); }
+
+function showLotHistory(idx){
+  const s=ingStock[idx]; if(!s) return;
+  const rows=ledgerRecords.filter(r=>r.name===s.name&&(r.lot||'')===(s.lot||''))
+    .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const label={init:'초기재고',in:'입고',out:'출고',dispose:'폐기',return:'반품'};
+  const lines=rows.map(r=>`${r.date||'-'}  ${label[r.type]||r.type}  ${r.type==='init'||r.type==='in'?'+':'-'}${Number(r.qty||0).toFixed(3)}kg${r.batchLot?'  공정LOT:'+r.batchLot:''}${r.inputLot?'  투입LOT:'+r.inputLot:''}`).join('\n');
+  alert(`${s.name}\nLOT: ${s.lot||'LOT 미지정'}\n현재 잔량: ${Number(s.qty).toFixed(3)}kg\n\n${lines||'연결된 이력이 없습니다.'}`);
+}
 
 // ===== 폐기 처리 =====
 function openDispose(idx){
@@ -3900,9 +3916,9 @@ async function saveDispose(){
   // ledgerRecords에 dispose 추가
   ledgerRecords.push({
     date, name:s.name, code:s.code||'', qty, lot:s.lot||'',
-    exp:s.expiry||'', mfg:s.mfg||'', reason, type:'dispose'
+    exp:s.expiry||'', mfg:s.mfg||'', reason, type:'dispose', source:'통합관리', processId:'DISPOSE-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)))
   });
-  saveLedger();
+  await saveLedger();
   // ingStock 재계산
   syncIngStockFromLedger();
   closeModal('disposeModal');
@@ -3932,7 +3948,7 @@ function renderDisposeLog(){
 }
 
 async function deleteDispose(date, name, lot, qty){
-  const idx = ledgerRecords.findIndex(r=>r.type==='dispose'&&r.date===date&&r.name===name&&r.lot===lot&&r.qty===qty);
+  const idx = ledgerRecords.findIndex(r=>r.type==='dispose'&&r.date===date&&r.name===name&&r.lot===lot&&Number(r.qty)===Number(qty));
   if(idx===-1){ alert('기록을 찾을 수 없습니다'); return; }
   const target = ledgerRecords[idx];
   if(!confirm(`폐기 기록을 삭제하시겠습니까?\n원료: ${target.name}\n수량: ${target.qty}kg\n사유: ${target.reason||'-'}\n\n삭제 시 원료수불부 재고에 다시 반영됩니다.`)) return;
@@ -3982,9 +3998,9 @@ async function saveReturn(){
   if(qty>s.qty){ alert('반품량이 현재고보다 큽니다'); return; }
   ledgerRecords.push({
     date, name:s.name, code:s.code||'', qty, lot:s.lot||'',
-    exp:s.expiry||'', mfg:s.mfg||'', reason, type:'return'
+    exp:s.expiry||'', mfg:s.mfg||'', reason, type:'return', source:'통합관리', processId:'RETURN-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)))
   });
-  saveLedger();
+  await saveLedger();
   syncIngStockFromLedger();
   closeModal('returnModal');
   renderIngStock();
@@ -3997,7 +4013,7 @@ function renderReturnLog(){
   document.getElementById('returnCount').textContent = returns.length+'건';
   const tbody = document.getElementById('returnTbody');
   if(!returns.length){
-    tbody.innerHTML='<tr><td colspan="6" class="tc" style="padding:20px;color:var(--text3)">반품 이력이 없습니다</td></tr>';
+    tbody.innerHTML='<tr><td colspan="7" class="tc" style="padding:20px;color:var(--text3)">반품 이력이 없습니다</td></tr>';
     return;
   }
   tbody.innerHTML = returns.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(r=>`
@@ -4008,7 +4024,17 @@ function renderReturnLog(){
       <td style="color:#e67e22;font-weight:700">${r.qty}kg</td>
       <td style="font-size:11px">${r.lot||'-'}</td>
       <td><span class="badge badge-orange">${r.reason||'-'}</span></td>
+      <td class="tc"><button class="btn btn-sm btn-danger" onclick="deleteReturn('${r.date||''}','${(r.name||'').replace(/'/g,'&#39;')}','${r.lot||''}',${r.qty})">삭제</button></td>
     </tr>`).join('');
+}
+
+async function deleteReturn(date,name,lot,qty){
+  const idx=ledgerRecords.findIndex(r=>r.type==='return'&&r.date===date&&r.name===name&&r.lot===lot&&Number(r.qty)===Number(qty));
+  if(idx===-1){ alert('기록을 찾을 수 없습니다'); return; }
+  const target=ledgerRecords[idx];
+  if(!confirm(`반품 기록을 삭제하시겠습니까?\n원료: ${target.name}\nLOT: ${target.lot||'-'}\n수량: ${target.qty}kg\n\n삭제하면 원료수불부 재고가 복원됩니다.`)) return;
+  ledgerRecords.splice(idx,1); await saveLedger(); syncIngStockFromLedger(); renderIngStock(); renderReturnLog();
+  alert('삭제 완료. 원료수불부 재고가 복원됐습니다.');
 }
 
 function openEditIncoming(i){
@@ -4072,39 +4098,26 @@ function deleteIncoming(i){
 }
 
 function syncIncomingToLedger(){
-  // 안전장치: incomingRecords가 비어있으면 기존 'in' 레코드 유지
-  if(!incomingRecords || !incomingRecords.length) return;
-
-  // 1) 기존 type='in' 레코드 제거
-  const beforeIn = JSON.stringify(ledgerRecords.filter(r=>r.type==='in'));
-  ledgerRecords = ledgerRecords.filter(r=>r.type!=='in');
-
-  // 2) incomingRecords 기반으로 type='in' 레코드 재생성 (중복 제거)
-  const seen = new Set();
+  // 입고검사 행별 증분 동기화. 수동 입고·재고조정·출고는 보존한다.
+  if(window._fbLoadFailed) return;
+  const before=JSON.stringify(ledgerRecords);
+  const activeIds=new Set();
   incomingRecords.forEach((rec,recIdx)=>{
     const date = rec.date||'';
     (rec.rows||[]).forEach((row,rowIdx)=>{
       const qty = parseFloat(row.qty)||0;
       if(!row.product || qty<=0) return;
-      const dedupKey = (rec.syncId||('REC-'+recIdx))+'|'+(row.syncId||rowIdx);
-      if(seen.has(dedupKey)) return;
-      seen.add(dedupKey);
       const ing = (row.code&&INGREDIENT_DB.find(i=>i.code===row.code))||getIngByName(row.product);
-      ledgerRecords.push({
-        date: date,
-        name: row.product,
-        code: ing ? ing.code : '',
-        qty: qty,
-        exp: row.exp||'',
-        lot: row.lot||'',
-        type: 'in'
-      });
+      const sourceLineId=row.syncId||((rec.syncId||('INCOMING-LEGACY-'+(rec.id||rec.date||recIdx)))+'-ROW-'+String(rowIdx+1).padStart(3,'0'));
+      activeIds.add(sourceLineId);
+      let target=ledgerRecords.find(r=>r.type==='in'&&r.sourceType==='incoming'&&r.sourceLineId===sourceLineId);
+      if(!target) target=ledgerRecords.find(r=>r.type==='in'&&!r.sourceType&&r.date===date&&r.name===row.product&&(r.lot||'')===(row.lot||'')&&Math.abs((parseFloat(r.qty)||0)-qty)<0.0005);
+      const next={date,name:row.product,code:ing?ing.code:'',qty,exp:row.exp||'',mfg:row.mfg||'',dateType:row.dateType||(row.lot&&row.lot.endsWith('*')?'mfg':(row.mfg&&!row.exp?'mfg':'exp')),lot:row.lot||'',type:'in',sourceType:'incoming',sourceId:rec.syncId||'',sourceLineId};
+      if(target) Object.assign(target,next); else ledgerRecords.push(next);
     });
   });
-
-  // 3) 변경이 있을 때만 저장
-  const afterIn = JSON.stringify(ledgerRecords.filter(r=>r.type==='in'));
-  if(beforeIn !== afterIn) saveLedger();
+  ledgerRecords=ledgerRecords.filter(r=>!(r.type==='in'&&r.sourceType==='incoming'&&r.sourceLineId&&!activeIds.has(r.sourceLineId)));
+  if(before!==JSON.stringify(ledgerRecords)) saveLedger();
 }
 
 // ===== ③ 설비 세팅값 =====
