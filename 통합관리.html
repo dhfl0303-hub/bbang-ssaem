@@ -1075,6 +1075,21 @@ tr:hover td{background:var(--bg);}
   </div>
 </div>
 
+<!-- LOT 출고내역 관리 모달 -->
+<div class="modal-overlay" id="lotHistoryModal" onclick="closeModalOutside(event,'lotHistoryModal')">
+  <div class="modal" style="width:min(920px,96vw);max-height:88vh;overflow:hidden;display:flex;flex-direction:column">
+    <div class="modal-hd"><div class="modal-title" id="lotHistoryTitle">LOT 출고내역 관리</div><button class="modal-close" onclick="closeModal('lotHistoryModal')">×</button></div>
+    <div class="modal-bd" style="overflow:auto">
+      <div id="lotHistorySummary" style="padding:10px 12px;border-radius:8px;background:var(--bg2);margin-bottom:12px"></div>
+      <div class="table-wrap"><table><thead><tr><th>날짜</th><th>유형</th><th>수량</th><th>연결 공정LOT</th><th>사유</th><th>관리</th></tr></thead><tbody id="lotHistoryTbody"></tbody></table></div>
+      <div style="margin-top:14px;padding:12px;border:1px solid #f0c080;background:#fff8e8;border-radius:8px;font-size:12px;color:#7a4b00">
+        입고가 누락되었거나 테스트 시작재고가 없을 때만 보정하세요. 실제 출고가 잘못된 경우에는 해당 출고의 LOT 변경 또는 삭제를 사용하세요.
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('lotHistoryModal')">닫기</button><button class="btn btn-primary" onclick="addMissingStockForCurrentLot()">+ 누락 입고/시작재고 보정</button></div>
+  </div>
+</div>
+
 <!-- LOT 매핑 모달 -->
 <div class="modal-overlay" id="mappingModal" onclick="closeModalOutside(event,'mappingModal')">
   <div class="modal" style="width:520px">
@@ -1179,7 +1194,10 @@ let ledgerRecords = []; // {date, name, code, qty, exp, type:'in'|'out'}
 function initLedger(){
   // ledgerRecords Firebase에서 로드
 }
-function saveLedger(){ if(window._db) window._db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledgerRecords),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e)); }
+function saveLedger(){
+  if(!window._db) return Promise.reject(new Error('Firebase 연결 없음'));
+  return window._db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledgerRecords),updatedAt:new Date().toISOString()});
+}
 
 function getIngByCode(code){ return INGREDIENT_DB.find(i=>i.code===code); }
 function getIngByName(name){ return INGREDIENT_DB.find(i=>i.name===name); }
@@ -3866,13 +3884,62 @@ function saveIngStock(){
 }
 function deleteIngStock(i){ if(!confirm('삭제하시겠습니까?'))return; ingStock.splice(i,1); saveData('ingStock',ingStock); renderIngStock(); }
 
+let _lotHistoryKey='';
 function showLotHistory(idx){
   const s=ingStock[idx]; if(!s) return;
-  const rows=ledgerRecords.filter(r=>r.name===s.name&&(r.lot||'')===(s.lot||''))
-    .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  _lotHistoryKey=s._syncKey;
+  renderLotHistoryModal();
+  document.getElementById('lotHistoryModal').classList.add('open');
+}
+function getCurrentHistoryStock(){ return ingStock.find(s=>s._syncKey===_lotHistoryKey); }
+function renderLotHistoryModal(){
+  const s=getCurrentHistoryStock(); if(!s){ closeModal('lotHistoryModal'); return; }
+  document.getElementById('lotHistoryTitle').textContent='LOT 출고내역 관리 · '+s.name;
+  document.getElementById('lotHistorySummary').innerHTML=`<b>${s.code||'-'} · ${s.lot||'LOT 미지정'}</b><span style="margin-left:14px">현재 잔량: <b style="color:${Number(s.qty)<0?'var(--danger)':'var(--primary)'}">${Number(s.qty).toFixed(3)}kg</b></span>`;
   const label={init:'초기재고',in:'입고',out:'출고',dispose:'폐기',return:'반품'};
-  const lines=rows.map(r=>`${r.date||'-'}  ${label[r.type]||r.type}  ${r.type==='init'||r.type==='in'?'+':'-'}${Number(r.qty||0).toFixed(3)}kg${r.batchLot?'  공정LOT:'+r.batchLot:''}${r.inputLot?'  투입LOT:'+r.inputLot:''}`).join('\n');
-  alert(`${s.name}\nLOT: ${s.lot||'LOT 미지정'}\n현재 잔량: ${Number(s.qty).toFixed(3)}kg\n\n${lines||'연결된 이력이 없습니다.'}`);
+  const rows=ledgerRecords.map((r,i)=>({r,i})).filter(x=>x.r.name===s.name&&(x.r.lot||'')===(s.lot||'')).sort((a,b)=>(a.r.date||'').localeCompare(b.r.date||''));
+  document.getElementById('lotHistoryTbody').innerHTML=rows.length?rows.map(({r,i})=>{
+    const plus=r.type==='init'||r.type==='in';
+    const canFix=r.type==='out'||r.type==='dispose'||r.type==='return';
+    const linked=r.batchLot||r.inputLot||'-';
+    return `<tr><td>${r.date||'-'}</td><td><span class="badge ${plus?'badge-green':r.type==='out'?'badge-blue':'badge-red'}">${label[r.type]||r.type}</span></td><td style="font-weight:700;color:${plus?'var(--success)':'var(--danger)'}">${plus?'+':'-'}${Number(r.qty||0).toFixed(3)}kg</td><td style="font-size:11px">${linked}</td><td>${r.reason||'-'}</td><td style="white-space:nowrap">${canFix?`<button class="btn btn-sm btn-outline" onclick="changeLedgerLot(${i})">LOT 변경</button> <button class="btn btn-sm btn-danger" onclick="deleteLedgerMovement(${i})">삭제</button>`:(r.sourceType==='incoming'?'<span style="font-size:11px;color:var(--text3)">입고검사에서 수정</span>':'-')}</td></tr>`;
+  }).join(''):'<tr><td colspan="6" class="tc" style="padding:18px;color:var(--text3)">연결된 기록이 없습니다.</td></tr>';
+}
+async function deleteLedgerMovement(i){
+  const r=ledgerRecords[i]; if(!r||!['out','dispose','return'].includes(r.type)) return;
+  if(!confirm(`이 기록 한 건만 삭제하시겠습니까?\n\n날짜: ${r.date||'-'}\n유형: ${r.type}\n원료: ${r.name}\nLOT: ${r.lot||'-'}\n수량: ${Number(r.qty||0).toFixed(3)}kg\n\n삭제하면 해당 수량이 재고로 복원됩니다.`)) return;
+  const backup=ledgerRecords[i]; ledgerRecords.splice(i,1);
+  try{ await saveLedger(); }
+  catch(e){ ledgerRecords.splice(i,0,backup); alert('저장 실패로 삭제하지 않았습니다: '+e.message); return; }
+  syncIngStockFromLedger(); renderIngStock(); renderDisposeLog(); renderReturnLog(); renderLotHistoryModal();
+}
+async function changeLedgerLot(i){
+  const r=ledgerRecords[i]; if(!r||!['out','dispose','return'].includes(r.type)) return;
+  const candidates=[...new Set(ledgerRecords.filter(x=>x.name===r.name&&(x.type==='init'||x.type==='in')&&x.lot).map(x=>x.lot))];
+  const next=prompt(`실제로 사용한 LOT를 입력하세요.\n\n현재 LOT: ${r.lot||'-'}\n등록된 LOT:\n${candidates.join('\n')}`,r.lot||'');
+  if(next===null) return; const lot=next.trim();
+  if(!lot){ alert('LOT를 입력해주세요'); return; }
+  if(!candidates.includes(lot)){ alert('해당 원료의 입고 또는 초기재고에 존재하는 LOT만 선택할 수 있습니다.'); return; }
+  if(lot===r.lot) return;
+  if(!confirm(`${Number(r.qty||0).toFixed(3)}kg 출고를\n${r.lot||'-'} → ${lot}\n으로 변경하시겠습니까?`)) return;
+  const old=r.lot; r.lot=lot; r.correctedAt=new Date().toISOString(); r.correctedFromLot=old;
+  try{ await saveLedger(); }
+  catch(e){ r.lot=old; alert('저장 실패로 변경하지 않았습니다: '+e.message); return; }
+  syncIngStockFromLedger(); renderIngStock(); renderLotHistoryModal();
+}
+async function addMissingStockForCurrentLot(){
+  const s=getCurrentHistoryStock(); if(!s) return;
+  const val=prompt(`누락된 입고 또는 테스트 시작재고 수량을 입력하세요.\n\n원료: ${s.name}\nLOT: ${s.lot||'-'}\n현재 잔량: ${Number(s.qty).toFixed(3)}kg\n\n추가할 수량(kg):`,'');
+  if(val===null) return; const qty=parseFloat(val);
+  if(!Number.isFinite(qty)||qty<=0){ alert('0보다 큰 수량을 입력해주세요'); return; }
+  const reason=prompt('보정 사유를 입력하세요.','테스트 시작재고 누락')||'';
+  if(!reason.trim()){ alert('보정 사유가 필요합니다'); return; }
+  if(!confirm(`${s.name}\nLOT: ${s.lot||'-'}\n${qty.toFixed(3)}kg을 입고 보정으로 추가하시겠습니까?`)) return;
+  const rec={date:new Date().toISOString().slice(0,10),name:s.name,code:s.code||'',qty,lot:s.lot||'',exp:s.expiry||'',mfg:s.mfg||'',type:'in',sourceType:'adjustment',reason:reason.trim(),processId:'ADJUST-IN-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)))};
+  ledgerRecords.push(rec);
+  try{ await saveLedger(); }
+  catch(e){ ledgerRecords.pop(); alert('저장 실패로 보정하지 않았습니다: '+e.message); return; }
+  syncIngStockFromLedger(); renderIngStock(); renderLotHistoryModal();
 }
 
 // ===== 폐기 처리 =====
