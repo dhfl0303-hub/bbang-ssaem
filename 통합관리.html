@@ -2215,6 +2215,10 @@ async function deleteInputStatus(){
   const recs = (window._fbCache&&window._fbCache['inputRecords_'+key])||[];
   if(!recs.length){ alert('해당 날짜의 투입 데이터가 없습니다'); return; }
   if(!confirm(`${yymmddToDisplay(key)} 투입 데이터 ${recs.length}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  const sourceIds=new Set(recs.map(r=>r.syncId).filter(Boolean));
+  const inputLots=new Set(recs.map(r=>r.lot).filter(Boolean));
+  ledgerRecords=ledgerRecords.filter(r=>!(r.type==='out'&&((r.sourceId&&sourceIds.has(r.sourceId))||(r.inputLot&&inputLots.has(r.inputLot)))));
+  await saveLedger();
   if(window._fbCache) delete window._fbCache['inputRecords_'+key];
   if(window._db){ try{ await window._db.collection('appData').doc('inputRecords_'+key).delete(); await addDeletedKey('inputRecords_'+key); }catch(e){} }
   fillDateDropdown('inputStatusDate','inputRecords_');
@@ -2690,7 +2694,7 @@ function findPackByBatchLotData(batchLot){
     const found=[];
     keys.forEach(k=>{
       const recs=(window._fbCache&&window._fbCache[k])||[];
-      recs.forEach(r=>{ if(r.batchLot===batchLot) found.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot,filmLot:r.filmLot||'',bulkLot:r.bulkLot||'',boxLot:r.boxLot||'',pkgBoxLot:r.pkgBoxLot||''}); });
+      recs.forEach(r=>{ if(r.batchLot===batchLot||(r.allBatchLots||[]).includes(batchLot)) found.push({lot:r.lot,product:r.product,expiry:r.expiryDate,qtyPcs:r.qtyPcs,batchLot:r.batchLot,allBatchLots:r.allBatchLots||[],filmLot:r.filmLot||'',bulkLot:r.bulkLot||'',boxLot:r.boxLot||'',pkgBoxLot:r.pkgBoxLot||''}); });
     });
     return found;
   }catch(e){ return []; }
@@ -4072,20 +4076,20 @@ function syncIncomingToLedger(){
   if(!incomingRecords || !incomingRecords.length) return;
 
   // 1) 기존 type='in' 레코드 제거
-  const oldInCount = ledgerRecords.filter(r=>r.type==='in').length;
+  const beforeIn = JSON.stringify(ledgerRecords.filter(r=>r.type==='in'));
   ledgerRecords = ledgerRecords.filter(r=>r.type!=='in');
 
   // 2) incomingRecords 기반으로 type='in' 레코드 재생성 (중복 제거)
   const seen = new Set();
-  incomingRecords.forEach(rec=>{
+  incomingRecords.forEach((rec,recIdx)=>{
     const date = rec.date||'';
-    (rec.rows||[]).forEach(row=>{
+    (rec.rows||[]).forEach((row,rowIdx)=>{
       const qty = parseFloat(row.qty)||0;
       if(!row.product || qty<=0) return;
-      const dedupKey = date+'|'+(row.product||'').trim()+'|'+(row.exp||'').trim();
+      const dedupKey = (rec.syncId||('REC-'+recIdx))+'|'+(row.syncId||rowIdx);
       if(seen.has(dedupKey)) return;
       seen.add(dedupKey);
-      const ing = getIngByName(row.product);
+      const ing = (row.code&&INGREDIENT_DB.find(i=>i.code===row.code))||getIngByName(row.product);
       ledgerRecords.push({
         date: date,
         name: row.product,
@@ -4099,8 +4103,8 @@ function syncIncomingToLedger(){
   });
 
   // 3) 변경이 있을 때만 저장
-  const newInCount = ledgerRecords.filter(r=>r.type==='in').length;
-  if(oldInCount !== newInCount) saveLedger();
+  const afterIn = JSON.stringify(ledgerRecords.filter(r=>r.type==='in'));
+  if(beforeIn !== afterIn) saveLedger();
 }
 
 // ===== ③ 설비 세팅값 =====

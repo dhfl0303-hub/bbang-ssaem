@@ -178,7 +178,7 @@ select.td-input{cursor:pointer;}
       <button class="modal-close" onclick="closeModal('calcModal')">×</button>
     </div>
     <div class="modal-bd" style="padding:16px;">
-      <input id="calcExpr" class="form-input-modal" readonly placeholder="버튼으로 입력" style="font-size:18px;font-weight:700;text-align:center;margin-bottom:10px;background:#fff;cursor:default;">
+      <input id="calcExpr" class="form-input-modal" inputmode="decimal" autocomplete="off" placeholder="키보드 또는 버튼으로 입력" oninput="calcTypedInput(this)" onkeydown="calcKeydown(event)" style="font-size:18px;font-weight:700;text-align:center;margin-bottom:10px;background:#fff;">
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;">
         <button class="calc-btn" onclick="calcAppend('7')">7</button>
         <button class="calc-btn" onclick="calcAppend('8')">8</button>
@@ -597,6 +597,31 @@ function openCalc(rowId){
   document.getElementById('calcExpr').value = '';
   document.getElementById('calcResultDisplay').textContent = '-';
   document.getElementById('calcModal').classList.add('open');
+  setTimeout(()=>document.getElementById('calcExpr').focus(),0);
+}
+function calcTypedInput(input){
+  const cursor=input.selectionStart;
+  const raw=input.value.replace(/×/g,'*').replace(/÷/g,'/').replace(/[^0-9+\-*/.()\s]/g,'');
+  _calcDisplay=raw;
+  _calcJustEvaluated=false;
+  input.value=raw.replace(/\*/g,'×').replace(/\//g,'÷');
+  document.getElementById('calcResultDisplay').textContent='-';
+  try{ input.setSelectionRange(cursor,cursor); }catch(e){}
+}
+function calcKeydown(e){
+  if(e.key==='Enter'){
+    e.preventDefault();
+    if(_calcJustEvaluated) calcApply(); else calcResult();
+  }else if(e.key==='='){
+    e.preventDefault();
+    calcResult();
+  }else if(e.key==='Escape'){
+    e.preventDefault();
+    closeModal('calcModal');
+  }else if((e.key==='c'||e.key==='C')&&!e.ctrlKey&&!e.metaKey){
+    e.preventDefault();
+    calcClear();
+  }
 }
 function calcAppend(ch){
   const isOp = ['+','-','*','/'].includes(ch);
@@ -1078,12 +1103,13 @@ async function saveRecord(){
     const cert = getOX('cert',id);
     const temp = document.getElementById('temp-'+id).value;
     if(!supplier && !product) return;
-    rows.push({supplier, product, lot, qty, mfg, exp, expVal, ss, label, pack, vehicle, cert, temp});
+    rows.push({syncId:'INROW-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+id)),code:lotCode,supplier, product, lot, qty, mfg, exp, expVal, ss, label, pack, vehicle, cert, temp});
   });
 
   if(!rows.length){ alert('입고 항목을 입력해주세요'); return; }
 
   const record = {
+    syncId:'INCOMING-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2))),
     id: Date.now(),
     date,
     inspector: '이광훈',

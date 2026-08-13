@@ -150,7 +150,8 @@ tr:hover td{background:var(--bg);}
       <div class="form-grid">
         <div class="form-row"><label class="form-label">날짜</label><input class="form-input" id="outDate" type="date"></div>
         <div class="form-row"><label class="form-label">수량 (kg)</label><input class="form-input" id="outQty" type="number" placeholder="0" step="0.001"></div>
-        <div class="form-row"><label class="form-label">배합LOT</label><input class="form-input" id="outLot" placeholder="배합LOT번호"></div>
+        <div class="form-row"><label class="form-label">원료 LOT</label><input class="form-input" id="outLot" placeholder="차감할 원료 LOT번호"></div>
+        <div class="form-row"><label class="form-label">배합/투입 LOT</label><input class="form-input" id="outBatchLot" placeholder="연결할 공정 LOT번호"></div>
         <div class="form-row"><label class="form-label">비고</label><input class="form-input" id="outNote" placeholder="비고"></div>
       </div>
     </div>
@@ -318,20 +319,20 @@ async function initLedger(){
     if(!recs.length) return;
 
     // 1) 기존 type='in' 레코드 수 확인 후 제거
-    const oldInCount = ledgerRecords.filter(r=>r.type==='in').length;
+    const beforeIn = JSON.stringify(ledgerRecords.filter(r=>r.type==='in'));
     ledgerRecords = ledgerRecords.filter(r=>r.type!=='in');
 
     // 2) incomingRecords 기반으로 type='in' 재생성 (날짜+원료명+LOT 기준 중복 제거)
     const seen = new Set();
     const skipped = [];
-    recs.forEach(rec=>{
+    recs.forEach((rec,recIdx)=>{
       const date = rec.date||'';
-      (rec.rows||[]).forEach(row=>{
+      (rec.rows||[]).forEach((row,rowIdx)=>{
         const qty = parseFloat(row.qty)||0;
         if(!row.product || qty<=0) return;
-        const ing = getIngByName(row.product);
+        const ing = (row.code&&INGREDIENT_DB.find(i=>i.code===row.code))||getIngByName(row.product);
         if(!ing||!ing.code){ skipped.push(row.product); return; }
-        const dedupKey = date+'|'+(row.product||'').trim()+'|'+(row.lot||row.exp||'').trim();
+        const dedupKey = (rec.syncId||('REC-'+recIdx))+'|'+(row.syncId||rowIdx);
         if(seen.has(dedupKey)) return;
         seen.add(dedupKey);
         ledgerRecords.push({
@@ -353,8 +354,8 @@ async function initLedger(){
     }
 
     // 3) 변경이 있을 때만 저장
-    const newInCount = ledgerRecords.filter(r=>r.type==='in').length;
-    if(oldInCount !== newInCount) await saveLedger();
+    const afterIn = JSON.stringify(ledgerRecords.filter(r=>r.type==='in'));
+    if(beforeIn !== afterIn) await saveLedger();
   }catch(e){ console.warn('initLedger 오류', e); }
 }
 
@@ -449,14 +450,14 @@ function renderLedger(){
 
   tbody.innerHTML=ings.map(ing=>{
     // 전일재고: init은 날짜 무관, in/out은 selDate 이전
-    const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
-    const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
-    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+    const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
+    const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<selDate).reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
+    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date<selDate).reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
     const prevStock=prevInit+prevIn-prevOut;
 
     // 당일 입고/출고
-    const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
-    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
+    const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date===selDate).reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
+    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date===selDate).reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
     const closing=prevStock+monthIn-monthOut;
 
     // 스토리지 뱃지
@@ -573,7 +574,7 @@ function buildAccordionContent(ing,selDate){
     if(r.type==='init'||(r.type==='in'&&r.date<=selDate)){
       const key=r.lot||'_미지정';
       if(!lotMap[key])lotMap[key]={lot:r.lot||'LOT 미지정',type:r.type==='init'?'초기':'입고',exp:r.exp||'',mfg:r.mfg||'',dateType:r.dateType||'',inQty:0,outQty:0,inDate:r.date||''};
-      lotMap[key].inQty+=r.qty;
+      lotMap[key].inQty+=parseFloat(r.qty)||0;
       if(r.exp&&!lotMap[key].exp)lotMap[key].exp=r.exp;
       if(r.mfg&&!lotMap[key].mfg)lotMap[key].mfg=r.mfg;
       if(r.date&&(!lotMap[key].inDate||r.date<lotMap[key].inDate)) lotMap[key].inDate=r.date;
@@ -585,17 +586,17 @@ function buildAccordionContent(ing,selDate){
     if((r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date<=selDate){
       const key=r.lot||'_미지정';
       if(lotMap[key]){
-        lotMap[key].outQty+=r.qty;
+        lotMap[key].outQty+=parseFloat(r.qty)||0;
       }else{
         // LOT 매칭 안 되는 출고 → 미지정 그룹
         if(!lotMap['_미지정'])lotMap['_미지정']={lot:'LOT 미지정',type:'-',exp:'',inQty:0,outQty:0};
-        lotMap['_미지정'].outQty+=r.qty;
+        lotMap['_미지정'].outQty+=parseFloat(r.qty)||0;
       }
     }
   });
 
-  // 잔여량 계산 후 0 이상만 필터
-  const lots=Object.values(lotMap).map(l=>({...l,remain:l.inQty-l.outQty})).filter(l=>l.remain>0.0005);
+  // 음수/미매칭 LOT도 숨기지 않아 상단 마감재고와 LOT 합계가 항상 일치하도록 표시
+  const lots=Object.values(lotMap).map(l=>({...l,remain:l.inQty-l.outQty})).filter(l=>Math.abs(l.remain)>0.0005);
 
   if(!lots.length)return '<div class="acc-inner"><div class="acc-empty">현재 잔여 재고가 없습니다</div></div>';
 
@@ -1075,12 +1076,12 @@ function printLedger(){
   });
   let bodyHtml='';
   ings.forEach(ing=>{
-    const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+r.qty,0);
-    const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
-    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date<selDate).reduce((s,r)=>s+r.qty,0);
+    const prevInit=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='init').reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
+    const prevIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date<selDate).reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
+    const prevOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date<selDate).reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
     const prevStock=prevInit+prevIn-prevOut;
-    const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
-    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date===selDate).reduce((s,r)=>s+r.qty,0);
+    const monthIn=ledgerRecords.filter(r=>r.name===ing.name&&r.type==='in'&&r.date===selDate).reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
+    const monthOut=ledgerRecords.filter(r=>r.name===ing.name&&(r.type==='out'||r.type==='dispose'||r.type==='return')&&r.date===selDate).reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
     const closing=prevStock+monthIn-monthOut;
     bodyHtml+=`<tr>
       <td>${ing.code}</td>
@@ -1153,6 +1154,7 @@ function openOutModal(){
   document.getElementById('outDate').value=getTodayISO2();
   document.getElementById('outQty').value='';
   document.getElementById('outLot').value='';
+  document.getElementById('outBatchLot').value='';
   document.getElementById('outNote').value='';
   document.getElementById('outModal').classList.add('open');
 }
@@ -1161,11 +1163,12 @@ async function saveOut(){
   const qty=parseFloat(document.getElementById('outQty').value)||0;
   const date=document.getElementById('outDate').value||getTodayISO2();
   const lot=document.getElementById('outLot').value.trim();
+  const batchLot=document.getElementById('outBatchLot').value.trim();
   const note=document.getElementById('outNote').value.trim();
-  if(!name||!qty){alert('원료명과 수량을 입력해주세요');return;}
+  if(!name||!qty||!lot){alert('원료명, 수량, 차감할 원료 LOT를 입력해주세요');return;}
   const ing=getIngByName(name);
   if(!ing||!ing.code){alert('⚠️ 원료DB에 등록되지 않은 원료입니다.\n원료명: '+name+'\n\n신규 원료 등록 후 다시 시도해주세요.');return;}
-  ledgerRecords.push({date,name,code:ing.code,qty,lot,note,type:'out'});
+  ledgerRecords.push({date,name,code:ing.code,qty,lot,batchLot,note,type:'out'});
   await saveLedger();closeModal('outModal');renderLedger();
 }
 

@@ -828,8 +828,12 @@ function initFormPage(){
   // 포장LOT 표시
   const today=getWorkDateKey();
   const pCode = S.product||S.batchLot?.split('-')[1]||'P';
-  const existCount=S.todayRecords.filter(r=>r.productCode===pCode).length;
-  const lot=`포장-${pCode}-${today}-${String(existCount+1).padStart(3,'0')}`;
+  const allKnown=[...S.todayRecords,...(((window._fbPackCache||{})['packRecords_'+today])||[])];
+  const maxSeq=allKnown.filter(r=>r.productCode===pCode).reduce((m,r)=>{
+    const n=parseInt(String(r.lot||'').split('-').pop(),10); return Number.isFinite(n)?Math.max(m,n):m;
+  },0);
+  const lot=`포장-${pCode}-${today}-${String(maxSeq+1).padStart(3,'0')}`;
+  const syncId='PACK-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
   const packLotEl=document.getElementById('packLot');
   if(packLotEl) packLotEl.textContent=lot;
   // 설비세팅값 불러오기
@@ -1752,7 +1756,7 @@ function completePackaging(signImg=''){
   const lot=`포장-${pCode}-${today}-${String(existCount+1).padStart(3,'0')}`;
 
   const record={
-    lot, productCode:pCode, product:productName,
+    syncId, lot, productCode:pCode, product:productName,
     date:today, time:getNow(),
     batchLot:document.getElementById('batchLotSel')?.value||S.batchLot||'-',
     batchLotType:S.batchLotType||'배합',
@@ -1887,7 +1891,12 @@ async function syncToServer(){
 
     for(const key of keys){
       const dayRecs = JSON.parse(localStorage.getItem(key)||'[]').filter(r=>!r._isTest);
-      if(dayRecs.length) await db.collection('appData').doc(key).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
+      const serverSnap=await db.collection('appData').doc(key).get();
+      const serverRecs=(serverSnap.exists&&serverSnap.data().data)?JSON.parse(serverSnap.data().data):[];
+      const merged=new Map();
+      serverRecs.forEach(r=>merged.set(r.syncId||('LEGACY-'+(r.lot||'')),r));
+      dayRecs.forEach(r=>merged.set(r.syncId||('LEGACY-'+(r.lot||'')),r));
+      if(dayRecs.length) await db.collection('appData').doc(key).set({data:JSON.stringify([...merged.values()]),updatedAt:new Date().toISOString()});
     }
 
     // 3. 부자재수불부 출고 반영
@@ -1900,22 +1909,24 @@ async function syncToServer(){
       // 필름 FIFO 분배 출고
       const filmLots=rec.filmLots||[];
       if(filmLots.length){
-        filmLots.forEach(fd=>{
+        filmLots.forEach((fd,fi)=>{
           if(!fd.lot||!fd.qty) return;
-          const exists=subRecs.find(r=>r.type==='out'&&r.lot===fd.lot&&r.packLot===rec.lot);
+          const sourceLineId=rec.syncId?`${rec.syncId}-FILM-${fi+1}`:'';
+          const exists=sourceLineId?subRecs.find(r=>r.sourceLineId===sourceLineId):subRecs.find(r=>r.type==='out'&&r.lot===fd.lot&&r.packLot===rec.lot);
           if(!exists){
             const matched=subRecs.find(r=>r.lot===fd.lot&&(r.type==='in'||r.type==='init'));
-            subRecs.push({date:isoDate,name:matched?matched.name:'필름포장지',lot:fd.lot,qty:fd.qty,packLot:rec.lot,type:'out'});
+            subRecs.push({date:isoDate,name:matched?matched.name:'필름포장지',lot:fd.lot,qty:fd.qty,packLot:rec.lot,sourceId:rec.syncId||'',sourceLineId,type:'out'});
           }
         });
       } else if(rec.filmLot && rec.filmLot!=='-'){
         // 기존 단일 LOT 호환
         const filmQty=getFilmQtyFromRecord(rec);
         if(filmQty>0){
-          const exists=subRecs.find(r=>r.type==='out'&&r.lot===rec.filmLot&&r.packLot===rec.lot);
+          const sourceLineId=rec.syncId?`${rec.syncId}-FILM-1`:'';
+          const exists=sourceLineId?subRecs.find(r=>r.sourceLineId===sourceLineId):subRecs.find(r=>r.type==='out'&&r.lot===rec.filmLot&&r.packLot===rec.lot);
           if(!exists){
             const matched=subRecs.find(r=>r.lot===rec.filmLot&&(r.type==='in'||r.type==='init'));
-            subRecs.push({date:isoDate,name:matched?matched.name:'필름포장지',lot:rec.filmLot,qty:filmQty,packLot:rec.lot,type:'out'});
+            subRecs.push({date:isoDate,name:matched?matched.name:'필름포장지',lot:rec.filmLot,qty:filmQty,packLot:rec.lot,sourceId:rec.syncId||'',sourceLineId,type:'out'});
           }
         }
       }
@@ -1923,22 +1934,24 @@ async function syncToServer(){
        {lot:boxLot,cat:'박스',qty:parseFloat(rec.boxQty)||0},
        {lot:pkgBoxLot,cat:'패키지박스',qty:parseFloat(rec.pkgBoxQty)||0}]
         .filter(x=>x.lot&&x.qty>0)
-        .forEach(x=>{
-          const exists = subRecs.find(r=>r.type==='out'&&r.lot===x.lot&&r.packLot===rec.lot);
+        .forEach((x,xi)=>{
+          const sourceLineId=rec.syncId?`${rec.syncId}-SUB-${xi+1}-${x.cat}`:'';
+          const exists = sourceLineId?subRecs.find(r=>r.sourceLineId===sourceLineId):subRecs.find(r=>r.type==='out'&&r.lot===x.lot&&r.packLot===rec.lot);
           if(!exists){
             const matched=subRecs.find(r=>r.lot===x.lot&&(r.type==='in'||r.type==='init'));
             const itemName=matched?matched.name:x.cat;
-            subRecs.push({date:isoDate,name:itemName,lot:x.lot,qty:x.qty,packLot:rec.lot,type:'out'});
+            subRecs.push({date:isoDate,name:itemName,lot:x.lot,qty:x.qty,packLot:rec.lot,sourceId:rec.syncId||'',sourceLineId,type:'out'});
           }
         });
       // 필름 폐기량 반영
       const filmWasteLot=(filmLots.length?filmLots[0].lot:rec.filmLot)||'';
       if(filmWasteLot && parseFloat(rec.filmWaste)>0){
-        const wasteExists=subRecs.find(r=>r.type==='dispose'&&r.lot===filmWasteLot&&r.packLot===rec.lot);
+      const wasteSourceId=rec.syncId?`${rec.syncId}-FILM-WASTE`:'';
+      const wasteExists=wasteSourceId?subRecs.find(r=>r.sourceLineId===wasteSourceId):subRecs.find(r=>r.type==='dispose'&&r.lot===filmWasteLot&&r.packLot===rec.lot);
         if(!wasteExists){
           const matched=subRecs.find(r=>r.lot===filmWasteLot&&(r.type==='in'||r.type==='init'));
           const itemName=matched?matched.name:'필름포장지';
-          subRecs.push({date:isoDate,name:itemName,lot:filmWasteLot,qty:parseFloat(rec.filmWaste),packLot:rec.lot,type:'dispose',reason:'초기접합확인'});
+          subRecs.push({date:isoDate,name:itemName,lot:filmWasteLot,qty:parseFloat(rec.filmWaste),packLot:rec.lot,sourceId:rec.syncId||'',sourceLineId:wasteSourceId,type:'dispose',reason:'초기접합확인'});
         }
       }
     });
@@ -1994,12 +2007,13 @@ async function syncSinglePack(idx){
      {lot:boxLot,cat:'박스',qty:parseFloat(rec.boxQty)||0},
      {lot:pkgBoxLot,cat:'패키지박스',qty:parseFloat(rec.pkgBoxQty)||0}]
       .filter(x=>x.lot&&x.qty>0)
-      .forEach(x=>{
-        const exists=subRecs.find(r=>r.type==='out'&&r.lot===x.lot&&r.packLot===rec.lot);
+      .forEach((x,xi)=>{
+        const sourceLineId=rec.syncId?`${rec.syncId}-SINGLE-${xi+1}`:'';
+        const exists=sourceLineId?subRecs.find(r=>r.sourceLineId===sourceLineId):subRecs.find(r=>r.type==='out'&&r.lot===x.lot&&r.packLot===rec.lot);
         if(!exists){
           const matched=subRecs.find(r=>r.lot===x.lot&&(r.type==='in'||r.type==='init'));
           const itemName=matched?matched.name:x.cat;
-          subRecs.push({date:isoDate,name:itemName,lot:x.lot,qty:x.qty,packLot:rec.lot,type:'out'});
+          subRecs.push({date:isoDate,name:itemName,lot:x.lot,qty:x.qty,packLot:rec.lot,sourceId:rec.syncId||'',sourceLineId,type:'out'});
         }
       });
     // 필름 폐기량 반영
@@ -2016,7 +2030,14 @@ async function syncSinglePack(idx){
     // 2. 포장기록 Firebase 업로드
     const todayKey='packRecords_'+getWorkDateKey();
     const dayRecs=JSON.parse(localStorage.getItem(todayKey)||'[]').filter(r=>!r._isTest);
-    if(dayRecs.length) await db.collection('appData').doc(todayKey).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
+    if(dayRecs.length){
+      const serverSnap=await db.collection('appData').doc(todayKey).get();
+      const serverRecs=(serverSnap.exists&&serverSnap.data().data)?JSON.parse(serverSnap.data().data):[];
+      const merged=new Map();
+      serverRecs.forEach(r=>merged.set(r.syncId||('LEGACY-'+(r.lot||'')),r));
+      dayRecs.forEach(r=>merged.set(r.syncId||('LEGACY-'+(r.lot||'')),r));
+      await db.collection('appData').doc(todayKey).set({data:JSON.stringify([...merged.values()]),updatedAt:new Date().toISOString()});
+    }
 
     // 3. _synced 표시
     rec._synced=true;

@@ -1342,6 +1342,7 @@ function updateAutoCalc(block){
 
 function completeBatch(){
   const blocks=document.querySelectorAll('.ing-block'); const ingredients=[];
+  let invalid='';
   blocks.forEach(block=>{
     const name=block.dataset.name; const total=parseInt(block.dataset.total);
     const rows=block.querySelectorAll('.exp-row'); const exps=[];
@@ -1368,10 +1369,15 @@ function completeBatch(){
       const av=amtInput?amtInput.value:'';
       if(lotVal) exps.push({lot:lotVal, exp:expVal, dateType:dtType, amount:parseFloat(av)||0});
     });
-    if(!exps.length) exps.push({lot:'',exp:'',amount:total});
+    if(INGREDIENT_DB_STATIC[name]!=='M000'){
+      const assigned=exps.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+      if(!exps.length) invalid=invalid||`${name}: 원료 LOT를 선택해주세요.`;
+      else if(Math.abs(assigned-total)>1) invalid=invalid||`${name}: LOT 배분량 ${assigned}g / 필요량 ${total}g`;
+    }
     ingredients.push({name,total,exps});
     S.prevData[name]=exps;
   });
+  if(invalid){ alert('배합을 완료할 수 없습니다.\n\n'+invalid); return; }
   const lotNum=S.currentBatch+(S.lotOffset||0);
   const lot=`배합-${S.product}-${getWorkDateKey()}-${String(lotNum).padStart(3,'0')}`;
   const time=getNow();
@@ -1441,11 +1447,13 @@ function showComplete(){
   const newBatchRecords=JSON.parse(JSON.stringify(S.batchRecords));
   if(existIdx>=0){
     const existing=S.todayRecords[existIdx];
+    if(!existing.syncId) existing.syncId='BATCH-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
     existing.batchRecords=[...(existing.batchRecords||[]),...newBatchRecords];
     existing.totalBatches=existing.batchRecords.length;
     existing.endTime=newBatchRecords[newBatchRecords.length-1].time;
   } else {
     const sessionData={
+      syncId:'BATCH-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2))),
       sessionKey, productCode:S.product, product:p.name,
       date:getWorkDateKey(), totalBatches:S.totalBatches,
       startTime:S.batchRecords[0].time, endTime:S.batchRecords[S.batchRecords.length-1].time,
@@ -2186,7 +2194,12 @@ async function syncToServer(){
     for(const key of keys){
       const dayRecs = JSON.parse(localStorage.getItem(key)||'[]').filter(r=>!r._isTest);
       if(dayRecs.length){
-        await db.collection('appData').doc(key).set({ data: JSON.stringify(dayRecs), updatedAt: new Date().toISOString() });
+        const serverSnap=await db.collection('appData').doc(key).get();
+        const serverRecs=(serverSnap.exists&&serverSnap.data().data)?JSON.parse(serverSnap.data().data):[];
+        const merged=new Map();
+        serverRecs.forEach(r=>merged.set(r.syncId||('LEGACY-'+(r.sessionKey||'')),r));
+        dayRecs.forEach(r=>merged.set(r.syncId||('LEGACY-'+(r.sessionKey||'')),r));
+        await db.collection('appData').doc(key).set({ data: JSON.stringify([...merged.values()]), updatedAt: new Date().toISOString() });
       }
     }
 
@@ -2207,18 +2220,21 @@ async function syncToServer(){
         : ('배합-'+(rec.productCode||'')+'-'+rawDate);
 
       // 배합 원료 출고
-      (rec.batchRecords||[]).forEach(br=>{
-        br.ingredients.forEach(ing=>{
+      (rec.batchRecords||[]).forEach((br,bi)=>{
+        br.ingredients.forEach((ing,ii)=>{
           const ingCode = INGREDIENT_DB_STATIC[ing.name]||'';
           if(ingCode==='M000') return;
-          (ing.exps||[ing]).forEach(e=>{
+          (ing.exps||[ing]).forEach((e,ei)=>{
             const qty = (e.amount||0)/1000;
             if(!qty) return;
-            const exists = ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===br.lot&&r.exp===e.exp);
+            const sourceLineId=rec.syncId?`${rec.syncId}-B${bi+1}-I${ii+1}-L${ei+1}`:'';
+            const exists = sourceLineId
+              ? ledgerRecords.find(r=>r.sourceLineId===sourceLineId)
+              : ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===br.lot&&r.lot===(e.lot||''));
             if(exists){
               if(!exists.qty || exists.qty===0) exists.qty = qty;
             } else {
-              ledgerRecords.push({ date:isoDate, name:ing.name, code:ingCode, qty, lot:e.lot||'', exp:e.exp||'', batchLot:br.lot, type:'out' });
+              ledgerRecords.push({ date:isoDate, name:ing.name, code:ingCode, qty, lot:e.lot||'', exp:e.exp||'', batchLot:br.lot, sourceId:rec.syncId||'', sourceLineId, type:'out' });
             }
           });
         });
@@ -2317,16 +2333,19 @@ async function syncSingleBatch(idx){
     let ledgerRecords=(ledgerSnap.exists&&ledgerSnap.data().data)?JSON.parse(ledgerSnap.data().data):[];
 
     // 2. 이 레코드의 출고만 반영
-    (rec.batchRecords||[]).forEach(br=>{
-      br.ingredients.forEach(ing=>{
+    (rec.batchRecords||[]).forEach((br,bi)=>{
+      br.ingredients.forEach((ing,ii)=>{
         const ingCode=INGREDIENT_DB_STATIC[ing.name]||'';
         if(ingCode==='M000') return;
-        (ing.exps||[ing]).forEach(e=>{
+        (ing.exps||[ing]).forEach((e,ei)=>{
           const qty=(e.amount||0)/1000;
           if(!qty) return;
-          const exists=ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===br.lot&&r.exp===e.exp);
+          const sourceLineId=rec.syncId?`${rec.syncId}-B${bi+1}-I${ii+1}-L${ei+1}`:'';
+          const exists=sourceLineId
+            ? ledgerRecords.find(r=>r.sourceLineId===sourceLineId)
+            : ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===br.lot&&r.lot===(e.lot||''));
           if(exists){ if(!exists.qty||exists.qty===0) exists.qty=qty; }
-          else{ ledgerRecords.push({date:isoDate,name:ing.name,code:ingCode,qty,lot:e.lot||'',exp:e.exp||'',batchLot:br.lot,type:'out'}); }
+          else{ ledgerRecords.push({date:isoDate,name:ing.name,code:ingCode,qty,lot:e.lot||'',exp:e.exp||'',batchLot:br.lot,sourceId:rec.syncId||'',sourceLineId,type:'out'}); }
         });
       });
     });
@@ -2354,7 +2373,14 @@ async function syncSingleBatch(idx){
     // 4. 배합기록 Firebase 업로드
     const todayKey='batchRecords_'+getWorkDateKey();
     const dayRecs=JSON.parse(localStorage.getItem(todayKey)||'[]').filter(r=>!r._isTest);
-    if(dayRecs.length) await db.collection('appData').doc(todayKey).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
+    if(dayRecs.length){
+      const serverSnap=await db.collection('appData').doc(todayKey).get();
+      const serverRecs=(serverSnap.exists&&serverSnap.data().data)?JSON.parse(serverSnap.data().data):[];
+      const merged=new Map();
+      serverRecs.forEach(r=>merged.set(r.syncId||('LEGACY-'+(r.sessionKey||'')),r));
+      dayRecs.forEach(r=>merged.set(r.syncId||('LEGACY-'+(r.sessionKey||'')),r));
+      await db.collection('appData').doc(todayKey).set({data:JSON.stringify([...merged.values()]),updatedAt:new Date().toISOString()});
+    }
 
     // 5. 배합비 서버 최신본 다운로드 — 업로드 금지 (통합관리 신규품목 유실 방지)
     try{

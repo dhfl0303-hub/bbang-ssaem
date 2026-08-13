@@ -701,18 +701,21 @@ function selectIng(id, name, code){
 
 // ===== 저장 =====
 function saveInputRecord(){
+  const syncId = 'INPUT-' + (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(36).slice(2)));
   // ingredients: 원료별 lots 배열 펼쳐서 저장
   const ingredients = [];
+  let sourceSeq = 0;
   S.ingRows.forEach(row=>{
     if(!row.name) return;
     (row.lots||[]).forEach(lr=>{
       if(!lr.qty) return;
-      ingredients.push({name:row.name, qty:parseFloat(lr.qty)||0, lot:lr.lot||'', exp:lr.exp||''});
+      ingredients.push({name:row.name, qty:parseFloat(lr.qty)||0, lot:lr.lot||'', exp:lr.exp||'', sourceLineId:syncId+'-ING-'+String(++sourceSeq).padStart(3,'0')});
     });
   });
   if(!ingredients.length){ alert('원료와 수량을 입력해주세요'); return; }
   const lot = document.getElementById('inputLot').textContent;
   const record = {
+    syncId,
     lot,
     product: document.getElementById('inputProduct').value.trim()||'',
     productCode: S.selectedProductCode||'',
@@ -780,7 +783,12 @@ async function syncToServer(){
     // 1. inputRecords Firebase 업로드
     for(const key of keys){
       const dayRecs = JSON.parse(localStorage.getItem(key)||'[]');
-      if(dayRecs.length) await db.collection('appData').doc(key).set({data:JSON.stringify(dayRecs),updatedAt:new Date().toISOString()});
+      const serverSnap = await db.collection('appData').doc(key).get();
+      const serverRecs = (serverSnap.exists&&serverSnap.data().data)?JSON.parse(serverSnap.data().data):[];
+      const merged = new Map();
+      serverRecs.forEach(r=>merged.set(r.syncId||('LEGACY-'+(r.lot||'')+'-'+(r.savedAt||'')),r));
+      dayRecs.forEach(r=>merged.set(r.syncId||('LEGACY-'+(r.lot||'')+'-'+(r.savedAt||'')),r));
+      if(dayRecs.length) await db.collection('appData').doc(key).set({data:JSON.stringify([...merged.values()]),updatedAt:new Date().toISOString()});
     }
 
     // 처리 완료된 deletedKeys 제거
@@ -798,14 +806,17 @@ async function syncToServer(){
       ledgerRecords = ledgerRecords.filter(r=>!(r.type==='out' && r.inputLot && deletedInputLots.includes(r.inputLot)));
     }
     recs.forEach(rec=>{
-      rec.ingredients.forEach(ing=>{
-        const exists = ledgerRecords.find(r=>r.type==='out'&&r.lot===ing.lot&&r.inputLot===rec.lot);
+      rec.ingredients.forEach((ing,ii)=>{
+        const sourceLineId=ing.sourceLineId||(rec.syncId?rec.syncId+'-ING-'+String(ii+1).padStart(3,'0'):'');
+        const exists = sourceLineId
+          ? ledgerRecords.find(r=>r.sourceLineId===sourceLineId)
+          : ledgerRecords.find(r=>r.type==='out'&&r.lot===ing.lot&&r.inputLot===rec.lot&&r.name===ing.name);
         if(!exists && ing.qty>0){
           const ingInfo = INGREDIENT_DB.find(i=>i.name===ing.name)||{};
           ledgerRecords.push({
             date:'20'+rec.date.slice(0,2)+'-'+rec.date.slice(2,4)+'-'+rec.date.slice(4,6),
             name:ing.name, code:ingInfo.code||'', qty:ing.qty, lot:ing.lot, exp:ing.exp||'',
-            inputLot:rec.lot, type:'out'
+            inputLot:rec.lot, sourceId:rec.syncId||'', sourceLineId, type:'out'
           });
         }
       });

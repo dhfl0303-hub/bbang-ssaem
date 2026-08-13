@@ -442,8 +442,8 @@ function flSyncFromPack(silent=false){
         const wLotClient=mappingEntry.wLots[0].client;
         const prod=FL_STATE.products.find(p=>p.lot_code===wLotCode);
         const mfg=r.date||'';
-        const existCount=FL_STATE.lots.filter(l=>l.lot_code_base===wLotCode&&l.mfg_date===mfg).length;
-        const lotNum=`${wLotCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
+        const nextSeq=FL_STATE.lots.filter(l=>l.lot_code_base===wLotCode&&l.mfg_date===mfg).reduce((m,l)=>{const n=parseInt(String(l.lot_number||'').split('-').pop(),10);return Number.isFinite(n)?Math.max(m,n):m;},0)+1;
+        const lotNum=`${wLotCode}-${mfg}-${String(nextSeq).padStart(2,'0')}`;
         FL_STATE.lots.push({
           lot_number:lotNum, lot_code_base:wLotCode,
           client:wLotClient, name:wLotName,
@@ -451,7 +451,7 @@ function flSyncFromPack(silent=false){
           exp_date:r.expiryDate||'',
           total_box:parseInt(r.qtyBoxes)||0,
           remain_box:parseInt(r.qtyBoxes)||0,
-          is_partial:false, pkg_lot:r.lot,
+          is_partial:false, pkg_lot:r.lot, sourcePackId:r.syncId||'',
           outbound:[], reg_date:r.date||getTodayISO2()
         });
         count++;
@@ -460,6 +460,7 @@ function flSyncFromPack(silent=false){
         if(!window._flPending) window._flPending=[];
         const remainBox = totalBox - registeredBox;
         window._flPending.push({
+          syncId:r.syncId||'',
           pkg_lot:r.lot,
           productCode:r.productCode,
           product:r.product||'',
@@ -580,15 +581,15 @@ function flDoDirectInbound(idx, lotCode, inboundDate){
   if(!p) return;
   const prod=FL_STATE.products.find(pr=>pr.lot_code===lotCode);
   const mfg=(inboundDate||p.date||'').replace(/\D/g,'').slice(0,6)||p.date||'';
-  const existCount=FL_STATE.lots.filter(l=>l.lot_code_base===lotCode&&l.mfg_date===mfg).length;
-  const lotNum=`${lotCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
+  const nextSeq=FL_STATE.lots.filter(l=>l.lot_code_base===lotCode&&l.mfg_date===mfg).reduce((m,l)=>{const n=parseInt(String(l.lot_number||'').split('-').pop(),10);return Number.isFinite(n)?Math.max(m,n):m;},0)+1;
+  const lotNum=`${lotCode}-${mfg}-${String(nextSeq).padStart(2,'0')}`;
   FL_STATE.lots.push({
     lot_number:lotNum, lot_code_base:lotCode,
     client:prod?.client||'', name:prod?.name||'',
     spec:prod?.spec||'', mfg_date:mfg,
     exp_date:p.exp_date||'',
     total_box:p.total_box, remain_box:p.total_box,
-    is_partial:false, pkg_lot:p.pkg_lot,
+    is_partial:false, pkg_lot:p.pkg_lot, sourcePackId:p.syncId||'',
     outbound:[], reg_date:getTodayISO2()
   });
   window._flPending.splice(idx,1);
@@ -661,15 +662,15 @@ function flConfirmSplit(){
   const mfg=(document.getElementById('flSplitDate')?.value||p.date||'').replace(/\D/g,'').slice(0,6)||p.date||'';
   splits.forEach(sp=>{
     const prod=FL_STATE.products.find(pr=>pr.lot_code===sp.lotCode);
-    const existCount=FL_STATE.lots.filter(l=>l.lot_code_base===sp.lotCode&&l.mfg_date===mfg).length;
-    const lotNum=`${sp.lotCode}-${mfg}-${String(existCount+1).padStart(2,'0')}`;
+    const nextSeq=FL_STATE.lots.filter(l=>l.lot_code_base===sp.lotCode&&l.mfg_date===mfg).reduce((m,l)=>{const n=parseInt(String(l.lot_number||'').split('-').pop(),10);return Number.isFinite(n)?Math.max(m,n):m;},0)+1;
+    const lotNum=`${sp.lotCode}-${mfg}-${String(nextSeq).padStart(2,'0')}`;
     FL_STATE.lots.push({
       lot_number:lotNum, lot_code_base:sp.lotCode,
       client:prod?.client||'', name:prod?.name||'',
       spec:prod?.spec||'', mfg_date:mfg,
       exp_date:p.exp_date||'',
       total_box:sp.qty, remain_box:sp.qty,
-      is_partial:true, pkg_lot:p.pkg_lot,
+      is_partial:true, pkg_lot:p.pkg_lot, sourcePackId:p.syncId||'',
       outbound:[], reg_date:getTodayISO2()
     });
   });
