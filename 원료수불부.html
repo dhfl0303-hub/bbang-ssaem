@@ -100,6 +100,7 @@ tr:hover td{background:var(--bg);}
     </select>
     <button class="btn btn-primary btn-sm" onclick="renderLedger()">조회</button>
     <button class="btn btn-outline btn-sm" onclick="printLedger()">🖨️ 출력</button>
+    <button class="btn btn-sm" style="background:#7c3aed;color:#fff;border:1px solid #6d28d9" onclick="printFullLedgerPDF()">📄 전체기간 PDF</button>
     <button class="btn btn-sm btn-primary" onclick="openNewIngModal()">+ 신규 원료 등록</button>
     <button class="btn btn-sm" style="background:var(--warning-light);color:var(--warning);border:1px solid #f0c080" onclick="openInitStock()">📋 전일재고 등록</button>
     <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="openDeleteCode()">🗑️ 코드 삭제</button>
@@ -1115,6 +1116,49 @@ function printLedger(){
   </body></html>`);
   printWin.document.close();
   setTimeout(()=>printWin.print(),500);
+}
+
+function printFullLedgerPDF(){
+  if(!ledgerRecords.length){ alert('출력할 수불 기록이 없습니다'); return; }
+  const dates=ledgerRecords.map(r=>r.date).filter(Boolean).sort();
+  const defaultStart=dates[0]||getTodayISO2();
+  const defaultEnd=dates[dates.length-1]||getTodayISO2();
+  const start=(prompt('PDF 시작일을 입력하세요. (YYYY-MM-DD)',defaultStart)||'').trim();
+  if(!start) return;
+  const end=(prompt('PDF 종료일을 입력하세요. (YYYY-MM-DD)',defaultEnd)||'').trim();
+  if(!end) return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(start)||!/^\d{4}-\d{2}-\d{2}$/.test(end)||start>end){ alert('기간을 YYYY-MM-DD 형식으로 올바르게 입력해주세요'); return; }
+  const typeLabel={init:'기초재고',in:'입고',out:'출고',dispose:'폐기',return:'반품',adjust_in:'조정입고',adjust_out:'조정출고'};
+  const codes=[...new Set(ledgerRecords.map(r=>r.code||getIngByName(r.name)?.code||'-'))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+  let sections=''; let totalRows=0;
+  codes.forEach(code=>{
+    const all=ledgerRecords.filter(r=>(r.code||getIngByName(r.name)?.code||'-')===code);
+    const names=[...new Set(all.map(r=>r.name||'-'))];
+    names.forEach(name=>{
+      const recs=all.filter(r=>(r.name||'-')===name).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+      const openingByLot={};
+      recs.filter(r=>(r.date||'')<start).forEach(r=>{const lot=r.lot||'LOT 미지정';const plus=r.type==='init'||r.type==='in'||r.type==='adjust_in';openingByLot[lot]=(openingByLot[lot]||0)+(plus?1:-1)*(parseFloat(r.qty)||0);});
+      const period=recs.filter(r=>(r.date||'')>=start&&(r.date||'')<=end);
+      const lots=[...new Set([...Object.keys(openingByLot),...period.map(r=>r.lot||'LOT 미지정')])];
+      if(!period.length&&!lots.some(l=>Math.abs(openingByLot[l]||0)>0.0005)) return;
+      const balances={...openingByLot}; let rows='';
+      lots.filter(l=>Math.abs(openingByLot[l]||0)>0.0005).forEach(lot=>{
+        rows+=`<tr class="opening"><td>${start}</td><td>이월재고</td><td>${lot}</td><td class="num">${(openingByLot[lot]||0).toFixed(3)}</td><td class="num">0.000</td><td class="num">${(openingByLot[lot]||0).toFixed(3)}</td><td>기간 시작 전 누적</td></tr>`; totalRows++;
+      });
+      period.forEach(r=>{
+        const lot=r.lot||'LOT 미지정';const qty=parseFloat(r.qty)||0;const plus=r.type==='init'||r.type==='in'||r.type==='adjust_in';
+        balances[lot]=(balances[lot]||0)+(plus?qty:-qty);
+        rows+=`<tr><td>${r.date||'-'}</td><td>${typeLabel[r.type]||r.type||'-'}</td><td>${lot}</td><td class="num">${plus?qty.toFixed(3):'0.000'}</td><td class="num">${plus?'0.000':qty.toFixed(3)}</td><td class="num ${balances[lot]<0?'negative':''}">${balances[lot].toFixed(3)}</td><td>${r.batchLot||r.inputLot||r.reason||r.note||'-'}</td></tr>`; totalRows++;
+      });
+      const close=Object.values(balances).reduce((s,v)=>s+v,0);
+      sections+=`<section><h2><span>${code}</span> ${name}</h2><div class="summary">기간: ${start} ~ ${end} · 마감재고: <b class="${close<0?'negative':''}">${close.toFixed(3)}kg</b></div><table><thead><tr><th>일자</th><th>구분</th><th>LOT</th><th>입고(kg)</th><th>출고(kg)</th><th>LOT잔량(kg)</th><th>연결·사유</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+    });
+  });
+  const w=window.open('','_blank'); if(!w){ alert('팝업이 차단되었습니다. 이 페이지의 팝업을 허용해주세요.'); return; }
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>원료수불부 전체기간 ${start}_${end}</title><style>
+  *{box-sizing:border-box}body{font-family:"Malgun Gothic","Noto Sans KR",sans-serif;color:#111;margin:0;font-size:9px}header{border-bottom:2px solid #1d4ed8;padding-bottom:8px;margin-bottom:12px}h1{font-size:20px;margin:0 0 6px}header .meta{color:#555;font-size:10px}section{page-break-before:always}section:first-of-type{page-break-before:auto}h2{font-size:13px;margin:0 0 4px}h2 span{color:#1d4ed8}.summary{margin-bottom:6px;color:#555}table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group}th,td{border:1px solid #777;padding:4px;vertical-align:middle}th{background:#eaf2ff;text-align:center}td:nth-child(1){width:10%;text-align:center}td:nth-child(2){width:9%;text-align:center}td:nth-child(3){width:22%;font-family:monospace;font-size:8px}td:nth-child(4),td:nth-child(5),td:nth-child(6){width:10%}.num{text-align:right;font-family:monospace}.negative{color:#c00;font-weight:700}.opening{background:#f7f7f7}@page{size:A4 landscape;margin:10mm}@media print{header{position:relative}}
+  </style></head><body><header><h1>원료수불부 전체기간 보존본</h1><div class="meta">기준기간: ${start} ~ ${end} · 출력일시: ${new Date().toLocaleString('ko-KR')} · 총 거래행: ${totalRows}건</div><div class="meta">기초재고/이월재고부터 입고, 배합·투입 출고, 폐기, 반품 및 조정 이력을 LOT별로 산출</div></header>${sections}<script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`);
+  w.document.close();
 }
 
 function openInModal(){
