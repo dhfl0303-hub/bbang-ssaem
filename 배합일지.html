@@ -209,10 +209,13 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
   <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
     <div id="testModeIndicator" style="display:none;background:#ff6b6b;color:#fff;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;animation:testBlink 1.2s infinite;">⚠️ 테스트</div>
     <button onclick="openTestModeAuth()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:1.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🧪</button>
+    <button onclick="openWorkerManual()" style="background:#fff;color:#1d4ed8;border:0;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:800;cursor:pointer;">❓ 사용방법</button>
     <button onclick="openAdmin()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⚙️ 설정</button>
     <button onclick="downloadRecipeDB()" style="background:rgba(255,255,255,0.15);color:#fff;border:1.5px solid rgba(255,255,255,0.4);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⬇️ 배합비</button>
   </div>
 </div>
+
+<div id="workerManual" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:20000;align-items:center;justify-content:center;padding:14px" onclick="if(event.target===this)closeWorkerManual()"><div style="background:#fff;width:min(720px,100%);max-height:92vh;overflow:auto;border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.3)"><div style="position:sticky;top:0;background:#1d4ed8;color:#fff;padding:16px 18px;display:flex;justify-content:space-between;align-items:center"><b style="font-size:20px">배합일지 사용방법</b><button onclick="closeWorkerManual()" style="background:#fff;color:#1d4ed8;border:0;border-radius:8px;padding:8px 13px;font-weight:800">닫기</button></div><div style="padding:18px;font-size:16px;line-height:1.55"><div class="wm-warn">작업 전에 작업일자·작업자·제품코드·배합 횟수를 반드시 확인하세요.</div><ol class="wm-steps"><li><b>제품 선택</b><span>오늘 생산할 제품을 누릅니다.</span></li><li><b>설비와 배합 수 선택</b><span>사용 설비와 실제 생산할 배합 횟수를 입력합니다.</span></li><li><b>원료 LOT 확인</b><span>화면의 원료명·필요량과 현물 LOT를 대조합니다. 실제 사용 LOT가 다르면 반드시 변경합니다.</span></li><li><b>계량량 입력</b><span>여러 LOT를 사용하면 LOT별 사용량을 나누어 입력합니다. 필요량과 합계가 맞아야 완료됩니다.</span></li><li><b>기타 투입·폐기 입력</b><span>배합비 외 원료나 공정 중 폐기가 있을 때만 입력합니다.</span></li><li><b>서명 후 저장</b><span>내용을 다시 확인하고 서명합니다.</span></li><li><b>인터넷 연결 후 동기화</b><span>완료목록의 파란 동기화 버튼을 한 번 누르고 ✅ 표시를 확인합니다.</span></li></ol><div class="wm-danger"><b>절대 금지</b><br>실제와 다른 LOT 선택 · 작업 전 미리 완료 · 동기화 중 창 닫기 · 완료 기록을 임의로 다시 작성</div></div></div></div>
 
 <div class="content">
 
@@ -1454,7 +1457,7 @@ function showComplete(){
   } else {
     const sessionData={
       syncId:'BATCH-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2))),
-      sessionKey, productCode:S.product, product:p.name,
+      sessionKey, productCode:S.product, product:p.name, savedAt:new Date().toISOString(),
       date:getWorkDateKey(), totalBatches:S.totalBatches,
       startTime:S.batchRecords[0].time, endTime:S.batchRecords[S.batchRecords.length-1].time,
       batchRecords:newBatchRecords,
@@ -2189,6 +2192,12 @@ async function syncToServer(){
     if(!allRecs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
     // 출고 반영은 아직 동기화 안 된 건만
     let recs = allRecs.filter(r=>!r._synced);
+    // 원료수불부 기초재고 전환 이전의 로컬 기록은 새 장부에 재차감하지 않음
+    try{
+      const rs=await db.collection('appData').doc('ledgerRolloverMeta').get();
+      const cut=rs.exists?(rs.data().executedAt||''):'';
+      if(cut) recs=recs.filter(r=>r.savedAt&&r.savedAt>cut);
+    }catch(e){}
 
     // 2. 배합기록 Firebase 업로드 (날짜별 키로 저장, 테스트 기록 제외)
     for(const key of keys){
@@ -2483,5 +2492,6 @@ async function verifyTestMode(){
     </div>
   </div>
 </div>
+<style>.wm-warn{background:#eaf2ff;border:2px solid #93c5fd;border-radius:10px;padding:12px;margin-bottom:14px;font-weight:700;color:#1e3a8a}.wm-steps{padding-left:28px;margin:0}.wm-steps li{padding:10px 8px;border-bottom:1px solid #e5e7eb}.wm-steps li::marker{font-size:20px;font-weight:900;color:#1d4ed8}.wm-steps b{display:block;font-size:17px}.wm-steps span{display:block;color:#4b5563;margin-top:2px}.wm-danger{margin-top:16px;background:#fff1f2;border:2px solid #fda4af;border-radius:10px;padding:12px;color:#9f1239}</style><script>function openWorkerManual(){document.getElementById('workerManual').style.display='flex'}function closeWorkerManual(){document.getElementById('workerManual').style.display='none'}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeWorkerManual()});</script>
 </body>
 </html>

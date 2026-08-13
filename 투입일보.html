@@ -116,10 +116,13 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
   <button class="back-btn" id="backBtn" style="display:none" onclick="goBack()">←</button>
   <div class="tb-main" id="tbMain">투입일보</div>
   <div style="margin-left:auto;display:flex;gap:8px;">
+    <button onclick="openWorkerManual()" style="background:#fff;color:#1d4ed8;border:0;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:800;cursor:pointer;">❓ 사용방법</button>
     <button onclick="openAdmin()" style="background:rgba(255,255,255,0.2);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⚙️ 설정</button>
     <button onclick="downloadInputDB()" style="background:rgba(255,255,255,0.15);color:#fff;border:1.5px solid rgba(255,255,255,0.4);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⬇️ 투입비</button>
   </div>
 </div>
+
+<div id="workerManual" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:20000;align-items:center;justify-content:center;padding:14px" onclick="if(event.target===this)closeWorkerManual()"><div style="background:#fff;width:min(720px,100%);max-height:92vh;overflow:auto;border-radius:16px"><div style="position:sticky;top:0;background:#1d4ed8;color:#fff;padding:16px 18px;display:flex;justify-content:space-between;align-items:center"><b style="font-size:20px">투입일보 사용방법</b><button onclick="closeWorkerManual()" style="background:#fff;color:#1d4ed8;border:0;border-radius:8px;padding:8px 13px;font-weight:800">닫기</button></div><div style="padding:18px;font-size:16px;line-height:1.55"><div class="wm-warn">작업일자와 작업자를 먼저 확인하고, 현장에서 실제 사용하는 원료 LOT만 기록하세요.</div><ol class="wm-steps"><li><b>작업일·작업자 확인</b><span>날짜가 다르면 먼저 수정합니다.</span></li><li><b>제품 선택 또는 직접 입력</b><span>투입할 제품과 제품코드를 확인합니다.</span></li><li><b>원료 선택</b><span>원료명 또는 원료코드로 찾습니다.</span></li><li><b>원료 LOT 선택</b><span>포대·용기의 LOT와 화면 LOT가 같은지 확인합니다.</span></li><li><b>실제 투입량 입력</b><span>여러 LOT를 사용하면 LOT를 추가하여 수량을 각각 입력합니다.</span></li><li><b>서명 후 저장</b><span>원료명·LOT·수량을 한 번 더 확인합니다.</span></li><li><b>인터넷 연결 후 동기화</b><span>파란 동기화 버튼을 누르고 ✅ 표시를 확인합니다.</span></li></ol><div class="wm-danger"><b>주의</b><br>LOT를 모르면 임의 입력하지 말고 관리자에게 확인하세요. 저장 후 실제 사용 LOT가 틀렸다면 관리자에게 즉시 알리세요.</div></div></div></div>
 
 <div class="content">
   <!-- 메인 페이지 -->
@@ -779,6 +782,12 @@ async function syncToServer(){
     if(!allRecs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
     // 출고 반영은 아직 동기화 안 된 건만
     let recs = allRecs.filter(r=>!r._synced);
+    // 원료수불부 기초재고 전환 이전의 로컬 기록은 새 장부에 재차감하지 않음
+    try{
+      const rs=await db.collection('appData').doc('ledgerRolloverMeta').get();
+      const cut=rs.exists?(rs.data().executedAt||''):'';
+      if(cut) recs=recs.filter(r=>r.savedAt&&r.savedAt>cut);
+    }catch(e){}
 
     // 1. inputRecords Firebase 업로드
     for(const key of keys){
@@ -1126,5 +1135,6 @@ function selectInputProduct(code){
   loadLocal();
 })();
 </script>
+<style>.wm-warn{background:#eaf2ff;border:2px solid #93c5fd;border-radius:10px;padding:12px;margin-bottom:14px;font-weight:700;color:#1e3a8a}.wm-steps{padding-left:28px;margin:0}.wm-steps li{padding:10px 8px;border-bottom:1px solid #e5e7eb}.wm-steps li::marker{font-size:20px;font-weight:900;color:#1d4ed8}.wm-steps b{display:block;font-size:17px}.wm-steps span{display:block;color:#4b5563;margin-top:2px}.wm-danger{margin-top:16px;background:#fff1f2;border:2px solid #fda4af;border-radius:10px;padding:12px;color:#9f1239}</style><script>function openWorkerManual(){document.getElementById('workerManual').style.display='flex'}function closeWorkerManual(){document.getElementById('workerManual').style.display='none'}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeWorkerManual()});</script>
 </body>
 </html>

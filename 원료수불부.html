@@ -105,7 +105,7 @@ tr:hover td{background:var(--bg);}
     <button class="btn btn-sm" style="background:var(--warning-light);color:var(--warning);border:1px solid #f0c080" onclick="openInitStock()">📋 전일재고 등록</button>
     <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid #f5a0a0;" onclick="openDeleteCode()">🗑️ 코드 삭제</button>
     <button class="btn btn-sm" style="background:#1a1a3d;color:#8888ff;border:1px solid #44f;" onclick="openDeleteByInputLot()">🗑️ 투입LOT 출고삭제</button>
-    <button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;" onclick="openDeleteAllLedger()">⚠️ 수불내역 전체삭제</button>
+    <button class="btn btn-sm" style="background:#0f766e;color:#fff;border:1px solid #0d5f59;font-weight:800" onclick="previewStockRollover()">✅ 현재 LOT 재고를 기초재고로 전환</button>
     <button class="btn btn-sm" style="background:var(--success-light);color:var(--success);border:1px solid #8dc;" onclick="backupLedger()">💾 백업</button>
     <button class="btn btn-sm" style="background:var(--primary-light);color:var(--primary);border:1px solid #acd;" onclick="restoreLedger()">🔄 복원</button>
     <button class="btn btn-sm" style="background:#f0e6ff;color:#7c3aed;border:1px solid #c4b5fd;" onclick="findEmptyCodes()">🔍 빈 코드 조회</button>
@@ -124,6 +124,21 @@ tr:hover td{background:var(--bg);}
         </table>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- 현재재고 기초재고 일괄전환 모달 -->
+<div class="modal-overlay" id="stockRolloverModal" onclick="closeModalOutside(event,'stockRolloverModal')">
+  <div class="modal" style="width:min(680px,96vw)">
+    <div class="modal-hd"><div class="modal-title">✅ 현재 LOT 재고 일괄전환</div><button class="modal-close" onclick="closeModal('stockRolloverModal')">×</button></div>
+    <div class="modal-bd">
+      <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.6"><b>한 줄씩 입력할 필요가 없습니다.</b><br>현재 양수 LOT의 원료코드·LOT·소비기한·잔량을 그대로 새 기초재고로 만듭니다.</div>
+      <div class="form-row"><label class="form-label">기초재고 기준일</label><input class="form-input" id="rolloverDate" type="date" value="2026-08-06"></div>
+      <div id="rolloverSummary" style="margin-top:12px"></div>
+      <div style="margin-top:12px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px 12px;font-size:12px;color:#9a3412">음수·0 재고와 LOT 미지정 재고는 전환하지 않습니다. 실행 전 현재 수불내역은 Firebase에 날짜·시간별 백업으로 자동 저장됩니다.</div>
+      <label style="display:flex;gap:8px;align-items:flex-start;margin-top:14px;font-size:13px;font-weight:700"><input type="checkbox" id="rolloverConfirm" style="margin-top:3px"> 기존 거래내역을 백업하고 위 대상만 새 기초재고로 전환하는 것에 동의합니다.</label>
+    </div>
+    <div class="modal-ft"><button class="btn btn-outline" onclick="closeModal('stockRolloverModal')">취소</button><button class="btn" style="background:#0f766e;color:#fff" onclick="executeStockRollover()">기초재고 전환 실행</button></div>
   </div>
 </div>
 
@@ -329,6 +344,7 @@ async function initLedger(){
         const ing = (row.code&&INGREDIENT_DB.find(i=>i.code===row.code))||getIngByName(row.product);
         if(!ing||!ing.code){ skipped.push(row.product); return; }
         const sourceLineId=row.syncId||((rec.syncId||('INCOMING-LEGACY-'+(rec.id||rec.date||recIdx)))+'-ROW-'+String(rowIdx+1).padStart(3,'0'));
+        if((window._rolloverIgnoredIncomingIds||new Set()).has(sourceLineId)) return;
         activeIds.add(sourceLineId);
         let target=ledgerRecords.find(r=>r.type==='in'&&r.sourceType==='incoming'&&r.sourceLineId===sourceLineId);
         // 최초 전환 시 기존 자동생성 입고를 찾아 ID만 부여하여 중복 생성을 방지
@@ -346,6 +362,60 @@ async function initLedger(){
 
     if(before !== JSON.stringify(ledgerRecords)) await saveLedger();
   }catch(e){ console.warn('initLedger 오류', e); }
+}
+
+function calculateCurrentLotBalances(){
+  const map={};
+  ledgerRecords.forEach(r=>{
+    const name=(r.name||'').replace(/\n/g,' ').trim();
+    const lot=(r.lot||'').trim();
+    if(!name) return;
+    const key=name+'|'+(lot||'_NOLOT');
+    if(!map[key]) map[key]={name,code:r.code||getIngByName(name)?.code||'',lot,exp:r.exp||'',mfg:r.mfg||'',dateType:r.dateType||'',qty:0};
+    const qty=parseFloat(r.qty)||0;
+    const plus=r.type==='init'||r.type==='in'||r.type==='adjust_in';
+    const minus=r.type==='out'||r.type==='dispose'||r.type==='return'||r.type==='adjust_out';
+    if(plus) map[key].qty+=qty; else if(minus) map[key].qty-=qty;
+    if(!map[key].code&&r.code) map[key].code=r.code;
+    if(!map[key].exp&&r.exp) map[key].exp=r.exp;
+    if(!map[key].mfg&&r.mfg) map[key].mfg=r.mfg;
+  });
+  return Object.values(map);
+}
+function previewStockRollover(){
+  const all=calculateCurrentLotBalances();
+  const targets=all.filter(x=>x.lot&&x.qty>0.0005);
+  const negative=all.filter(x=>x.qty< -0.0005);
+  const noLot=all.filter(x=>!x.lot&&Math.abs(x.qty)>0.0005);
+  const zero=all.filter(x=>Math.abs(x.qty)<=0.0005);
+  window._rolloverPreview=targets;
+  document.getElementById('rolloverDate').value='2026-08-06';
+  document.getElementById('rolloverConfirm').checked=false;
+  const total=targets.reduce((s,x)=>s+x.qty,0);
+  document.getElementById('rolloverSummary').innerHTML=`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px"><div class="card" style="padding:12px"><b style="font-size:20px;color:#0f766e">${targets.length}개 LOT</b><br><span style="font-size:12px;color:var(--text3)">전환 대상</span></div><div class="card" style="padding:12px"><b style="font-size:20px">${total.toFixed(3)}kg</b><br><span style="font-size:12px;color:var(--text3)">전환 합계</span></div><div class="card" style="padding:12px"><b style="font-size:20px;color:var(--danger)">${negative.length}개</b><br><span style="font-size:12px;color:var(--text3)">음수 제외</span></div><div class="card" style="padding:12px"><b style="font-size:20px;color:var(--warning)">${noLot.length}개</b><br><span style="font-size:12px;color:var(--text3)">LOT 미지정 제외</span></div></div>`;
+  document.getElementById('stockRolloverModal').classList.add('open');
+}
+async function executeStockRollover(){
+  if(!document.getElementById('rolloverConfirm').checked){ alert('동의 확인란을 선택해주세요'); return; }
+  const date=document.getElementById('rolloverDate').value;
+  if(!date){ alert('기준일을 선택해주세요'); return; }
+  const targets=window._rolloverPreview||[];
+  if(!targets.length){ alert('전환할 양수 LOT가 없습니다'); return; }
+  if(!window._db){ alert('Firebase 연결을 확인해주세요'); return; }
+  if(!confirm(`${date} 기준 기초재고로 ${targets.length}개 LOT를 전환합니다.\n\n기존 수불 기록은 자동 백업되고 새 장부에는 전환된 기초재고만 남습니다.\n계속하시겠습니까?`)) return;
+  const old=JSON.parse(JSON.stringify(ledgerRecords));
+  const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+  const ignored=[];
+  (window._incomingRecords||[]).forEach((rec,ri)=>(rec.rows||[]).forEach((row,ii)=>ignored.push(row.syncId||((rec.syncId||('INCOMING-LEGACY-'+(rec.id||rec.date||ri)))+'-ROW-'+String(ii+1).padStart(3,'0')))));
+  const next=targets.map((x,i)=>({date,name:x.name,code:x.code||'',qty:Math.round(x.qty*1000)/1000,lot:x.lot,exp:x.exp||'',mfg:x.mfg||'',dateType:x.dateType||'',type:'init',sourceType:'rollover',processId:'ROLLOVER-'+stamp+'-'+String(i+1).padStart(4,'0'),reason:'현재 LOT 재고 기초재고 일괄전환'}));
+  try{
+    await window._db.collection('appData').doc('ledgerRecords_archive_'+stamp).set({data:JSON.stringify(old),createdAt:new Date().toISOString(),count:old.length,basisDate:date});
+    await window._db.collection('appData').doc('ledgerRolloverMeta').set({basisDate:date,executedAt:new Date().toISOString(),ignoredIncomingIds:JSON.stringify(ignored),archiveDoc:'ledgerRecords_archive_'+stamp,count:next.length});
+    ledgerRecords=next; await saveLedger();
+    window._rolloverIgnoredIncomingIds=new Set(ignored);
+    closeModal('stockRolloverModal'); renderLedger();
+    alert(`완료되었습니다.\n\n기준일: ${date}\n기초재고: ${next.length}개 LOT\n기존 기록: 자동 백업 완료`);
+  }catch(e){ ledgerRecords=old; alert('전환 실패로 기존 기록을 유지했습니다: '+e.message); }
 }
 
 function getTodayISO2(){ return new Date().toISOString().slice(0,10); }
@@ -1214,10 +1284,11 @@ async function loadFromFirebase(){
   window._incomingLoadOk=false;
   if(!window._db) return;
   try{
-    const [ledgerSnap, incomingSnap, ingSnap] = await Promise.all([
+    const [ledgerSnap, incomingSnap, ingSnap, rolloverSnap] = await Promise.all([
       window._db.collection('appData').doc('ledgerRecords').get(),
       window._db.collection('appData').doc('incomingRecords').get(),
-      window._db.collection('appData').doc('ingredientDB').get()
+      window._db.collection('appData').doc('ingredientDB').get(),
+      window._db.collection('appData').doc('ledgerRolloverMeta').get()
     ]);
     if(ledgerSnap.exists && ledgerSnap.data().data) ledgerRecords = JSON.parse(ledgerSnap.data().data);
     if(incomingSnap.exists && incomingSnap.data().data) window._incomingRecords = JSON.parse(incomingSnap.data().data);
@@ -1225,6 +1296,10 @@ async function loadFromFirebase(){
     window._incomingLoadOk=true;
     if(ingSnap.exists && ingSnap.data().data) INGREDIENT_DB = JSON.parse(ingSnap.data().data);
     else saveIngredientDB(); // 최초 1회 Firebase에 업로드
+    window._rolloverIgnoredIncomingIds=new Set();
+    if(rolloverSnap.exists&&rolloverSnap.data().ignoredIncomingIds){
+      try{ window._rolloverIgnoredIncomingIds=new Set(JSON.parse(rolloverSnap.data().ignoredIncomingIds)); }catch(e){}
+    }
   }catch(e){ console.warn('Firebase 로드 실패', e); }
 }
 
