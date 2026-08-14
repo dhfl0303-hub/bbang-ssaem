@@ -1087,12 +1087,14 @@ async function saveRecord(){
     const product = document.getElementById('product-'+id)?.value?.trim()||'';
     const lotCode = document.getElementById('lot-code-'+id)?.value.trim()||'';
     const lotDate = document.getElementById('lot-date-'+id)?.value.trim()||'';
-    const lotExp  = document.getElementById('lot-exp-'+id)?.value.trim()||'';
+    let lotExp  = document.getElementById('lot-exp-'+id)?.value.trim()||'';
+    const mfgRaw = document.getElementById('mfg-'+id).value;
+    const expRaw = document.getElementById('exp-'+id).value; // 6자리 hidden
+    const dateType = validateExp6(expRaw) ? 'exp' : (validateExp6(mfgRaw) ? 'mfg' : '');
+    if(dateType==='mfg' && lotExp && !lotExp.endsWith('*')) lotExp += '*';
     const lot = [lotCode,lotDate,lotExp].filter(Boolean).join('-')
              || document.getElementById('lot-'+id)?.textContent.trim()||'';
     const qty = getQtyRaw(id);
-    const mfgRaw = document.getElementById('mfg-'+id).value;
-    const expRaw = document.getElementById('exp-'+id).value; // 6자리 hidden
     const mfg = formatExpDisplay(mfgRaw); // 표시용 00.00.00
     const exp = formatExpDisplay(expRaw); // 표시용 00.00.00
     const expVal = expRaw; // 저장용 6자리
@@ -1103,7 +1105,7 @@ async function saveRecord(){
     const cert = getOX('cert',id);
     const temp = document.getElementById('temp-'+id).value;
     if(!supplier && !product) return;
-    rows.push({syncId:'INROW-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+id)),code:lotCode,supplier, product, lot, qty, mfg, exp, expVal, ss, label, pack, vehicle, cert, temp});
+    rows.push({syncId:'INROW-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+id)),code:lotCode,supplier, product, lot, qty, mfg, exp, expVal, dateType, ss, label, pack, vehicle, cert, temp});
   });
 
   if(!rows.length){ alert('입고 항목을 입력해주세요'); return; }
@@ -1350,8 +1352,7 @@ async function saveEditRecord(){
     const product  = document.getElementById('edit-product-'+id)?.value||'';
     const lotCode  = document.getElementById('edit-lot-code-'+id)?.value.trim()||'';
     const lotDate  = document.getElementById('edit-lot-date-'+id)?.value.trim()||'';
-    const lotExp   = document.getElementById('edit-lot-exp-'+id)?.value.trim()||'';
-    const lot = [lotCode,lotDate,lotExp].filter(Boolean).join('-');
+    let lotExp   = document.getElementById('edit-lot-exp-'+id)?.value.trim()||'';
     const qty  = document.getElementById('edit-qty-'+id)?.value||'';
     const mfg  = document.getElementById('edit-mfg-'+id)?.value||'';
     const exp  = document.getElementById('edit-exp-'+id)?.value||'';
@@ -1363,7 +1364,10 @@ async function saveEditRecord(){
     const temp    = document.getElementById('edit-temp-'+id)?.value||'';
     if(!supplier && !product) return;
     const oldRow=records[i]?.rows?.find(r=>r.syncId===tr.dataset.syncId)||{};
-    rows.push({syncId:tr.dataset.syncId,code:lotCode||oldRow.code||'',supplier,product,lot,qty,mfg,exp,ss,label,pack,vehicle,cert,temp});
+    const dateType = exp ? 'exp' : (mfg ? 'mfg' : (oldRow.dateType||''));
+    if(dateType==='mfg' && lotExp && !lotExp.endsWith('*')) lotExp += '*';
+    const lot = [lotCode,lotDate,lotExp].filter(Boolean).join('-');
+    rows.push({syncId:tr.dataset.syncId,code:lotCode||oldRow.code||'',supplier,product,lot,qty,mfg,exp,dateType,ss,label,pack,vehicle,cert,temp});
   });
 
   if(!rows.length){ alert('입고 항목을 입력해주세요'); return; }
@@ -1658,6 +1662,10 @@ async function loadFromFirebase(){
         (rec.rows||[]).forEach((row,ii)=>{
           if(!row.syncId){ row.syncId=rec.syncId+'-ROW-'+String(ii+1).padStart(3,'0'); migrated=true; }
           if(!row.code&&row.lot){ row.code=String(row.lot).split('-')[0]||''; migrated=true; }
+          if(!row.dateType){
+            row.dateType=row.exp?'exp':(row.mfg?'mfg':(String(row.lot||'').endsWith('*')?'mfg':''));
+            if(row.dateType) migrated=true;
+          }
         });
       });
       if(migrated) await saveRecordsToFirebase();

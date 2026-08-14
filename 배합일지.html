@@ -1004,27 +1004,26 @@ function getIngLots(ingName){
 
       const remaining = Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
       const stockLbl = remaining>0 ? ` [재고:${remaining}kg]` : ' [재고없음]';
+      const isMfg = r.dateType==='mfg'||String(r.lot||'').endsWith('*')||(!r.exp&&!!r.mfg);
+      const dateVal = isMfg?(r.mfg||r.exp||''):(r.exp||r.mfg||'');
+      const dateLbl = (isMfg?'제조:':'소비:')+fmtExp(dateVal);
 
       if(r.type==='init'){
-        const hasExp = !!(r.exp);
-        const dateLbl = hasExp ? '소비:'+fmtExp(r.exp) : '제조:'+fmtExp(r.mfg||'');
         lots.push({
           lot:r.lot,
           label:r.lot+' (초기재고 '+dateLbl+')'+stockLbl,
-          exp:fmtExp(r.exp||r.mfg||''),
-          dateType:hasExp?'exp':'mfg',
+          exp:fmtExp(dateVal),
+          dateType:isMfg?'mfg':'exp',
           date:'',
           isOI:true,
           remaining
         });
       } else {
-        const hasExp = !!(r.exp);
-        const dateLbl = hasExp ? '소비:'+fmtExp(r.exp) : '제조:'+fmtExp(r.mfg||'');
         lots.push({
           lot:r.lot,
           label:r.lot+' (입고:'+r.date+' '+dateLbl+')'+stockLbl,
-          exp:fmtExp(r.exp||r.mfg||''),
-          dateType:hasExp?'exp':'mfg',
+          exp:fmtExp(dateVal),
+          dateType:isMfg?'mfg':'exp',
           date:r.date||'',
           isOI:false,
           remaining
@@ -1086,9 +1085,10 @@ function getIngLotsByName(ingName){
       seen.add(r.lot);
       const remaining=Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
       const stockLbl=remaining>0?` [재고:${remaining}kg]`:' [재고없음]';
-      const hasExp=!!(r.exp);
-      const dateLbl=hasExp?'소비:'+fmtExp(r.exp):'제조:'+fmtExp(r.mfg||'');
-      lots.push({lot:r.lot,label:r.lot+(r.type==='init'?` (초기재고 ${dateLbl})`:` (입고:${r.date||''} ${dateLbl})`)+stockLbl,exp:fmtExp(r.exp||r.mfg||''),dateType:hasExp?'exp':'mfg',date:r.date||'',isOI:r.type==='init',remaining});
+      const isMfg=r.dateType==='mfg'||String(r.lot||'').endsWith('*')||(!r.exp&&!!r.mfg);
+      const dateVal=isMfg?(r.mfg||r.exp||''):(r.exp||r.mfg||'');
+      const dateLbl=isMfg?'제조:'+fmtExp(dateVal):'소비:'+fmtExp(dateVal);
+      lots.push({lot:r.lot,label:r.lot+(r.type==='init'?` (초기재고 ${dateLbl})`:` (입고:${r.date||''} ${dateLbl})`)+stockLbl,exp:fmtExp(dateVal),dateType:isMfg?'mfg':'exp',date:r.date||'',isOI:r.type==='init',remaining});
     });
     lots.sort((a,b)=>{
       if(a.remaining>0&&b.remaining<=0) return -1;
@@ -1457,7 +1457,7 @@ function showComplete(){
   } else {
     const sessionData={
       syncId:'BATCH-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2))),
-      sessionKey, productCode:S.product, product:p.name, savedAt:new Date().toISOString(),
+      sessionKey, productCode:S.product, product:p.name,
       date:getWorkDateKey(), totalBatches:S.totalBatches,
       startTime:S.batchRecords[0].time, endTime:S.batchRecords[S.batchRecords.length-1].time,
       batchRecords:newBatchRecords,
@@ -2192,12 +2192,6 @@ async function syncToServer(){
     if(!allRecs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
     // 출고 반영은 아직 동기화 안 된 건만
     let recs = allRecs.filter(r=>!r._synced);
-    // 원료수불부 기초재고 전환 이전의 로컬 기록은 새 장부에 재차감하지 않음
-    try{
-      const rs=await db.collection('appData').doc('ledgerRolloverMeta').get();
-      const cut=rs.exists?(rs.data().executedAt||''):'';
-      if(cut) recs=recs.filter(r=>r.savedAt&&r.savedAt>cut);
-    }catch(e){}
 
     // 2. 배합기록 Firebase 업로드 (날짜별 키로 저장, 테스트 기록 제외)
     for(const key of keys){

@@ -3689,13 +3689,15 @@ function syncIngStockFromLedger(){
       if(r.type!=='init' && r.type!=='in') return;
       const name = (r.name||'').replace(/\n/g,' ');
       const key = name+'_'+(r.lot||'_nolot_'+(r.exp||r.mfg||''));
+      const isMfg = r.dateType==='mfg' || String(r.lot||'').endsWith('*') || (!r.exp && !!r.mfg);
       if(!stockMap[key]){
         stockMap[key] = {
           name:name,
           code:r.code||'',
           qty:0,
-          expiry:r.exp||'',
-          mfg:r.mfg||'',
+          expiry:isMfg?'':(r.exp||''),
+          mfg:isMfg?(r.mfg||r.exp||''):(r.mfg||''),
+          dateType:isMfg?'mfg':'exp',
           lot:r.lot||'',
           _syncKey:key
         };
@@ -3716,7 +3718,8 @@ function syncIngStockFromLedger(){
           matched.qty -= remain;
         }else{
           const key=name+'_'+lot;
-          stockMap[key]={name,code:r.code||'',qty:-remain,expiry:r.exp||'',mfg:r.mfg||'',lot,_syncKey:key,_anomaly:true};
+          const isMfg=r.dateType==='mfg'||String(lot).endsWith('*')||(!r.exp&&!!r.mfg);
+          stockMap[key]={name,code:r.code||'',qty:-remain,expiry:isMfg?'':(r.exp||''),mfg:isMfg?(r.mfg||r.exp||''):(r.mfg||''),dateType:isMfg?'mfg':'exp',lot,_syncKey:key,_anomaly:true};
         }
         remain=0;
       }
@@ -3780,7 +3783,7 @@ function renderIngStock(){
       return `<div class="alert-item ${a.type==='expired'||isAnomaly?'alert-red':'alert-orange'}">
         <div style="flex:1">
           <div class="alert-name">${a.name} <span style="font-family:monospace;font-size:11px;color:var(--primary)">${a.lot||'LOT 미지정'}</span></div>
-          <div class="alert-sub">소비기한: ${a.expiry||'-'} · LOT 잔량: ${Number(a.qty).toLocaleString()}kg</div>
+          <div class="alert-sub">${a.dateType==='mfg'?'제조일자':'소비기한'}: ${a.dateType==='mfg'?(a.mfg||'-'):(a.expiry||'-')} · LOT 잔량: ${Number(a.qty).toLocaleString()}kg</div>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           <span class="badge ${a.type==='expired'||isAnomaly?'badge-red':'badge-orange'}" style="font-size:15px;padding:6px 14px;font-weight:800">
