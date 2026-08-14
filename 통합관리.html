@@ -200,7 +200,7 @@ tr:hover td{background:var(--bg);}
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.6 · 2026.08.14 17:15</div>
+<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.7 · 2026.08.14 17:26</div>
 <!-- 로그인 화면 -->
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0d3f75;z-index:9999;align-items:center;justify-content:center;">
   <div style="width:340px;">
@@ -815,8 +815,9 @@ tr:hover td{background:var(--bg);}
           </div>
           <!-- 권한 설정 -->
           <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
-            <div style="font-size:13px;font-weight:700;margin-bottom:12px;">메뉴 접근 권한</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;" id="accPermChecks"></div>
+            <div style="font-size:13px;font-weight:700;">권한 안내</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:7px;line-height:1.55;">일반 관리자는 전체 메뉴를 조회할 수 있습니다.<br>등록·수정·삭제 등 데이터 변경은 최고관리자만 가능합니다.</div>
+            <div style="display:none;" id="accPermChecks"></div>
           </div>
           <div id="accErrMsg" style="font-size:12px;color:var(--danger);min-height:18px;margin-top:10px;"></div>
         </div>
@@ -3311,10 +3312,6 @@ function toggleSidebar(){
 }
 
 function showPanel(id, triggerEl=null){
-  if (window._userRole && !hasPermission(id)) {
-    alert('이 메뉴의 조회 권한이 없습니다.');
-    return;
-  }
   // 모바일에서 메뉴 선택 시 사이드바 닫기
   const sb=document.getElementById('sidebarEl');
   const ov=document.getElementById('sidebarOverlay');
@@ -4677,7 +4674,7 @@ async function loadAccounts() {
   tbody.innerHTML = rows.map(u => {
     const isSA = u.role === 'superadmin';
     const badge = `<span style="display:inline-block;background:${isSA?'var(--primary-light)':'var(--success-light)'};color:${isSA?'var(--primary)':'var(--success)'};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">${isSA?'슈퍼어드민':'관리자'}</span>`;
-    const permCount = isSA ? '전체' : (u.permissions||[]).length + '개';
+    const permText = isSA ? '전체 관리' : '전체 메뉴 조회';
     const btns = isSA ? `<span style="font-size:11px;color:var(--text3);">-</span>` :
       `<button class="btn btn-outline btn-sm" onclick="openAccountModal('${u.empId}')" style="font-size:11px;padding:4px 10px;">수정</button>
        <button class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:var(--danger-light);color:var(--danger);border:1px solid rgba(214,48,49,0.2);" onclick="deleteAccount('${u.empId}','${u.name}')">삭제</button>`;
@@ -4686,7 +4683,7 @@ async function loadAccounts() {
       <td style="font-weight:500;">${u.name}</td>
       <td>${u.dept||'-'}</td>
       <td>${u.rank||'-'}</td>
-      <td>${badge}<div style="font-size:10px;color:var(--text3);margin-top:2px;">권한 ${permCount}</div></td>
+      <td>${badge}<div style="font-size:10px;color:var(--text3);margin-top:2px;">${permText}</div></td>
       <td style="text-align:center;">${btns}</td>
     </tr>`;
   }).join('');
@@ -4928,18 +4925,6 @@ async function applySession(session) {
   await _dataReady;
   renderIngStock();
   applyAllPanelPermissions();
-
-  // 기본 화면 권한이 없으면 허용된 첫 메뉴로 이동한다.
-  const activePanel = document.querySelector('.panel.active');
-  const activeId = activePanel ? activePanel.id.replace(/^panel-/, '') : '';
-  if (!activeId || !hasPermission(activeId)) {
-    const firstMenu = [...document.querySelectorAll('.nav-item[onclick*="showPanel"]')]
-      .find(item => item.style.display !== 'none');
-    if (firstMenu) {
-      const m = (firstMenu.getAttribute('onclick') || '').match(/showPanel\('([^']+)'/);
-      if (m) showPanel(m[1], firstMenu);
-    }
-  }
   showLoadingOverlay(false);
 }
 
@@ -4947,14 +4932,11 @@ async function applySession(session) {
 function applyPermissions(session) {
   window._userRole = session.role;
   window._userPerms = session.permissions || [];
-
-  // 일반 관리자는 권한을 받은 메뉴만 보이게 한다.
+  // 일반 관리자도 모든 업무 메뉴를 조회할 수 있다.
   document.querySelectorAll('.nav-item[onclick*="showPanel"]').forEach(item => {
     const m = (item.getAttribute('onclick') || '').match(/showPanel\('([^']+)'/);
-    if (!m) return;
-    item.style.display = hasPermission(m[1]) ? '' : 'none';
+    item.style.display = (m && m[1] === 'account-mgmt' && session.role !== 'superadmin') ? 'none' : '';
   });
-
   applyAllPanelPermissions();
 }
 
