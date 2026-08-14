@@ -200,7 +200,7 @@ tr:hover td{background:var(--bg);}
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.2 · 2026.07.24</div>
+<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.3 · 2026.08.14 11:26</div>
 <!-- 로그인 화면 -->
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0d3f75;z-index:9999;align-items:center;justify-content:center;">
   <div style="width:340px;">
@@ -1640,6 +1640,11 @@ async function loadFromFirebase(){
       'productNameMapping'
     ];
     const snaps = await Promise.all(keys.map(k=>window._db.collection('appData').doc(k).get()));
+    const rolloverSnap=await window._db.collection('appData').doc('ledgerRolloverMeta').get();
+    window._rolloverIgnoredIncomingIds=new Set();
+    if(rolloverSnap.exists&&rolloverSnap.data().ignoredIncomingIds){
+      try{ window._rolloverIgnoredIncomingIds=new Set(JSON.parse(rolloverSnap.data().ignoredIncomingIds)); }catch(e){}
+    }
     snaps.forEach((snap,i)=>{
       if(snap.exists && snap.data().data){
         const key = keys[i];
@@ -4179,6 +4184,7 @@ function syncIncomingToLedger(){
       if(!row.product || qty<=0) return;
       const ing = (row.code&&INGREDIENT_DB.find(i=>i.code===row.code))||getIngByName(row.product);
       const sourceLineId=row.syncId||((rec.syncId||('INCOMING-LEGACY-'+(rec.id||rec.date||recIdx)))+'-ROW-'+String(rowIdx+1).padStart(3,'0'));
+      if((window._rolloverIgnoredIncomingIds||new Set()).has(sourceLineId)) return;
       activeIds.add(sourceLineId);
       let target=ledgerRecords.find(r=>r.type==='in'&&r.sourceType==='incoming'&&r.sourceLineId===sourceLineId);
       if(!target) target=ledgerRecords.find(r=>r.type==='in'&&!r.sourceType&&r.date===date&&r.name===row.product&&(r.lot||'')===(row.lot||'')&&Math.abs((parseFloat(r.qty)||0)-qty)<0.0005);
