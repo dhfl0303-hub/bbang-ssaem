@@ -193,7 +193,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.5 · 2026.08.14 13:10</div>
+<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.6 · 2026.08.14 14:31</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -401,6 +401,21 @@ const FLOUR_NAMES = ['제빵용밀가루','제빵용고급밀가루','유기농�
 const INGREDIENT_DB_STATIC_LIST = [{"code":"M000","name":"정제수"},{"code":"M001","name":"가당연유"},{"code":"M002","name":"가루찹쌀"},{"code":"M003","name":"갈릭소스"},{"code":"M004","name":"감자다이스"},{"code":"M005","name":"강력쌀가루"},{"code":"M006","name":"건조블루베리"},{"code":"M007","name":"건조크랜베리"},{"code":"M008","name":"검은깨분말"},{"code":"M009","name":"고메버터"},{"code":"M010","name":"고메버터(플로리)"},{"code":"M011","name":"공주밤다이스"},{"code":"M012","name":"그랜드500-프리"},{"code":"M013","name":"난황액"},{"code":"M014","name":"냉동블루베리"},{"code":"M015","name":"냉동삼색피망"},{"code":"M016","name":"냉동양파"},{"code":"M017","name":"다목적박력분"},{"code":"M018","name":"다크초콜릿칩"},{"code":"M019","name":"당적밤 다이스"},{"code":"M020","name":"데리야끼소스"},{"code":"M021","name":"럼"},{"code":"M022","name":"마가린(노블)"},{"code":"M023","name":"로즈버드크리머"},{"code":"M024","name":"마리네이트\n체리토마토"},{"code":"M025","name":"마요네즈(롯데)"},{"code":"M026","name":"마요네즈(오뚜기)"},{"code":"M027","name":"멀티그레인"},{"code":"M028","name":"메이플시럽"},{"code":"M029","name":"모짜렐라치즈"},{"code":"M030","name":"몰트액기스"},{"code":"M031","name":"물엿(큐원)"},{"code":"M032","name":"미니페파로니"},{"code":"M033","name":"밀크웨이분말"},{"code":"M034","name":"바닐프로200"},{"code":"M035","name":"바닐프로T"},{"code":"M036","name":"바질"},{"code":"M037","name":"바질페스토"},{"code":"M038","name":"바통브랑제 \n베이킹스틱"},{"code":"M039","name":"반건조무화과"},{"code":"M040","name":"버터"},{"code":"M041","name":"베사멜소스"},{"code":"M042","name":"베이컨칩"},{"code":"M043","name":"롤치즈"},{"code":"M044","name":"베이킹파우더 \n포뮬러2"},{"code":"M045","name":"볶음검정깨가루"},{"code":"M046","name":"분당"},{"code":"M047","name":"블랙올리브슬라이스"},{"code":"M048","name":"빙수애콩가루"},{"code":"M049","name":"빵가루"},{"code":"M050","name":"사프르방LV"},{"code":"M051","name":"세몰리나"},{"code":"M052","name":"세미드라이이스트 골드"},{"code":"M053","name":"세미드라이이스트 레드"},{"code":"M054","name":"소불고기"},{"code":"M055","name":"스모크햄슬라이스"},{"code":"M056","name":"스크럼블에그"},{"code":"M057","name":"스위트콘"},{"code":"M058","name":"식용유"},{"code":"M059","name":"아몬드분말"},{"code":"M060","name":"아바론밀가루"},{"code":"M061","name":"아뺑드밀가루 T45"},{"code":"M062","name":"아카시아청"},{"code":"M063","name":"안데스트레샬소금"},{"code":"M064","name":"앵커버터"},{"code":"M065","name":"애플턴오버"},{"code":"M066","name":"에멘탈치즈"},{"code":"M067","name":"에버휩"},{"code":"M068","name":"에스500키모"},{"code":"M069","name":"오버나이트"},{"code":"M070","name":"올리브유"},{"code":"M071","name":"우유"},{"code":"M072","name":"우유버터화이트"},{"code":"M073","name":"왁시브레드KC"},{"code":"M074","name":"월드콤파운드\n버터"},{"code":"M075","name":"유기농밀가루 강력"},{"code":"M076","name":"유기농밀가루 박력"},{"code":"M077","name":"으깬삶은감자"},{"code":"M078","name":"으깬삶은고구마"},{"code":"M079","name":"이즈니버터"},{"code":"M080","name":"이지마요"},{"code":"M081","name":"자색고구마분말"},{"code":"M082","name":"잣분말"},{"code":"M083","name":"전란분말"},{"code":"M084","name":"전란액"},{"code":"M085","name":"제빵용고급밀가루"},{"code":"M086","name":"제빵용밀가루"},{"code":"M087","name":"제빵용탕종분"},{"code":"M088","name":"체다치즈"},{"code":"M089","name":"초코믹스파우더"},{"code":"M090","name":"초코칩"},{"code":"M091","name":"커피분말"},{"code":"M092","name":"코코아분말"},{"code":"M093","name":"코코아분말"},{"code":"M094","name":"콩고물"},{"code":"M095","name":"크리미 \n땅콩버터"},{"code":"M096","name":"크리미비트"},{"code":"M097","name":"탈지분유"},{"code":"M098","name":"파슬리"},{"code":"M099","name":"파인소프트202"},{"code":"M100","name":"파인소프트C"},{"code":"M101","name":"파인소프트T"},{"code":"M102","name":"펄솔트"},{"code":"M103","name":"펍스(해쉬브라운)"},{"code":"M104","name":"페파로니다이스"},{"code":"M105","name":"포테이토샐러드"},{"code":"M106","name":"프레즐소다"},{"code":"M107","name":"플레인 식빵"},{"code":"M108","name":"플레인요거트"},{"code":"M109","name":"피자소스"},{"code":"M110","name":"피칸분테"},{"code":"M111","name":"하얀설탕"},{"code":"M112","name":"할라피뇨다이스"},{"code":"M113","name":"핫케이크믹스"},{"code":"M114","name":"허니머스타드"},{"code":"M115","name":"호두분태"},{"code":"M116","name":"화미고백당"},{"code":"M117","name":"황등앙금"},{"code":"M118","name":"황치즈분말"},{"code":"M119","name":"휘핑크림"},{"code":"M120","name":"자색고구마분말"},{"code":"M121","name":"잣파이"},{"code":"M122","name":"버터향"},{"code":"M123","name":"치자황색소"},{"code":"M124","name":"슈가파우더"},{"code":"M125","name":"마늘분말"},{"code":"M126","name":"양파분태"}];
 const INGREDIENT_DB_STATIC = {};
 INGREDIENT_DB_STATIC_LIST.forEach(i=>{ INGREDIENT_DB_STATIC[i.name]=i.code; });
+let LIVE_INGREDIENT_DB=[];
+function normalizeIngName(v){ return String(v||'').replace(/\n/g,' ').replace(/\s+/g,' ').trim(); }
+function getIngredientCode(name, lot=''){
+  const target=normalizeIngName(name);
+  const live=LIVE_INGREDIENT_DB.find(i=>normalizeIngName(i.name)===target);
+  if(live?.code) return live.code;
+  const ledger=(window._ledgerRecords||[]).find(r=>normalizeIngName(r.name)===target&&r.code);
+  if(ledger?.code) return ledger.code;
+  const lotCode=String(lot||'').split('-')[0];
+  if(/^M\d+$/i.test(lotCode)) return lotCode.toUpperCase();
+  const custom=JSON.parse(localStorage.getItem('customIngredients')||'[]').find(i=>normalizeIngName(i.name)===target);
+  if(custom?.code) return custom.code;
+  const staticItem=INGREDIENT_DB_STATIC_LIST.find(i=>normalizeIngName(i.name)===target);
+  return staticItem?.code||'';
+}
 
 let DB = {};
 let INPUT_DB = {}; // 투입비 DB (P500~)
@@ -494,6 +509,12 @@ function initDB(){
   if(!s) localStorage.setItem('recipeDB',JSON.stringify(DB));
   // 시작 시 배합비 자동 다운로드 (온라인일 때만 성공, 오프라인이면 기존 localStorage 유지)
   if(window._db){
+    window._db.collection('appData').doc('ingredientDB').get().then(snap=>{
+      if(snap.exists&&snap.data().data){
+        LIVE_INGREDIENT_DB=JSON.parse(snap.data().data);
+        localStorage.setItem('ingredientDB',JSON.stringify(LIVE_INGREDIENT_DB));
+      }
+    }).catch(()=>{ LIVE_INGREDIENT_DB=JSON.parse(localStorage.getItem('ingredientDB')||'[]'); });
     window._db.collection('appData').doc('recipeDB').get().then(snap=>{
       if(snap.exists && snap.data().data){
         DB = JSON.parse(snap.data().data);
@@ -533,6 +554,7 @@ function initDB(){
     // Firebase 없음(오프라인): localStorage 캐시 사용
     const cached = localStorage.getItem('ledgerRecords');
     window._ledgerRecords = cached ? JSON.parse(cached) : [];
+    LIVE_INGREDIENT_DB=JSON.parse(localStorage.getItem('ingredientDB')||'[]');
     const stockCached=localStorage.getItem('currentIngStock');
     window._currentIngStock=stockCached?JSON.parse(stockCached):null;
   }
@@ -723,7 +745,8 @@ function buildAccTable(batchRecords, extraIngredients){
     <tr><th>원료코드</th><th>원료명</th><th>LOT</th><th>제조일자/소비기한</th><th>총 사용량(g)</th></tr>
     ${Object.entries(totals).map(([n,keys])=>{
       const found=ingDB.find(i=>i.name===n)||{code:''};
-      const code=found.code||INGREDIENT_DB_STATIC[n]||'';
+      const firstLot=Object.values(keys)[0]?.lot||'';
+      const code=found.code||getIngredientCode(n,firstLot);
       return Object.entries(keys).map(([k,v])=>
         `<tr><td style="color:var(--primary);font-weight:700">${code}</td><td>${n}</td><td>${v.lot||'-'}</td><td>${code==='M000'?'-':fmtBothDates(v.mfg,v.exp)}</td><td>${Math.round(v.amt).toLocaleString()}</td></tr>`
       ).join('');
@@ -789,7 +812,7 @@ function printSingleRecord(idx){
       </tr>
       ${Object.entries(totals).map(([n,keys])=>{
         const found=ingDB.find(i=>i.name===n)||{code:''};
-        const code=found.code||INGREDIENT_DB_STATIC[n]||'';
+        const code=found.code||getIngredientCode(n,Object.values(keys)[0]?.lot||'');
         return Object.entries(keys).map(([k,v])=>`<tr>
           <td style="border:1px solid #999;padding:4px;text-align:center;color:#1a5fa8;font-weight:700">${code}</td>
           <td style="border:1px solid #999;padding:4px">${n}</td>
@@ -818,7 +841,7 @@ function printSingleRecord(idx){
         </tr>
         ${dispRows.map(d=>{
           const found2=ingDB2.find(i=>i.name===d.name)||{code:''};
-          const code2=found2.code||INGREDIENT_DB_STATIC[d.name]||'';
+          const code2=found2.code||getIngredientCode(d.name,d.lot);
           return `<tr>
             <td style="border:1px solid #999;padding:4px;text-align:center;color:#1a5fa8;font-weight:700">${code2}</td>
             <td style="border:1px solid #999;padding:4px">${d.name}</td>
@@ -966,7 +989,7 @@ function onExpInput(input){
 function getAdminCurrentLots(ingName){
   if(!Array.isArray(window._currentIngStock)) return null;
   const ingN=(ingName||'').trim().replace(/\n/g,' ');
-  const ingCode=INGREDIENT_DB_STATIC[ingN]||'';
+  const ingCode=getIngredientCode(ingN);
   const fmtStockDate=v=>{
     const s=String(v||'');
     return /^\d{4}-\d{2}-\d{2}$/.test(s)?fmtExp(s.slice(2).replace(/-/g,'')):fmtExp(s);
@@ -990,7 +1013,7 @@ function getIngLots(ingName){
     const ledger = window._ledgerRecords || JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
 
     const ingN=ingName.trim().replace(/\n/g,' ');
-    const ingCode = INGREDIENT_DB_STATIC[ingN]||'';
+    const ingCode = getIngredientCode(ingN);
 
     function recMatch(r){
       if(ingCode && r.code) return r.code === ingCode;
@@ -1142,7 +1165,7 @@ function renderIngredients(ings){
     const lots=getIngLots(ing.name);
     const ingDB=JSON.parse(localStorage.getItem('customIngredients')||'[]');
     const found=ingDB.find(i=>i.name===ing.name)||{code:''};
-    const code=found.code||INGREDIENT_DB_STATIC[ing.name]||'';
+    const code=found.code||getIngredientCode(ing.name,lots[0]?.lot||'');
     const codeStr=code?` <span style="font-size:12px;color:var(--text3);font-weight:400">(${code})</span>`:'';
     block.dataset.name=ing.name; block.dataset.total=total; block.dataset.ingCode=code;
     block.innerHTML=`
@@ -1422,7 +1445,7 @@ function completeBatch(){
       const av=amtInput?amtInput.value:'';
       if(lotVal) exps.push({lot:lotVal, exp:expVal, dateType:dtType, amount:parseFloat(av)||0});
     });
-    if(INGREDIENT_DB_STATIC[name]!=='M000'){
+    if(getIngredientCode(name,exps[0]?.lot||'')!=='M000'){
       const assigned=exps.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
       if(!exps.length) invalid=invalid||`${name}: 원료 LOT를 선택해주세요.`;
       else if(Math.abs(assigned-total)>1) invalid=invalid||`${name}: LOT 배분량 ${assigned}g / 필요량 ${total}g`;
@@ -1454,7 +1477,7 @@ function syncBatchToLedger(){
       br.ingredients.forEach(ing=>{
         ing.exps.forEach(e=>{
           if(!e.amount) return;
-          const ingCode = INGREDIENT_DB_STATIC[ing.name]||'';
+          const ingCode = getIngredientCode(ing.name,ing.exps?.[0]?.lot||'');
           if(ingCode==='M000') return;
           const exists=ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===br.lot&&r.exp===e.exp);
           if(!exists){
@@ -1471,7 +1494,7 @@ function syncBatchToLedger(){
 
     // 기타사용원재료(투입량) 출고 - FIFO 분배 형식
     (S.inputIngredients||[]).filter(ing=>ing.name).forEach(ing=>{
-      const ingCode = INGREDIENT_DB_STATIC[ing.name]||'';
+      const ingCode = getIngredientCode(ing.name,ing.lot||'');
       if(ingCode==='M000') return;
       const dists = ing.distributions||[];
       if(dists.length){
@@ -1545,7 +1568,7 @@ function showComplete(){
     <div class="sec">원료별 총 사용량</div>
     <table class="result-table">
       <tr><th>원료명</th><th>LOT</th><th>제조일자/소비기한</th><th>사용량(g)</th></tr>
-      ${sortedRows.map(({name:n,lot:l,exp:e,dateType:dt,amt:a})=>`<tr><td>${n}</td><td style="font-size:11px">${l||'-'}</td><td>${(INGREDIENT_DB_STATIC[n]==='M000'||n==='정제수')?'-':(() => { const _pd = parseLotDates(l,e,dt); return fmtBothDates(_pd.mfg, _pd.exp); })()}</td><td>${Math.round(a).toLocaleString()}</td></tr>`).join('')}
+      ${sortedRows.map(({name:n,lot:l,exp:e,dateType:dt,amt:a})=>`<tr><td>${n}</td><td style="font-size:11px">${l||'-'}</td><td>${(getIngredientCode(n,l)==='M000'||n==='정제수')?'-':(() => { const _pd = parseLotDates(l,e,dt); return fmtBothDates(_pd.mfg, _pd.exp); })()}</td><td>${Math.round(a).toLocaleString()}</td></tr>`).join('')}
     </table>
     <div style="margin-top:12px;padding:10px 14px;background:#fff8e8;border:1px solid #f0d080;border-radius:8px;font-size:13px;color:#7a5800;">
       💡 투입량·폐기량은 저장된 기록에서 <strong>"📋 투입/폐기 입력"</strong> 버튼으로 별도 입력하세요.
@@ -1621,7 +1644,7 @@ function genPrint(){
       ${Object.entries(totals).map(([n,keys])=>{
         const ingDB=JSON.parse(localStorage.getItem('customIngredients')||'[]');
         const found=ingDB.find(i=>i.name===n)||{code:''};
-        const code=found.code||INGREDIENT_DB_STATIC[n]||'';
+        const code=found.code||getIngredientCode(n,Object.values(keys)[0]?.lot||'');
         return Object.entries(keys).map(([k,v])=>`<tr>
           <td style="border:1px solid #999;padding:4px;text-align:center;color:#1a5fa8;font-weight:700">${code}</td>
           <td style="border:1px solid #999;padding:4px">${n}</td>
@@ -1646,7 +1669,7 @@ function genPrint(){
         </tr>
         ${dispRows.map(d=>{
           const found2=ingDB2.find(i=>i.name===d.name)||{code:''};
-          const code2=found2.code||INGREDIENT_DB_STATIC[d.name]||'';
+          const code2=found2.code||getIngredientCode(d.name,d.lot);
           return `<tr>
             <td style="border:1px solid #999;padding:4px;text-align:center;color:#1a5fa8;font-weight:700">${code2}</td>
             <td style="border:1px solid #999;padding:4px">${d.name}</td>
@@ -1834,7 +1857,7 @@ function getDisposeIngOptions(selectedName){
   if(!names.length) return '<option value="">사용된 원료 없음</option>';
   return '<option value="">원료 선택...</option>' +
     names.map(n=>{
-      const code = INGREDIENT_DB_STATIC[n]||'';
+      const code = getIngredientCode(n);
       return `<option value="${n}" ${n===selectedName?'selected':''}>${code?code+' - ':''}${n}</option>`;
     }).join('');
 }
@@ -2044,7 +2067,7 @@ function renderInputDisposeModal(){
           style="flex:2;font-size:13px;border:1px solid #e0a0a0;border-radius:6px;padding:5px 8px;background:#fff;font-family:'Noto Sans KR',sans-serif;outline:none;">
         <datalist id="ipDisposeDL_${di}">${usedIngNames.map(name=>{
           const found=ingDB.find(i=>i.name===name)||{code:''};
-          const code=found.code||INGREDIENT_DB_STATIC[name]||'';
+          const code=found.code||getIngredientCode(name,d.lot);
           return `<option value="${name}">${code?code+' - ':''}${name}</option>`;
         }).join('')}</datalist>
         ${disposes.length>1?`<button onclick="ipDelDispose(${di})" style="background:none;border:none;color:#c0392b;font-size:20px;cursor:pointer;">×</button>`:''}
@@ -2283,7 +2306,7 @@ async function syncToServer(){
       // 배합 원료 출고
       (rec.batchRecords||[]).forEach((br,bi)=>{
         br.ingredients.forEach((ing,ii)=>{
-          const ingCode = INGREDIENT_DB_STATIC[ing.name]||'';
+          const ingCode = getIngredientCode(ing.name,ing.exps?.[0]?.lot||'');
           if(ingCode==='M000') return;
           (ing.exps||[ing]).forEach((e,ei)=>{
             const qty = (e.amount||0)/1000;
@@ -2304,7 +2327,7 @@ async function syncToServer(){
       // 기타사용원재료(투입량) 출고
       (rec.extraIngredients||[]).forEach(ing=>{
         if(!ing.name || !(parseFloat(ing.qty)>0)) return;
-        const ingCode = INGREDIENT_DB_STATIC[ing.name]||'';
+        const ingCode = getIngredientCode(ing.name,ing.lot||'');
         if(ingCode==='M000') return;
         const qty = parseFloat(ing.qty)||0;
         const exists = ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===lastBatchLot&&r.lot===ing.lot);
@@ -2396,7 +2419,7 @@ async function syncSingleBatch(idx){
     // 2. 이 레코드의 출고만 반영
     (rec.batchRecords||[]).forEach((br,bi)=>{
       br.ingredients.forEach((ing,ii)=>{
-        const ingCode=INGREDIENT_DB_STATIC[ing.name]||'';
+        const ingCode=getIngredientCode(ing.name,ing.exps?.[0]?.lot||'');
         if(ingCode==='M000') return;
         (ing.exps||[ing]).forEach((e,ei)=>{
           const qty=(e.amount||0)/1000;
@@ -2412,7 +2435,7 @@ async function syncSingleBatch(idx){
     });
     (rec.extraIngredients||[]).forEach(ing=>{
       if(!ing.name||!(parseFloat(ing.qty)>0)) return;
-      const ingCode=INGREDIENT_DB_STATIC[ing.name]||'';
+      const ingCode=getIngredientCode(ing.name,ing.lot||'');
       if(ingCode==='M000') return;
       const qty=parseFloat(ing.qty)||0;
       const exists=ledgerRecords.find(r=>r.type==='out'&&r.name===ing.name&&r.batchLot===lastBatchLot&&r.lot===ing.lot);
@@ -2421,7 +2444,7 @@ async function syncSingleBatch(idx){
     });
     (rec.disposeIngredients||[]).forEach(d=>{
       if(!d.name||!(parseFloat(d.qty)>0)) return;
-      const ingCode=INGREDIENT_DB_STATIC[d.name]||'';
+      const ingCode=getIngredientCode(d.name,d.lot||'');
       if(ingCode==='M000') return;
       const qty=parseFloat(d.qty)||0;
       const exists=ledgerRecords.find(r=>r.type==='dispose'&&r.name===d.name&&r.batchLot===lastBatchLot&&r.lot===d.lot);
