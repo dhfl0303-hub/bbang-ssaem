@@ -193,7 +193,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.4 · 2026.08.14 11:20</div>
+<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.5 · 2026.08.14 13:10</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -1159,6 +1159,18 @@ function renderIngredients(ings){
       <div class="add-exp-btn" onclick="addExpRow(this)">＋ LOT 추가</div>`;
     block.dataset.lotOptions=JSON.stringify(lots);
     const expRows=block.querySelector('.exp-rows');
+    const availableKg=lots.filter(l=>Number(l.remaining)>0).reduce((sum,l)=>sum+Number(l.remaining||0),0);
+    const stockShortage=code!=='M000' && availableKg*1000+0.5<total;
+    if(stockShortage){
+      block.style.background='#fff1f2';
+      block.style.border='2px solid #ef4444';
+      const warning=document.createElement('div');
+      warning.style.cssText='margin:8px 12px;padding:10px 12px;border-radius:8px;background:#fee2e2;color:#b91c1c;font-size:14px;font-weight:800;';
+      warning.textContent=availableKg<=0
+        ? '⚠ 재고 없음 — LOT를 선택할 수 없습니다. 관리자에게 확인하세요.'
+        : `⚠ 재고 부족 — 필요 ${(total/1000).toLocaleString()}kg / 현재 ${availableKg.toLocaleString()}kg`;
+      block.querySelector('.ing-col-hd').before(warning);
+    }
 
     // 정제수(M000)는 무한수 → 자동 LOT 생성 + 금액 자동입력
     if(code==='M000'){
@@ -1181,6 +1193,11 @@ function renderIngredients(ings){
       } else {
         // LOT 정보 없으면 빈 행 1개
         addExpRowEl(expRows,'','',total,0,1,lots,code);
+      }
+      if(stockShortage){
+        expRows.querySelectorAll('select').forEach(sel=>{
+          sel.style.background='#fee2e2'; sel.style.color='#b91c1c'; sel.style.border='2px solid #ef4444'; sel.style.fontWeight='800';
+        });
       }
     }
     updateAutoCalc(block);
