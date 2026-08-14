@@ -110,6 +110,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </script>
 </head>
 <body>
+<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.1 · 2026.08.14 13:20</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -321,7 +322,7 @@ function showComplete(){
   const ings = r.ingredients||[];
   document.getElementById('doneResult').innerHTML = `
     <table class="result-table" style="margin-top:12px;">
-      <tr><th>원료명</th><th>LOT</th><th>소비기한</th><th style="text-align:right;">투입량(kg)</th></tr>
+      <tr><th>원료명</th><th>LOT</th><th>제조일자/소비기한</th><th style="text-align:right;">투입량(kg)</th></tr>
       ${ings.map(i=>`<tr>
         <td>${i.name}</td>
         <td style="font-size:11px;">${i.lot||'-'}</td>
@@ -377,7 +378,7 @@ function genPrint(){
           <th style="border:1px solid #999;padding:4px;text-align:center;width:8%">원료코드</th>
           <th style="border:1px solid #999;padding:4px;text-align:left;width:25%">원료명</th>
           <th style="border:1px solid #999;padding:4px;text-align:center;width:30%">LOT</th>
-          <th style="border:1px solid #999;padding:4px;text-align:center;width:20%">소비기한</th>
+          <th style="border:1px solid #999;padding:4px;text-align:center;width:20%">제조일자/소비기한</th>
           <th style="border:1px solid #999;padding:4px;text-align:right;width:17%">투입량(kg)</th>
         </tr>
         ${ings.map(i=>{
@@ -411,7 +412,7 @@ function initForm(){
 // ===== 원료 행 =====
 function addIngRow(){
   const id = Date.now();
-  S.ingRows.push({id, name:'', lots:[{lotId:Date.now()+1, lot:'', qty:'', exp:''}]});
+  S.ingRows.push({id, name:'', lots:[{lotId:Date.now()+1, lot:'', qty:'', exp:'', dateType:'exp'}]});
   renderIngList();
 }
 function removeIngRow(id){
@@ -422,7 +423,7 @@ function addLotRow(ingId){
   const row = S.ingRows.find(r=>r.id===ingId);
   if(!row) return;
   if(row.lots.length>=5){ alert('LOT는 최대 5개까지 입력 가능합니다'); return; }
-  row.lots.push({lotId:Date.now(), lot:'', qty:'', exp:''});
+  row.lots.push({lotId:Date.now(), lot:'', qty:'', exp:'', dateType:'exp'});
   renderIngList();
 }
 function removeLotRow(ingId, lotId){
@@ -452,7 +453,7 @@ function fifoDistribute(ingId){
       lotId: Date.now()+newLots.length,
       lot: l.lot,
       qty: String(use),
-      exp: l.exp||''
+      exp: l.exp||'', dateType:l.dateType||'exp'
     });
     remain = Math.round((remain-use)*1000)/1000;
   }
@@ -519,9 +520,10 @@ function getIngLots(ingName){
       seen.add(r.lot);
       const remaining = Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
       const stockLbl = remaining>0 ? ` [재고:${remaining}kg]` : ' [재고없음]';
-      const hasExp = !!(r.exp);
-      const dateLbl = hasExp ? '소비:'+fmtExp(r.exp) : '제조:'+fmtExp(r.mfg||'');
-      lots.push({lot:r.lot, exp:fmtExp(r.exp||r.mfg||''), date:'', isOI:true, label:'초기재고 '+dateLbl+stockLbl, remaining});
+      const isMfg=r.dateType==='mfg'||String(r.lot||'').endsWith('*')||(!r.exp&&!!r.mfg);
+      const dateVal=fmtExp(isMfg?(r.mfg||r.exp||''):(r.exp||r.mfg||''));
+      const dateLbl=(isMfg?'제조:':'소비:')+dateVal;
+      lots.push({lot:r.lot, exp:dateVal, dateType:isMfg?'mfg':'exp', date:'', isOI:true, label:'초기재고 '+dateLbl+stockLbl, remaining});
     });
 
     // 3-2) in LOT (입고검사)
@@ -532,9 +534,10 @@ function getIngLots(ingName){
       seen.add(r.lot);
       const remaining = Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
       const stockLbl = remaining>0 ? ` [재고:${remaining}kg]` : ' [재고없음]';
-      const hasExp = !!(r.exp);
-      const dateLbl = hasExp ? '소비:'+fmtExp(r.exp) : '제조:'+fmtExp(r.mfg||'');
-      lots.push({lot:r.lot, exp:fmtExp(r.exp||r.mfg||''), date:r.date||'', isOI:false, label:'입고:'+r.date+' '+dateLbl+stockLbl, remaining});
+      const isMfg=r.dateType==='mfg'||String(r.lot||'').endsWith('*')||(!r.exp&&!!r.mfg);
+      const dateVal=fmtExp(isMfg?(r.mfg||r.exp||''):(r.exp||r.mfg||''));
+      const dateLbl=(isMfg?'제조:':'소비:')+dateVal;
+      lots.push({lot:r.lot, exp:dateVal, dateType:isMfg?'mfg':'exp', date:r.date||'', isOI:false, label:'입고:'+r.date+' '+dateLbl+stockLbl, remaining});
     });
 
     // 3-3) incomingRecords 보충 (ledger에 없는 LOT)
@@ -549,9 +552,10 @@ function getIngLots(ingName){
         const stockLbl = remaining>0 ? ` [재고:${remaining}kg]` : ' [재고없음]';
         const expDisp = row.expVal||row.exp||'';
         const mfgDisp = row.mfg||'';
-        const hasExp = !!expDisp;
-        const dateLbl = hasExp ? '소비:'+fmtExp(expDisp) : '제조:'+fmtExp(mfgDisp);
-        lots.push({lot:row.lot, exp:fmtExp(expDisp||mfgDisp||''), date:rec.date||'', isOI:false, label:'입고:'+(rec.date||'')+' '+dateLbl+stockLbl, remaining});
+        const isMfg=row.dateType==='mfg'||String(row.lot||'').endsWith('*')||(!expDisp&&!!mfgDisp);
+        const dateVal=fmtExp(isMfg?(mfgDisp||expDisp):(expDisp||mfgDisp));
+        const dateLbl=(isMfg?'제조:':'소비:')+dateVal;
+        lots.push({lot:row.lot, exp:dateVal, dateType:isMfg?'mfg':'exp', date:rec.date||'', isOI:false, label:'입고:'+(rec.date||'')+' '+dateLbl+stockLbl, remaining});
       });
     });
 
@@ -578,7 +582,7 @@ function renderIngList(){
       const lotOptions = availLots.length
         ? `<select class="ing-input" id="lot_sel_${lr.lotId}" onchange="onLotSelChange(${row.id},${lr.lotId})" style="margin-bottom:4px;">
             <option value="">-- LOT 선택 --</option>
-            ${availLots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" ${l.lot===lr.lot?'selected':''}>${l.lot} (${l.label})</option>`).join('')}
+            ${availLots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" data-date-type="${l.dateType||'exp'}" ${l.lot===lr.lot?'selected':''}>${l.lot} (${l.label})</option>`).join('')}
            </select>` : '';
       return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
         ${lotOptions}
@@ -596,7 +600,7 @@ function renderIngList(){
           <button class="del-btn" onclick="removeLotRow(${row.id},${lr.lotId})" style="margin-bottom:0;">×</button>
         </div>
         <div style="margin-top:4px;">
-          <label class="ing-label">소비기한 YYMMDD</label>
+          <label class="ing-label" id="lot_date_label_${lr.lotId}" style="${lr.dateType==='mfg'?'color:#0f766e;font-weight:800;':''}">${lr.dateType==='mfg'?'제조일자':'소비기한'} YYMMDD</label>
           <input class="ing-input" id="lot_exp_${lr.lotId}" value="${lr.exp}" placeholder="예: 270518" maxlength="6" inputmode="numeric"
             onchange="onLotExpChange(${row.id},${lr.lotId})">
         </div>
@@ -648,8 +652,11 @@ function onLotSelChange(ingId, lotId){
   if(!sel) return;
   lr.lot = sel.value;
   lr.exp = sel.options[sel.selectedIndex]?.dataset.exp||'';
+  lr.dateType = sel.options[sel.selectedIndex]?.dataset.dateType||'exp';
   document.getElementById('lot_lot_'+lotId).value = lr.lot;
   document.getElementById('lot_exp_'+lotId).value = lr.exp;
+  const dateLabel=document.getElementById('lot_date_label_'+lotId);
+  if(dateLabel){ dateLabel.textContent=(lr.dateType==='mfg'?'제조일자':'소비기한')+' YYMMDD'; dateLabel.style.color=lr.dateType==='mfg'?'#0f766e':''; dateLabel.style.fontWeight=lr.dateType==='mfg'?'800':''; }
   calcTotal();
 }
 function onLotQtyInput(ingId, lotId){
@@ -712,7 +719,7 @@ function saveInputRecord(){
     if(!row.name) return;
     (row.lots||[]).forEach(lr=>{
       if(!lr.qty) return;
-      ingredients.push({name:row.name, qty:parseFloat(lr.qty)||0, lot:lr.lot||'', exp:lr.exp||'', sourceLineId:syncId+'-ING-'+String(++sourceSeq).padStart(3,'0')});
+      ingredients.push({name:row.name, qty:parseFloat(lr.qty)||0, lot:lr.lot||'', exp:lr.exp||'', dateType:lr.dateType||'exp', sourceLineId:syncId+'-ING-'+String(++sourceSeq).padStart(3,'0')});
     });
   });
   if(!ingredients.length){ alert('원료와 수량을 입력해주세요'); return; }
@@ -782,12 +789,6 @@ async function syncToServer(){
     if(!allRecs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
     // 출고 반영은 아직 동기화 안 된 건만
     let recs = allRecs.filter(r=>!r._synced);
-    // 원료수불부 기초재고 전환 이전의 로컬 기록은 새 장부에 재차감하지 않음
-    try{
-      const rs=await db.collection('appData').doc('ledgerRolloverMeta').get();
-      const cut=rs.exists?(rs.data().executedAt||''):'';
-      if(cut) recs=recs.filter(r=>r.savedAt&&r.savedAt>cut);
-    }catch(e){}
 
     // 1. inputRecords Firebase 업로드
     for(const key of keys){
@@ -824,7 +825,7 @@ async function syncToServer(){
           const ingInfo = INGREDIENT_DB.find(i=>i.name===ing.name)||{};
           ledgerRecords.push({
             date:'20'+rec.date.slice(0,2)+'-'+rec.date.slice(2,4)+'-'+rec.date.slice(4,6),
-            name:ing.name, code:ingInfo.code||'', qty:ing.qty, lot:ing.lot, exp:ing.exp||'',
+            name:ing.name, code:ingInfo.code||'', qty:ing.qty, lot:ing.lot, exp:ing.exp||'', dateType:ing.dateType||'exp',
             inputLot:rec.lot, sourceId:rec.syncId||'', sourceLineId, type:'out'
           });
         }
@@ -879,8 +880,8 @@ function renderTodayList(){
       </div>
       <div class="accordion-body" id="body_${idx}">
         <table class="acc-table">
-          <thead><tr><th>원료명</th><th>수량(kg)</th><th>LOT</th><th>소비기한</th></tr></thead>
-          <tbody>${(r.ingredients||[]).map(i=>`<tr><td>${i.name}</td><td>${i.qty}</td><td>${i.lot||'-'}</td><td>${i.exp||'-'}</td></tr>`).join('')}</tbody>
+          <thead><tr><th>원료명</th><th>수량(kg)</th><th>LOT</th><th>제조일자/소비기한</th></tr></thead>
+          <tbody>${(r.ingredients||[]).map(i=>`<tr><td>${i.name}</td><td>${i.qty}</td><td>${i.lot||'-'}</td><td>${i.dateType==='mfg'?'제조':'소비'}: ${i.exp||'-'}</td></tr>`).join('')}</tbody>
         </table>
         <button onclick="delRecord(${idx})" style="background:#fff0f0;color:var(--danger);border:1px solid #fcc;padding:8px 16px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:500;width:100%;">삭제</button>
       </div>
@@ -923,7 +924,7 @@ async function syncSingleInput(idx){
         const ingInfo=INGREDIENT_DB.find(i=>i.name===ing.name)||{};
         ledgerRecords.push({
           date:'20'+rec.date.slice(0,2)+'-'+rec.date.slice(2,4)+'-'+rec.date.slice(4,6),
-          name:ing.name, code:ingInfo.code||'', qty:ing.qty, lot:ing.lot, exp:ing.exp||'',
+          name:ing.name, code:ingInfo.code||'', qty:ing.qty, lot:ing.lot, exp:ing.exp||'', dateType:ing.dateType||'exp',
           inputLot:rec.lot, type:'out'
         });
       }
@@ -1109,7 +1110,7 @@ function selectInputProduct(code){
   // ingRows 먼저 세팅
   S.ingRows = [];
   (p.ingredients||[]).forEach(ing=>{
-    S.ingRows.push({id:Date.now()+Math.random(), name:ing.name, lots:[{lotId:Date.now()+Math.random(), lot:'', qty:'', exp:''}]});
+    S.ingRows.push({id:Date.now()+Math.random(), name:ing.name, lots:[{lotId:Date.now()+Math.random(), lot:'', qty:'', exp:'', dateType:'exp'}]});
   });
   // initForm 건너뛰고 폼으로 이동
   S._skipInit = true;
