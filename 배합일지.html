@@ -193,7 +193,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.6 · 2026.08.14 14:31</div>
+<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.7 · 2026.08.14 14:41</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -689,23 +689,25 @@ function toggleAccordion(idx){
   body.classList.toggle('open',!isOpen);
   arrow.classList.toggle('open',!isOpen);
 }
-// LOT 마지막 부분에 * 있으면 제조일자, 없으면 소비기한
+// 저장 구분값과 현재 원료수불부의 LOT 구분을 우선하고, LOT 표식은 구자료 보조로 사용
 function parseLotDates(lot, exp, dateType){
+  const ledgerRec=(window._ledgerRecords||[]).find(r=>(r.lot||'')===(lot||'')&&(r.type==='init'||r.type==='in'));
+  const effectiveType=ledgerRec?.dateType||dateType||'';
   const parts=(lot||'').split('-');
+  let lotDate='';
   if(parts.length>=3){
     const last=parts[parts.length-1];
     const isMfg=last.endsWith('*');
     const dateVal=last.replace('*','');
     if(/^\d{6}$/.test(dateVal)){
-      const f=fmtExp(dateVal);
-      if(isMfg) return {mfg:f, exp:''};
-      return {mfg:'', exp:f};
+      lotDate=fmtExp(dateVal);
+      if(!effectiveType&&isMfg) return {mfg:lotDate, exp:''};
     }
   }
-  // fallback: dateType 기반
-  const f=fmtExp(exp);
+  const ledgerDate=effectiveType==='mfg'?(ledgerRec?.mfg||ledgerRec?.exp||''):(ledgerRec?.exp||ledgerRec?.mfg||'');
+  const f=fmtExp(ledgerDate||exp)||lotDate;
   if(!f||f==='-') return {mfg:'', exp:''};
-  if(dateType==='mfg') return {mfg:f, exp:''};
+  if(effectiveType==='mfg') return {mfg:f, exp:''};
   return {mfg:'', exp:f};
 }
 function fmtBothDates(mfg, exp){
