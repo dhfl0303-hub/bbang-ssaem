@@ -911,7 +911,7 @@ function addRow(){
     </td>
     <td>
       <div style="display:flex;align-items:center;gap:2px;">
-        <input class="td-input" type="text" inputmode="decimal" id="qty-${id}" placeholder="0" oninput="formatQty(this)" style="text-align:center;flex:1;">
+        <input class="td-input" type="text" inputmode="decimal" id="qty-${id}" placeholder="0" oninput="formatQty(this)" onkeydown="moveToNextQty(event,${id})" style="text-align:center;flex:1;">
         <button onclick="openCalc(${id})" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 5px;cursor:pointer;font-size:14px;flex-shrink:0;" title="계산기">🧮</button>
       </div>
     </td>
@@ -1027,6 +1027,21 @@ function formatQty(input){
   const parts = v.split('.');
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   input.value = parts.join('.');
+}
+
+function moveToNextQty(event, id){
+  if(event.key!=='Enter') return;
+  event.preventDefault();
+  const rows=Array.from(document.querySelectorAll('#mainTbody tr'));
+  const currentIndex=rows.findIndex(tr=>tr.id==='row-'+id);
+  if(currentIndex<0) return;
+  if(currentIndex===rows.length-1) addRow();
+  const nextRow=Array.from(document.querySelectorAll('#mainTbody tr'))[currentIndex+1];
+  const nextQty=nextRow?.querySelector('input[id^="qty-"]');
+  if(nextQty){
+    nextQty.focus();
+    nextQty.select();
+  }
 }
 
 function getQtyRaw(id){
