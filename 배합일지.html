@@ -193,7 +193,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.3 · 2026.08.14 11:14</div>
+<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.4 · 2026.08.14 11:20</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -985,8 +985,6 @@ function getAdminCurrentLots(ingName){
 // 통합관리 현재재고 우선, 없을 때만 ledgerRecords에서 계산
 function getIngLots(ingName){
   try{
-    const adminLots=getAdminCurrentLots(ingName);
-    if(adminLots!==null) return adminLots;
     const lots=[];
     const seen=new Set();
     const ledger = window._ledgerRecords || JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
@@ -1036,6 +1034,7 @@ function getIngLots(ingName){
       seen.add(r.lot);
 
       const remaining = Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
+      if(remaining<=0.0005) return;
       const stockLbl = remaining>0 ? ` [재고:${remaining}kg]` : ' [재고없음]';
       const isMfg = r.dateType==='mfg'||String(r.lot||'').endsWith('*')||(!r.exp&&!!r.mfg);
       const dateVal = isMfg?(r.mfg||r.exp||''):(r.exp||r.mfg||'');
@@ -1082,8 +1081,6 @@ function getIngLots(ingName){
 
 // 기타사용원재료용 - 이름 기반 매칭 (코드 무관)
 function getIngLotsByName(ingName){
-  const adminLots=getAdminCurrentLots(ingName);
-  if(adminLots!==null) return adminLots;
   try{
     const lots=[];
     const seen=new Set();
@@ -1119,6 +1116,7 @@ function getIngLotsByName(ingName){
       if(!r.lot||seen.has(r.lot)) return;
       seen.add(r.lot);
       const remaining=Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
+      if(remaining<=0.0005) return;
       const stockLbl=remaining>0?` [재고:${remaining}kg]`:' [재고없음]';
       const isMfg=r.dateType==='mfg'||String(r.lot||'').endsWith('*')||(!r.exp&&!!r.mfg);
       const dateVal=isMfg?(r.mfg||r.exp||''):(r.exp||r.mfg||'');
