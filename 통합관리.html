@@ -200,7 +200,7 @@ tr:hover td{background:var(--bg);}
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.3 · 2026.08.14 11:26</div>
+<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.4 · 2026.08.14 11:45</div>
 <!-- 로그인 화면 -->
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0d3f75;z-index:9999;align-items:center;justify-content:center;">
   <div style="width:340px;">
@@ -3795,6 +3795,7 @@ function renderIngStock(){
             ${isAnomaly?'재고 이상':a.type==='expired'?'초과':'D-'+a.diff}
           </span>
           <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();showLotHistory(${aIdx})">출고내역</button>
+          <button class="btn btn-sm btn-outline" style="color:#0f766e;border-color:#0f766e" onclick="event.stopPropagation();changeLotToMfg(${aIdx})">제조일자로 수정</button>
           ${isAnomaly?'':`<button class="btn btn-sm" style="background:#3d0000;color:#ff6b6b;border:1px solid #a00;font-size:11px;padding:4px 8px;" onclick="event.stopPropagation();openDispose(${aIdx})">폐기</button>
           <button class="btn btn-sm" style="background:#4a2800;color:#ffa64d;border:1px solid #a06000;font-size:11px;padding:4px 8px;" onclick="event.stopPropagation();openReturn(${aIdx})">반품</button>`}
         </div>
@@ -3873,6 +3874,35 @@ function renderIngStock(){
     }
   });
   document.getElementById('ingStockTbody').innerHTML=html;
+}
+
+async function changeLotToMfg(i){
+  const s=ingStock[i];
+  if(!s) return;
+  const current=s.mfg||s.expiry||'';
+  const input=prompt(`제조일자로 사용할 날짜를 확인해주세요.\n\n원료: ${s.name}\nLOT: ${s.lot||'-'}\n재고: ${Number(s.qty).toLocaleString()}kg\n\nYYYY-MM-DD 또는 YYMMDD`,current);
+  if(input===null) return;
+  const digits=String(input).replace(/\D/g,'');
+  let mfg='';
+  if(digits.length===8) mfg=digits.slice(0,4)+'-'+digits.slice(4,6)+'-'+digits.slice(6,8);
+  else if(digits.length===6) mfg='20'+digits.slice(0,2)+'-'+digits.slice(2,4)+'-'+digits.slice(4,6);
+  if(!mfg){ alert('날짜를 YYYY-MM-DD 또는 YYMMDD 형식으로 입력해주세요.'); return; }
+  if(!confirm(`${s.name} ${s.lot||''}\n\n소비기한 표시를 제조일자 ${mfg}로 변경합니다.\n재고수량과 출고이력은 변경하지 않습니다.`)) return;
+
+  ledgerRecords.forEach(r=>{
+    if((r.name||'').replace(/\n/g,' ')===s.name && (r.lot||'')===(s.lot||'')){
+      r.dateType='mfg'; r.mfg=mfg; r.exp='';
+    }
+  });
+  incomingRecords.forEach(rec=>(rec.rows||[]).forEach(row=>{
+    if((row.product||'').replace(/\n/g,' ')===s.name && (row.lot||'')===(s.lot||'')){
+      row.dateType='mfg'; row.mfg=mfg; row.exp=''; row.expVal='';
+    }
+  }));
+  await saveLedger();
+  if(window._db) await window._db.collection('appData').doc('incomingRecords').set({data:JSON.stringify(incomingRecords),updatedAt:new Date().toISOString()});
+  syncIngStockFromLedger(); renderIngStock();
+  alert(`제조일자로 수정했습니다.\n${s.name} / ${mfg}\n재고수량은 그대로 유지됩니다.`);
 }
 function openAddIngStock(){
   closeAllModals();
