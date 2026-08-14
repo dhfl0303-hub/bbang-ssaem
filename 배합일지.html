@@ -519,10 +519,22 @@ function initDB(){
       const cached = localStorage.getItem('ledgerRecords');
       window._ledgerRecords = cached ? JSON.parse(cached) : [];
     });
+    // 통합관리에서 계산·저장한 현재 LOT 재고를 최우선으로 사용
+    window._db.collection('appData').doc('ingStock').get().then(snap=>{
+      if(snap.exists && snap.data().data){
+        window._currentIngStock=JSON.parse(snap.data().data);
+        localStorage.setItem('currentIngStock',JSON.stringify(window._currentIngStock));
+      }else window._currentIngStock=[];
+    }).catch(()=>{
+      const cached=localStorage.getItem('currentIngStock');
+      window._currentIngStock=cached?JSON.parse(cached):null;
+    });
   } else {
     // Firebase 없음(오프라인): localStorage 캐시 사용
     const cached = localStorage.getItem('ledgerRecords');
     window._ledgerRecords = cached ? JSON.parse(cached) : [];
+    const stockCached=localStorage.getItem('currentIngStock');
+    window._currentIngStock=stockCached?JSON.parse(stockCached):null;
   }
 }
 
@@ -951,9 +963,30 @@ function onExpInput(input){
   updateAutoCalc(input.closest('.ing-block'));
 }
 
-// ledgerRecords(init+in)에서 원료별 LOT 목록 가져오기 + 잔여재고 계산
+function getAdminCurrentLots(ingName){
+  if(!Array.isArray(window._currentIngStock)) return null;
+  const ingN=(ingName||'').trim().replace(/\n/g,' ');
+  const ingCode=INGREDIENT_DB_STATIC[ingN]||'';
+  const fmtStockDate=v=>{
+    const s=String(v||'');
+    return /^\d{4}-\d{2}-\d{2}$/.test(s)?fmtExp(s.slice(2).replace(/-/g,'')):fmtExp(s);
+  };
+  return window._currentIngStock
+    .filter(s=>Number(s.qty)>0 && (ingCode&&s.code?s.code===ingCode:(s.name||'').trim().replace(/\n/g,' ')===ingN))
+    .map(s=>{
+      const isMfg=s.dateType==='mfg'||String(s.lot||'').endsWith('*')||(!s.expiry&&!!s.mfg);
+      const dateVal=fmtStockDate(isMfg?(s.mfg||s.expiry||''):(s.expiry||s.mfg||''));
+      return {lot:s.lot||'',label:`${s.lot||'LOT 미지정'} (현재재고 ${isMfg?'제조':'소비'}:${dateVal||'-'}) [재고:${Number(s.qty)}kg]`,exp:dateVal,dateType:isMfg?'mfg':'exp',date:'',isOI:false,remaining:Number(s.qty)};
+    })
+    .filter(s=>s.lot)
+    .sort((a,b)=>(a.exp||'99.99.99').localeCompare(b.exp||'99.99.99'));
+}
+
+// 통합관리 현재재고 우선, 없을 때만 ledgerRecords에서 계산
 function getIngLots(ingName){
   try{
+    const adminLots=getAdminCurrentLots(ingName);
+    if(adminLots!==null) return adminLots;
     const lots=[];
     const seen=new Set();
     const ledger = window._ledgerRecords || JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
@@ -1049,6 +1082,8 @@ function getIngLots(ingName){
 
 // 기타사용원재료용 - 이름 기반 매칭 (코드 무관)
 function getIngLotsByName(ingName){
+  const adminLots=getAdminCurrentLots(ingName);
+  if(adminLots!==null) return adminLots;
   try{
     const lots=[];
     const seen=new Set();
@@ -2153,6 +2188,14 @@ async function refreshLedgerRecords(){
     if(snap.exists && snap.data().data){
       window._ledgerRecords = JSON.parse(snap.data().data);
       localStorage.setItem('ledgerRecords', JSON.stringify(window._ledgerRecords));
+    }
+    const stockSnap=await window._db.collection('appData').doc('ingStock').get();
+    if(stockSnap.exists && stockSnap.data().data){
+      window._currentIngStock=JSON.parse(stockSnap.data().data);
+      localStorage.setItem('currentIngStock',JSON.stringify(window._currentIngStock));
+    }else{
+      window._currentIngStock=[];
+      localStorage.setItem('currentIngStock','[]');
     }
     // 현재 배합 화면에 있으면 LOT 드롭다운 즉시 갱신
     const batchPage = document.getElementById('page-batch');
