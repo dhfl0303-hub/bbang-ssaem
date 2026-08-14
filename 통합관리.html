@@ -200,7 +200,7 @@ tr:hover td{background:var(--bg);}
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.5 · 2026.08.14 15:19</div>
+<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.6 · 2026.08.14 17:15</div>
 <!-- 로그인 화면 -->
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0d3f75;z-index:9999;align-items:center;justify-content:center;">
   <div style="width:340px;">
@@ -3310,7 +3310,11 @@ function toggleSidebar(){
   ov.classList.toggle('open');
 }
 
-function showPanel(id){
+function showPanel(id, triggerEl=null){
+  if (window._userRole && !hasPermission(id)) {
+    alert('이 메뉴의 조회 권한이 없습니다.');
+    return;
+  }
   // 모바일에서 메뉴 선택 시 사이드바 닫기
   const sb=document.getElementById('sidebarEl');
   const ov=document.getElementById('sidebarOverlay');
@@ -3337,7 +3341,8 @@ function showPanel(id){
   if(id==='yield-mgmt'){
     fillYieldDateDropdown();
   }
-  event.currentTarget.classList.add('active');
+  const clicked = triggerEl || ((typeof event !== 'undefined' && event) ? event.currentTarget : null);
+  if(clicked && clicked.classList) clicked.classList.add('active');
   const titles={
     'material-ledger':'원료수불부','recipe':'배합비 관리','ingredient-stock':'원료 재고 현황','device':'설비 세팅값',
     'product-name-map':'완제품명 매핑','lot-mapping':'LOT 매핑 관리','finished-stock':'완제품 재고 현황',
@@ -4922,6 +4927,19 @@ async function applySession(session) {
   showLoadingOverlay(true);
   await _dataReady;
   renderIngStock();
+  applyAllPanelPermissions();
+
+  // 기본 화면 권한이 없으면 허용된 첫 메뉴로 이동한다.
+  const activePanel = document.querySelector('.panel.active');
+  const activeId = activePanel ? activePanel.id.replace(/^panel-/, '') : '';
+  if (!activeId || !hasPermission(activeId)) {
+    const firstMenu = [...document.querySelectorAll('.nav-item[onclick*="showPanel"]')]
+      .find(item => item.style.display !== 'none');
+    if (firstMenu) {
+      const m = (firstMenu.getAttribute('onclick') || '').match(/showPanel\('([^']+)'/);
+      if (m) showPanel(m[1], firstMenu);
+    }
+  }
   showLoadingOverlay(false);
 }
 
@@ -4929,6 +4947,15 @@ async function applySession(session) {
 function applyPermissions(session) {
   window._userRole = session.role;
   window._userPerms = session.permissions || [];
+
+  // 일반 관리자는 권한을 받은 메뉴만 보이게 한다.
+  document.querySelectorAll('.nav-item[onclick*="showPanel"]').forEach(item => {
+    const m = (item.getAttribute('onclick') || '').match(/showPanel\('([^']+)'/);
+    if (!m) return;
+    item.style.display = hasPermission(m[1]) ? '' : 'none';
+  });
+
+  applyAllPanelPermissions();
 }
 
 // 현재 패널 권한 체크
@@ -4938,23 +4965,47 @@ function hasPermission(panelKey) {
 }
 
 // 패널 내 수정/삭제 버튼 제어
-function applyPanelPermission(panelId) {
-  if (window._userRole === 'superadmin') return;
-  const panel = document.getElementById('panel-' + panelId);
-  if (!panel) return;
-  const allowed = hasPermission(panelId);
-  if (allowed) return;
-  panel.querySelectorAll('button, a.btn, [onclick]').forEach(btn => {
-    const oc = btn.getAttribute('onclick') || '';
-    const txt = btn.textContent || '';
-    if (oc.match(/filter|Filter|search|Search|load|show|toggle|fill|close|sort|render|print|sync/i)) return;
-    if (oc.match(/delete|Delete|open|Open|add|Add|edit|Edit|save|Save|backup|restore|remove/i)
-      || txt.match(/삭제|등록|추가|수정|편집|전체삭제|폐기|반품/)) {
-      btn.dataset.origDisplay = btn.style.display;
-      btn.style.display = 'none';
-    }
+const MANAGEMENT_HANDLER_RE = /(?:^|[;\s])(?:addIngRow|addIRIngRow|addMissingStock|changeLedger|changeLotToMfg|delete|delIngRow|migrate|openAdd|openEdit|openDispose|openReturn|openNew|openOutbound|outboundFinished|removeInitRow|resetPnMap|save(?:Account|Dispose|Edit|Ingredient|Input|Mapping|New|Recipe|Return)|yieldForceDelete|yieldRestore|yieldSoftDelete)\b|\.remove\(\)/i;
+const MANAGEMENT_TEXT_RE = /등록|추가|수정|편집|삭제|전체삭제|저장|폐기|반품|초기화|보정|LOT\s*변경|출고\s*처리|신규\s*원료|가져오기|복원/;
+
+function isManagementControl(el) {
+  const oc = el.getAttribute('onclick') || '';
+  const txt = (el.textContent || '').replace(/\s+/g, ' ').trim();
+  return MANAGEMENT_HANDLER_RE.test(oc) || MANAGEMENT_TEXT_RE.test(txt);
+}
+
+function setManagementControlState(el, visible) {
+  if (!el.dataset.authDisplaySaved) {
+    el.dataset.authDisplaySaved = '1';
+    el.dataset.authOrigDisplay = el.style.display || '';
+  }
+  el.style.display = visible ? el.dataset.authOrigDisplay : 'none';
+}
+
+function applyAllPanelPermissions() {
+  document.querySelectorAll('.panel').forEach(panel => {
+    const panelId = panel.id.replace(/^panel-/, '');
+    applyPanelPermission(panelId);
   });
 }
+
+function applyPanelPermission(panelId) {
+  const panel = document.getElementById('panel-' + panelId);
+  if (!panel) return;
+  panel.querySelectorAll('button, a.btn, [onclick]').forEach(el => {
+    if (isManagementControl(el)) setManagementControlState(el, window._userRole === 'superadmin');
+  });
+}
+
+// 일반 관리자가 숨겨진 변경 기능을 우회 클릭하는 것도 차단한다.
+document.addEventListener('click', e => {
+  if (window._userRole === 'superadmin') return;
+  const control = e.target.closest('button, a.btn, [onclick]');
+  if (!control || !isManagementControl(control)) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  alert('등록·수정·삭제 등 데이터 변경 기능은 최고관리자만 사용할 수 있습니다.');
+}, true);
 
 // 초기 실행
 (async () => {
@@ -4963,8 +5014,21 @@ function applyPanelPermission(panelId) {
   const tabAlive = sessionStorage.getItem('mesTabAlive');
   const saved = localStorage.getItem(AUTH_KEY);
   if (tabAlive && saved) {
-    // 새로고침 → 세션 유지
-    try { await applySession(JSON.parse(saved)); return; } catch(e) {}
+    // 새로고침할 때 Firebase의 최신 계정/권한을 다시 확인한다.
+    try {
+      const oldSession = JSON.parse(saved);
+      const snap = await window._db.collection('appData').doc('userAccounts').get();
+      const liveUser = snap.exists ? snap.data()[oldSession.empId] : null;
+      if (liveUser) {
+        const freshSession = {
+          empId: liveUser.empId, name: liveUser.name, dept: liveUser.dept,
+          rank: liveUser.rank, role: liveUser.role, permissions: liveUser.permissions || []
+        };
+        localStorage.setItem(AUTH_KEY, JSON.stringify(freshSession));
+        await applySession(freshSession);
+        return;
+      }
+    } catch(e) {}
   }
   // 탭 새로 열었거나 세션 없음 → 로그인 화면
   localStorage.removeItem(AUTH_KEY);
