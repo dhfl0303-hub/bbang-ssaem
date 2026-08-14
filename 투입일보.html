@@ -110,7 +110,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.1 · 2026.08.14 13:20</div>
+<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.2 · 2026.08.14 14:16</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -479,6 +479,11 @@ function getIngLots(ingName){
       const rn=(recName||'').trim().replace(/\n/g,' ');
       return rn===ingN || rn.includes(ingN) || ingN.includes(rn);
     }
+    const ingredientUsesMfg=ledger.some(r=>nameMatch(r.name)&&(r.dateType==='mfg'||String(r.lot||'').endsWith('*')||(!r.exp&&!!r.mfg)));
+    const lotDatePart=lot=>{
+      const part=String(lot||'').split('-').pop().replace('*','');
+      return /^\d{6}$/.test(part)?part:'';
+    };
 
     // 1) LOT별 입고량 합산 (init + in)
     const inQty={};
@@ -520,8 +525,9 @@ function getIngLots(ingName){
       seen.add(r.lot);
       const remaining = Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
       const stockLbl = remaining>0 ? ` [재고:${remaining}kg]` : ' [재고없음]';
-      const isMfg=r.dateType==='mfg'||String(r.lot||'').endsWith('*')||(!r.exp&&!!r.mfg);
-      const dateVal=fmtExp(isMfg?(r.mfg||r.exp||''):(r.exp||r.mfg||''));
+      const inferredMfg=ingredientUsesMfg&&!r.exp&&!r.mfg&&!!lotDatePart(r.lot);
+      const isMfg=r.dateType==='mfg'||String(r.lot||'').endsWith('*')||(!r.exp&&!!r.mfg)||inferredMfg;
+      const dateVal=fmtExp(isMfg?(r.mfg||r.exp||lotDatePart(r.lot)):(r.exp||r.mfg||''));
       const dateLbl=(isMfg?'제조:':'소비:')+dateVal;
       lots.push({lot:r.lot, exp:dateVal, dateType:isMfg?'mfg':'exp', date:'', isOI:true, label:'초기재고 '+dateLbl+stockLbl, remaining});
     });
@@ -534,8 +540,9 @@ function getIngLots(ingName){
       seen.add(r.lot);
       const remaining = Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
       const stockLbl = remaining>0 ? ` [재고:${remaining}kg]` : ' [재고없음]';
-      const isMfg=r.dateType==='mfg'||String(r.lot||'').endsWith('*')||(!r.exp&&!!r.mfg);
-      const dateVal=fmtExp(isMfg?(r.mfg||r.exp||''):(r.exp||r.mfg||''));
+      const inferredMfg=ingredientUsesMfg&&!r.exp&&!r.mfg&&!!lotDatePart(r.lot);
+      const isMfg=r.dateType==='mfg'||String(r.lot||'').endsWith('*')||(!r.exp&&!!r.mfg)||inferredMfg;
+      const dateVal=fmtExp(isMfg?(r.mfg||r.exp||lotDatePart(r.lot)):(r.exp||r.mfg||''));
       const dateLbl=(isMfg?'제조:':'소비:')+dateVal;
       lots.push({lot:r.lot, exp:dateVal, dateType:isMfg?'mfg':'exp', date:r.date||'', isOI:false, label:'입고:'+r.date+' '+dateLbl+stockLbl, remaining});
     });
@@ -552,8 +559,9 @@ function getIngLots(ingName){
         const stockLbl = remaining>0 ? ` [재고:${remaining}kg]` : ' [재고없음]';
         const expDisp = row.expVal||row.exp||'';
         const mfgDisp = row.mfg||'';
-        const isMfg=row.dateType==='mfg'||String(row.lot||'').endsWith('*')||(!expDisp&&!!mfgDisp);
-        const dateVal=fmtExp(isMfg?(mfgDisp||expDisp):(expDisp||mfgDisp));
+        const inferredMfg=ingredientUsesMfg&&!expDisp&&!mfgDisp&&!!lotDatePart(row.lot);
+        const isMfg=row.dateType==='mfg'||String(row.lot||'').endsWith('*')||(!expDisp&&!!mfgDisp)||inferredMfg;
+        const dateVal=fmtExp(isMfg?(mfgDisp||expDisp||lotDatePart(row.lot)):(expDisp||mfgDisp));
         const dateLbl=(isMfg?'제조:':'소비:')+dateVal;
         lots.push({lot:row.lot, exp:dateVal, dateType:isMfg?'mfg':'exp', date:rec.date||'', isOI:false, label:'입고:'+(rec.date||'')+' '+dateLbl+stockLbl, remaining});
       });
