@@ -193,7 +193,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.8 · 2026.08.14 14:47</div>
+<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.9 · 2026.08.19 08:47</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -2252,6 +2252,90 @@ async function refreshLedgerRecords(){
 }
 
 // ===== 동기화 =====
+function prepareBatchRecordsForLatestStock(records, ledgerRecords, currentStock=[]){
+  const copies=JSON.parse(JSON.stringify(records||[]));
+  const sourceIds=new Set(copies.map(r=>r.syncId).filter(Boolean));
+  // 재시도 중인 자기 출고는 잔량 계산에서 제외한 뒤 새 배분으로 다시 만든다.
+  const baseLedger=(ledgerRecords||[]).filter(r=>!(r.type==='out'&&r.sourceId&&sourceIds.has(r.sourceId)));
+  const pools=new Map();
+  const getPool=name=>{
+    const key=normalizeIngName(name);
+    if(!pools.has(key)) pools.set(key,new Map());
+    return pools.get(key);
+  };
+  baseLedger.forEach(r=>{
+    if(!['init','in'].includes(r.type)||!r.lot) return;
+    const pool=getPool(r.name);
+    if(!pool.has(r.lot)) pool.set(r.lot,{lot:r.lot,remaining:0,exp:r.exp||r.mfg||'',dateType:r.dateType||((!r.exp&&r.mfg)?'mfg':'exp'),date:r.date||''});
+    pool.get(r.lot).remaining+=(parseFloat(r.qty)||0);
+  });
+  baseLedger.forEach(r=>{
+    if(!['out','dispose','return'].includes(r.type)||!r.lot) return;
+    const item=getPool(r.name).get(r.lot);
+    if(item) item.remaining-=(parseFloat(r.qty)||0);
+  });
+
+  const orderMap=new Map();
+  (currentStock||[]).forEach((s,i)=>{ if(s.lot) orderMap.set(normalizeIngName(s.name)+'|'+s.lot,i); });
+  const changes=[];
+
+  copies.forEach(rec=>(rec.batchRecords||[]).forEach(br=>(br.ingredients||[]).forEach(ing=>{
+    const ingCode=getIngredientCode(ing.name,ing.exps?.[0]?.lot||'');
+    if(ingCode==='M000') return;
+    const oldExps=(ing.exps||[]).filter(e=>(parseFloat(e.amount)||0)>0);
+    const needKg=oldExps.reduce((s,e)=>s+(parseFloat(e.amount)||0)/1000,0);
+    if(needKg<=0) return;
+    const pool=getPool(ing.name);
+
+    // 최신 장부에서도 선택 LOT 잔량이 충분하면 작업자가 기록한 LOT를 그대로 보존한다.
+    const requested=new Map();
+    oldExps.forEach(e=>requested.set(e.lot,(requested.get(e.lot)||0)+(parseFloat(e.amount)||0)/1000));
+    const selectedEnough=[...requested.entries()].every(([lot,qty])=>lot&&pool.has(lot)&&pool.get(lot).remaining+0.0000001>=qty);
+    if(selectedEnough){
+      requested.forEach((qty,lot)=>{ pool.get(lot).remaining-=qty; });
+      return;
+    }
+
+    const candidates=[...pool.values()].filter(x=>x.remaining>0.0000001).sort((a,b)=>{
+      const ak=normalizeIngName(ing.name)+'|'+a.lot, bk=normalizeIngName(ing.name)+'|'+b.lot;
+      const ai=orderMap.has(ak)?orderMap.get(ak):999999, bi=orderMap.has(bk)?orderMap.get(bk):999999;
+      if(ai!==bi) return ai-bi;
+      const ae=String(a.exp||'99.99.99').replace(/\D/g,''), be=String(b.exp||'99.99.99').replace(/\D/g,'');
+      if(ae!==be) return ae.localeCompare(be);
+      return String(a.date||'').localeCompare(String(b.date||''))||String(a.lot).localeCompare(String(b.lot));
+    });
+    let remain=needKg;
+    const next=[];
+    candidates.forEach(c=>{
+      if(remain<=0.0000001) return;
+      const use=Math.min(c.remaining,remain);
+      if(use<=0) return;
+      next.push({lot:c.lot,exp:c.exp||'',dateType:c.dateType||'exp',amount:Math.round(use*1000)});
+      c.remaining-=use;
+      remain-=use;
+    });
+    if(remain>0.0005) throw new Error(`${ing.name} 최신 재고가 ${remain.toFixed(3)}kg 부족하여 동기화할 수 없습니다.`);
+    const before=oldExps.map(e=>`${e.lot}:${Math.round(parseFloat(e.amount)||0)}g`).join(', ');
+    const after=next.map(e=>`${e.lot}:${e.amount}g`).join(', ');
+    ing.exps=next;
+    changes.push(`${br.lot} / ${ing.name}\n${before}\n→ ${after}`);
+  })));
+  return {records:copies,changes};
+}
+
+function replaceAdjustedLocalRecords(keys, adjustedRecords){
+  const map=new Map(adjustedRecords.map(r=>[r.syncId||('LEGACY-'+(r.sessionKey||'')),r]));
+  keys.forEach(key=>{
+    const rows=JSON.parse(localStorage.getItem(key)||'[]');
+    let changed=false;
+    rows.forEach((r,i)=>{
+      const k=r.syncId||('LEGACY-'+(r.sessionKey||''));
+      if(map.has(k)){ rows[i]=map.get(k); changed=true; }
+    });
+    if(changed) localStorage.setItem(key,JSON.stringify(rows));
+  });
+}
+
 async function syncToServer(){
   const btn = document.getElementById('syncBtn');
   btn.textContent = '⏳ 동기화 중...';
@@ -2277,6 +2361,26 @@ async function syncToServer(){
     // 출고 반영은 아직 동기화 안 된 건만
     let recs = allRecs.filter(r=>!r._synced);
 
+    // 최신 Firebase 장부로 LOT 잔량을 재검사한다. 오래된 오프라인 잔량이면 다음 LOT로 재배분한다.
+    let ledgerSnap = await db.collection('appData').doc('ledgerRecords').get();
+    let ledgerRecords = (ledgerSnap.exists && ledgerSnap.data().data) ? JSON.parse(ledgerSnap.data().data) : [];
+    let latestStock=[];
+    try{
+      const stockSnap=await db.collection('appData').doc('ingStock').get();
+      latestStock=(stockSnap.exists&&stockSnap.data().data)?JSON.parse(stockSnap.data().data):[];
+    }catch(e){}
+    const prepared=prepareBatchRecordsForLatestStock(recs,ledgerRecords,latestStock);
+    if(prepared.changes.length){
+      const preview=prepared.changes.slice(0,12).join('\n\n')+(prepared.changes.length>12?`\n\n외 ${prepared.changes.length-12}건`:``);
+      if(!confirm(`최신 재고와 다른 LOT 배분을 발견했습니다.\n마이너스 재고 방지를 위해 아래와 같이 자동 변경합니다.\n\n${preview}\n\n변경 후 동기화하시겠습니까?`)){
+        btn.textContent='동기화 취소'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return;
+      }
+      recs=prepared.records;
+      replaceAdjustedLocalRecords(keys,recs);
+      S.todayRecords=JSON.parse(localStorage.getItem(todayKey)||'[]');
+      renderTodayList();
+    }
+
     // 2. 배합기록 Firebase 업로드 (날짜별 키로 저장, 테스트 기록 제외)
     for(const key of keys){
       const dayRecs = JSON.parse(localStorage.getItem(key)||'[]').filter(r=>!r._isTest);
@@ -2297,8 +2401,8 @@ async function syncToServer(){
     }
 
     // 3. 원료수불부 출고 반영 (ledgerRecords Firebase 업데이트)
-    let ledgerSnap = await db.collection('appData').doc('ledgerRecords').get();
-    let ledgerRecords = (ledgerSnap.exists && ledgerSnap.data().data) ? JSON.parse(ledgerSnap.data().data) : [];
+    const syncingSourceIds=new Set(recs.map(r=>r.syncId).filter(Boolean));
+    ledgerRecords=ledgerRecords.filter(r=>!(r.type==='out'&&r.sourceId&&syncingSourceIds.has(r.sourceId)));
     recs.forEach(rec=>{
       const rawDate=rec.date||getWorkDateKey();
       const isoDate=rawDate.length===6?'20'+rawDate.slice(0,2)+'-'+rawDate.slice(2,4)+'-'+rawDate.slice(4,6):rawDate;
@@ -2404,7 +2508,7 @@ async function downloadRecipeDB(){
 
 // ===== 개별 배합 동기화 =====
 async function syncSingleBatch(idx){
-  const rec = S.todayRecords[idx];
+  let rec = S.todayRecords[idx];
   if(!rec || rec._synced || rec._isTest) return;
   const btn = document.getElementById('syncBtn_'+idx);
   if(btn){ btn.textContent='⏳'; btn.disabled=true; }
@@ -2418,6 +2522,27 @@ async function syncSingleBatch(idx){
     // 1. ledgerRecords 로드
     let ledgerSnap=await db.collection('appData').doc('ledgerRecords').get();
     let ledgerRecords=(ledgerSnap.exists&&ledgerSnap.data().data)?JSON.parse(ledgerSnap.data().data):[];
+
+    // 개별 동기화도 Firebase 최신 잔량으로 다시 검증하고 필요하면 LOT를 재배분한다.
+    let latestStock=[];
+    try{
+      const stockSnap=await db.collection('appData').doc('ingStock').get();
+      latestStock=(stockSnap.exists&&stockSnap.data().data)?JSON.parse(stockSnap.data().data):[];
+    }catch(e){}
+    const prepared=prepareBatchRecordsForLatestStock([rec],ledgerRecords,latestStock);
+    if(prepared.changes.length){
+      const preview=prepared.changes.slice(0,12).join('\n\n')+(prepared.changes.length>12?`\n\n외 ${prepared.changes.length-12}건`:``);
+      if(!confirm(`최신 재고와 다른 LOT 배분을 발견했습니다.\n마이너스 재고 방지를 위해 아래와 같이 자동 변경합니다.\n\n${preview}\n\n변경 후 동기화하시겠습니까?`)){
+        if(btn){btn.textContent='🔄 동기화';btn.disabled=false;} return;
+      }
+      rec=prepared.records[0];
+      S.todayRecords[idx]=rec;
+      saveLocal();
+      renderTodayList();
+    }
+    if(rec.syncId){
+      ledgerRecords=ledgerRecords.filter(r=>!(r.type==='out'&&r.sourceId===rec.syncId));
+    }
 
     // 2. 이 레코드의 출고만 반영
     (rec.batchRecords||[]).forEach((br,bi)=>{
