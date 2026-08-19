@@ -108,9 +108,11 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
   });
   window._db = firebase.firestore();
 </script>
+<link rel="stylesheet" href="mes-responsive.css">
+<script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.2 · 2026.08.14 14:16</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.3 · 2026.08.19 10:03</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -587,14 +589,16 @@ function renderIngList(){
   el.innerHTML = S.ingRows.map((row,i)=>{
     const availLots = getIngLots(row.name||'');
     const lotRowsHtml = (row.lots||[{lotId:0,lot:'',qty:'',exp:''}]).map(lr=>{
+      const selectedLot=availLots.find(l=>l.lot===lr.lot);
       const lotOptions = availLots.length
         ? `<select class="ing-input" id="lot_sel_${lr.lotId}" onchange="onLotSelChange(${row.id},${lr.lotId})" style="margin-bottom:4px;">
             <option value="">-- LOT 선택 --</option>
-            ${availLots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" data-date-type="${l.dateType||'exp'}" ${l.lot===lr.lot?'selected':''}>${l.lot} (${l.label})</option>`).join('')}
+            ${availLots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" data-date-type="${l.dateType||'exp'}" data-remaining="${Number(l.remaining||0)}" ${l.lot===lr.lot?'selected':''}>${l.lot}</option>`).join('')}
            </select>` : '';
       return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
         ${lotOptions}
-        <div style="display:grid;grid-template-columns:1fr 1fr 34px;gap:6px;align-items:end;">
+        <div class="mes-lot-meta" id="lot_meta_${lr.lotId}" aria-live="polite">${selectedLot?`<strong>${selectedLot.dateType==='mfg'?'제조일자':'소비기한'}</strong>: ${selectedLot.exp||'-'} &nbsp;·&nbsp; <strong>현재 재고</strong>: ${Number(selectedLot.remaining||0).toLocaleString()}kg`:'<strong>LOT를 선택하세요</strong>'}</div>
+        <div class="mes-lot-input-grid" style="display:grid;grid-template-columns:1fr 1fr 34px;gap:6px;align-items:end;">
           <div>
             <label class="ing-label">수량 (kg)</label>
             <input class="ing-input" id="lot_qty_${lr.lotId}" value="${lr.qty}" type="number" step="0.001" placeholder="0.000"
@@ -661,6 +665,13 @@ function onLotSelChange(ingId, lotId){
   lr.lot = sel.value;
   lr.exp = sel.options[sel.selectedIndex]?.dataset.exp||'';
   lr.dateType = sel.options[sel.selectedIndex]?.dataset.dateType||'exp';
+  const selectedOpt=sel.options[sel.selectedIndex];
+  const meta=document.getElementById('lot_meta_'+lotId);
+  if(meta){
+    const label=lr.dateType==='mfg'?'제조일자':'소비기한';
+    const remaining=Number(selectedOpt?.dataset.remaining||0);
+    meta.innerHTML=lr.lot?`<strong>${label}</strong>: ${lr.exp||'-'} &nbsp;·&nbsp; <strong>현재 재고</strong>: ${remaining.toLocaleString()}kg`:'<strong>LOT를 선택하세요</strong>';
+  }
   document.getElementById('lot_lot_'+lotId).value = lr.lot;
   document.getElementById('lot_exp_'+lotId).value = lr.exp;
   const dateLabel=document.getElementById('lot_date_label_'+lotId);

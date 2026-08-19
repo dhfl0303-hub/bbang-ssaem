@@ -191,9 +191,11 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
   });
   window._db = firebase.firestore();
 </script>
+<link rel="stylesheet" href="mes-responsive.css">
+<script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.0 · 2026.08.19 09:25</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.1 · 2026.08.19 10:03</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -1294,7 +1296,7 @@ function addExpRowEl(container,lotVal,amtVal,total,rowIdx,totalRows,lots,ingCode
   const isLast=rowIdx===totalRows-1&&totalRows>1;
   const row=document.createElement('div'); row.className='exp-row'+(isLast?' auto-row':'');
   const lotOptions=(lots||[]).length
-    ? (lots||[]).map(l=>`<option value="${l.lot}" data-exp="${l.exp}" data-date-type="${l.dateType||'exp'}" ${l.lot===lotVal?'selected':''}>${l.label}</option>`).join('')
+    ? (lots||[]).map(l=>`<option value="${l.lot}" data-exp="${l.exp}" data-date-type="${l.dateType||'exp'}" data-remaining="${Number(l.remaining||0)}" ${l.lot===lotVal?'selected':''}>${l.lot}</option>`).join('')
     : `<option value="${lotVal||''}">${lotVal||'입고기록없음'}</option>`;
   row.innerHTML=`
     <div style="display:flex;flex-direction:column;gap:3px;flex:1;">
@@ -1302,6 +1304,7 @@ function addExpRowEl(container,lotVal,amtVal,total,rowIdx,totalRows,lots,ingCode
         <option value="">-- LOT 선택 --</option>
         ${lotOptions}
       </select>
+      <div class="mes-lot-meta" aria-live="polite"></div>
       <div class="lot-manual-wrap" style="display:none;align-items:center;gap:4px;height:42px;box-sizing:border-box;">
         <span style="background:#f0f4ff;color:var(--primary);font-weight:700;padding:8px 10px;border-radius:8px;font-size:12px;white-space:nowrap;height:100%;box-sizing:border-box;" id="lot-code-fixed-${rowIdx}">${ingCode}</span>
         <span style="color:var(--text2);font-weight:700;flex:0 0 auto;">-</span>
@@ -1322,6 +1325,19 @@ function addExpRowEl(container,lotVal,amtVal,total,rowIdx,totalRows,lots,ingCode
     if(opt) { sel.dataset.exp=opt.dataset.exp||''; sel.dataset.dateType=opt.dataset.dateType||'exp'; }
   }
   container.appendChild(row);
+  renderLotMeta(sel);
+}
+
+function renderLotMeta(sel){
+  if(!sel) return;
+  const meta=sel.parentElement?.querySelector('.mes-lot-meta');
+  if(!meta) return;
+  const opt=sel.options[sel.selectedIndex];
+  if(!opt||!opt.value){meta.innerHTML='<strong>LOT를 선택하세요</strong>';return;}
+  const dateType=opt.dataset.dateType==='mfg'?'제조일자':'소비기한';
+  const dateVal=opt.dataset.exp||'-';
+  const remaining=Number(opt.dataset.remaining||0);
+  meta.innerHTML=`<strong>${dateType}</strong>: ${dateVal} &nbsp;·&nbsp; <strong>현재 재고</strong>: ${remaining.toLocaleString()}kg`;
 }
 
 function toggleLotInput(btn){
@@ -1332,10 +1348,13 @@ function toggleLotInput(btn){
     sel.style.display='block';
     manualWrap.style.display='none';
     btn.textContent='✏️ 직접입력 / 선택으로 전환';
+    const meta=row.querySelector('.mes-lot-meta'); if(meta) meta.style.display='block';
+    renderLotMeta(sel);
   } else {
     sel.style.display='none';
     manualWrap.style.display='flex';
     btn.textContent='📋 LOT 선택으로 전환';
+    const meta=row.querySelector('.mes-lot-meta'); if(meta) meta.style.display='none';
   }
 }
 
@@ -1367,6 +1386,8 @@ function onLotSelect(sel){
   const opt=sel.options[sel.selectedIndex];
   sel.dataset.exp=opt.dataset.exp||'';
   sel.dataset.dateType=opt.dataset.dateType||'exp';
+  const meta=sel.parentElement?.querySelector('.mes-lot-meta'); if(meta) meta.style.display='block';
+  renderLotMeta(sel);
   updateAutoCalc(sel.closest('.ing-block'));
 }
 
@@ -1381,7 +1402,7 @@ function addExpRow(btn){
   }
   const lots=JSON.parse(block.dataset.lotOptions||'[]');
   const ingCode=block.dataset.ingCode||'';
-  const lotOptions=lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}">${l.label}</option>`).join('');
+  const lotOptions=lots.map(l=>`<option value="${l.lot}" data-exp="${l.exp}" data-date-type="${l.dateType||'exp'}" data-remaining="${Number(l.remaining||0)}">${l.lot}</option>`).join('');
   const newRow=document.createElement('div'); newRow.className='exp-row auto-row';
   newRow.innerHTML=`
     <div style="display:flex;flex-direction:column;gap:3px;flex:1;">
@@ -1389,6 +1410,7 @@ function addExpRow(btn){
         <option value="">-- LOT 선택 --</option>
         ${lotOptions}
       </select>
+      <div class="mes-lot-meta" aria-live="polite"><strong>LOT를 선택하세요</strong></div>
       <div class="lot-manual-wrap" style="display:none;align-items:center;gap:4px;height:42px;box-sizing:border-box;">
         <span style="background:#f0f4ff;color:var(--primary);font-weight:700;padding:8px 10px;border-radius:8px;font-size:12px;white-space:nowrap;height:100%;box-sizing:border-box;">${ingCode}</span>
         <span style="color:var(--text2);font-weight:700;flex:0 0 auto;">-</span>
