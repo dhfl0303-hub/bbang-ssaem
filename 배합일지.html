@@ -193,7 +193,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.9 · 2026.08.19 08:47</div>
+<div style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.0 · 2026.08.19 09:25</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -567,10 +567,38 @@ function loadLocal(){
   S.todayRecords = d ? JSON.parse(d) : [];
   updateStats(); renderTodayList();
 }
+function batchRecordToken(r){ return r?.syncId||('LEGACY-'+(r?.sessionKey||((r?.productCode||'')+'-'+(r?.date||'')))); }
+async function loadDeletedBatchSyncIds(){
+  if(!window._db) return [];
+  try{
+    const snap=await window._db.collection('appData').doc('deletedBatchSyncIds').get();
+    return (snap.exists&&snap.data().data)?JSON.parse(snap.data().data):[];
+  }catch(e){ return []; }
+}
+function removeDeletedBatchRecordsFromLocal(deletedIds){
+  const deleted=new Set(deletedIds||[]);
+  if(!deleted.size) return 0;
+  let removed=0;
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i);
+    if(!key||!key.startsWith('batchRecords_')) continue;
+    const rows=JSON.parse(localStorage.getItem(key)||'[]');
+    const kept=rows.filter(r=>!deleted.has(batchRecordToken(r)));
+    removed+=rows.length-kept.length;
+    if(kept.length!==rows.length) localStorage.setItem(key,JSON.stringify(kept));
+  }
+  if(removed){
+    const current=JSON.parse(localStorage.getItem('batchRecords_'+getWorkDateKey())||'[]');
+    S.todayRecords=current;
+    updateStats(); renderTodayList();
+  }
+  return removed;
+}
 // Firebase에서 명시적으로 삭제된(deletedKeys) 날짜의 localStorage만 정리
 async function cleanDeletedFromFirebase(){
   if(!window._db) return;
   try{
+    removeDeletedBatchRecordsFromLocal(await loadDeletedBatchSyncIds());
     const dkSnap = await window._db.collection('appData').doc('deletedKeys').get();
     if(!dkSnap.exists || !dkSnap.data().data) return;
     const deletedKeys = JSON.parse(dkSnap.data().data);
@@ -2355,6 +2383,10 @@ async function syncToServer(){
 
     // 1. 현재 작업일자의 배합 기록만 수집 (테스트 기록 제외)
     const todayKey = 'batchRecords_'+getWorkDateKey();
+    // 통합관리에서 개별 삭제한 기록은 오프라인 사본에서도 제거하여 재업로드를 막는다.
+    const deletedBatchIds=await loadDeletedBatchSyncIds();
+    const removedDeleted=removeDeletedBatchRecordsFromLocal(deletedBatchIds);
+    if(removedDeleted) console.log(`[동기화] 통합관리에서 삭제된 배합 ${removedDeleted}건 로컬 정리`);
     const keys = localStorage.getItem(todayKey) ? [todayKey] : [];
     let allRecs = []; keys.forEach(k=>{ allRecs = allRecs.concat(JSON.parse(localStorage.getItem(k)||'[]').filter(r=>!r._isTest)); });
     if(!allRecs.length){ btn.textContent='⚠️ 데이터 없음'; setTimeout(()=>{btn.textContent='🔄 동기화';btn.disabled=false;},2000); return; }
@@ -2515,6 +2547,13 @@ async function syncSingleBatch(idx){
   try{
     if(!window._db) throw new Error('Firebase 연결 없음');
     const db = window._db;
+    const deletedBatchIds=await loadDeletedBatchSyncIds();
+    if(deletedBatchIds.includes(batchRecordToken(rec))){
+      S.todayRecords.splice(idx,1);
+      saveLocal(); renderTodayList();
+      alert('통합관리에서 삭제된 배합기록이므로 오프라인 사본도 제거했습니다.');
+      return;
+    }
     const rawDate=rec.date||getWorkDateKey();
     const isoDate=rawDate.length===6?'20'+rawDate.slice(0,2)+'-'+rawDate.slice(2,4)+'-'+rawDate.slice(4,6):rawDate;
     const lastBatchLot=(rec.batchRecords||[]).length?rec.batchRecords[rec.batchRecords.length-1].lot:('배합-'+(rec.productCode||'')+'-'+rawDate);

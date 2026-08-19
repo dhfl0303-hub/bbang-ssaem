@@ -200,7 +200,7 @@ tr:hover td{background:var(--bg);}
 </script>
 </head>
 <body>
-<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.7 · 2026.08.14 17:26</div>
+<div style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.8 · 2026.08.19 09:25</div>
 <!-- 로그인 화면 -->
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0d3f75;z-index:9999;align-items:center;justify-content:center;">
   <div style="width:340px;">
@@ -2039,7 +2039,10 @@ function loadBatchStatus(){
           <span class="badge badge-gray">${worker}</span>
           <span style="font-size:12px;color:var(--text3);">${batches.length}배합 · ${totalG.toLocaleString()}g</span>
         </div>
-        <span class="arr">▼</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteOneBatchRecord(${ri})">이 배합만 삭제</button>
+          <span class="arr">▼</span>
+        </div>
       </div>
       <div class="bs-acc-bd">`;
 
@@ -2960,6 +2963,59 @@ async function deleteBatchStatus(){
   loadBatchStatus();
   renderIngStock();
   alert('삭제 완료 (원료수불부 출고내역도 정리됨)');
+}
+
+async function deleteOneBatchRecord(recordIndex){
+  const dateVal=document.getElementById('batchStatusDate').value;
+  if(!dateVal){ alert('날짜를 먼저 선택해주세요'); return; }
+  const key=dateToYYMMDD(dateVal);
+  const docKey='batchRecords_'+key;
+  const recs=(window._fbCache&&window._fbCache[docKey])||[];
+  const target=recs[recordIndex];
+  if(!target){ alert('삭제할 배합기록을 찾을 수 없습니다'); return; }
+  const batches=target.batchRecords||[];
+  const batchLots=new Set(batches.map(b=>b.lot).filter(Boolean));
+  const token=target.syncId||('LEGACY-'+(target.sessionKey||((target.productCode||'')+'-'+(target.date||key))));
+  if(!confirm(`이 배합기록만 삭제하시겠습니까?\n\n제품: ${target.product||'-'} (${target.productCode||'-'})\n배합 수: ${batches.length}회\n공정 LOT: ${batches[0]?.lot||'-'}${batches.length>1?' 외 '+(batches.length-1)+'건':''}\n\n해당 배합의 원료 출고가 제거되어 재고가 복원됩니다.\n같은 날짜의 다른 제품은 유지됩니다.`)) return;
+
+  const remaining=recs.filter((_,i)=>i!==recordIndex);
+  const nextLedger=ledgerRecords.filter(r=>{
+    if(!['out','dispose'].includes(r.type)) return true;
+    if(target.syncId&&r.sourceId===target.syncId) return false;
+    if(r.batchLot&&batchLots.has(r.batchLot)) return false;
+    return true;
+  });
+
+  try{
+    if(window._db){
+      const tombRef=window._db.collection('appData').doc('deletedBatchSyncIds');
+      const tombSnap=await tombRef.get();
+      let tombs=(tombSnap.exists&&tombSnap.data().data)?JSON.parse(tombSnap.data().data):[];
+      if(!tombs.includes(token)) tombs.push(token);
+      if(tombs.length>1000) tombs=tombs.slice(-1000);
+      const fbBatch=window._db.batch();
+      fbBatch.set(window._db.collection('appData').doc('ledgerRecords'),{data:JSON.stringify(nextLedger),updatedAt:new Date().toISOString()});
+      if(remaining.length){
+        fbBatch.set(window._db.collection('appData').doc(docKey),{data:JSON.stringify(remaining),updatedAt:new Date().toISOString()});
+      }else{
+        fbBatch.delete(window._db.collection('appData').doc(docKey));
+      }
+      fbBatch.set(tombRef,{data:JSON.stringify(tombs),updatedAt:new Date().toISOString()});
+      await fbBatch.commit();
+    }
+  }catch(e){
+    alert('Firebase 삭제 반영에 실패하여 삭제하지 않았습니다: '+e.message);
+    return;
+  }
+
+  ledgerRecords=nextLedger;
+  window._fbCache[docKey]=remaining;
+  await saveLedger();
+  syncIngStockFromLedger();
+  renderIngStock();
+  loadBatchStatus();
+  fillDateDropdown('batchStatusDate','batchRecords_');
+  alert(`${target.product||'배합'} 기록만 삭제했습니다.\n해당 원료 출고가 제거되어 재고가 복원되었습니다.`);
 }
 async function deletePackStatus(){
   const dateVal = document.getElementById('packStatusDate').value;
