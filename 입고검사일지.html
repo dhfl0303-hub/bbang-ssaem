@@ -171,7 +171,7 @@ select.td-input{cursor:pointer;}
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.42);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.1 · 2026.08.21 09:00</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.42);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.3 · 2026.08.21 09:08</div>
 
 <!-- 계산기 모달 -->
 <div class="modal-overlay" id="calcModal" onclick="closeModalOutside(event,'calcModal')">
@@ -225,7 +225,10 @@ select.td-input{cursor:pointer;}
   <div class="card">
     <div class="card-hd">
       <div class="card-hd-title">📋 원부재료 입고 검사 일지</div>
-      <button class="btn btn-sm btn-outline" onclick="openSupplierModal()">🏢 거래처 관리</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+        <button class="btn btn-sm btn-primary" onclick="startNewIncomingForm()">📝 새 작성</button>
+        <button class="btn btn-sm btn-outline" onclick="openSupplierModal()">🏢 거래처 관리</button>
+      </div>
     </div>
     <div class="card-bd">
       <div class="form-row">
@@ -1684,7 +1687,7 @@ function saveSuppliersToFirebase(){
     .catch(e=>console.warn('거래처 저장 실패', e));
 }
 async function loadFromFirebase(){
-  if(!window._db) return;
+  if(!window._db) return false;
   try{
     const [recSnap, supSnap, ingSnap] = await Promise.all([
       window._db.collection('appData').doc('incomingRecords').get(),
@@ -1709,7 +1712,34 @@ async function loadFromFirebase(){
     }
     if(supSnap.exists && supSnap.data().data) suppliers = JSON.parse(supSnap.data().data);
     if(ingSnap.exists && ingSnap.data().data) INGREDIENT_DB = JSON.parse(ingSnap.data().data);
-  }catch(e){ console.warn('Firebase 로드 실패', e); }
+    return true;
+  }catch(e){
+    console.warn('Firebase 로드 실패', e);
+    return false;
+  }
+}
+
+function startNewIncomingForm(){
+  if(!confirm('현재 작성 화면을 비우고 새 입고검사일지를 작성하시겠습니까?\n이미 저장된 내역은 삭제되지 않습니다.')) return;
+
+  const today = new Date();
+  const yy = String(today.getFullYear()).slice(2);
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const dd = String(today.getDate()).padStart(2,'0');
+  document.getElementById('inDateRaw').value = yy+mm+dd;
+  onInDateInput();
+
+  document.getElementById('mainTbody').innerHTML = '';
+  rowCount = 0;
+  for(let i=0;i<10;i++) addRow();
+
+  document.getElementById('nonconformity').value = '';
+  document.getElementById('corrective').value = '';
+  clearCanvas('write');
+  clearCanvas('approve');
+  switchTab('write');
+  window.scrollTo({top:0, behavior:'smooth'});
+  alert('새 작성 화면으로 초기화했습니다.');
 }
 
 // ===== 실행 =====

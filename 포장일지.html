@@ -107,6 +107,8 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 .done-sub{font-size:12px;color:var(--text3);margin-top:2px;}
 .done-badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:var(--success-light);color:var(--success);}
 .lot-box{background:var(--primary-light);border:1px solid #b3cef0;border-radius:10px;padding:12px 14px;margin-bottom:14px;}
+.field-input.stock-error{border:2px solid #e53935!important;background:#fff0f0!important;color:#c62828!important;font-weight:800;}
+.stock-error-msg{display:none;margin-top:5px;padding:7px 9px;border-radius:7px;background:#ffebee;color:#c62828;font-size:12px;font-weight:800;}
 .lot-lbl{font-size:11px;color:var(--primary);font-weight:700;margin-bottom:3px;}
 .lot-num{font-size:15px;font-weight:700;color:var(--primary-dark);}
 .complete-icon{width:70px;height:70px;border-radius:50%;background:var(--success-light);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:34px;}
@@ -178,7 +180,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v1.3 · 2026.08.19 10:03</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v1.4 · 2026.08.21 16:28</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -288,7 +290,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <div class="row">
           <div>
             <div class="field-label">작업시작시간</div>
-            <input class="field-input" id="startTime" placeholder="0830" maxlength="4" inputmode="numeric" oninput="fmtTime(this)" onblur="fmtTime(this)" onfocus="unfmtTime(this)">
+            <input class="field-input readonly" id="startTime" value="08:30" readonly>
           </div>
           <div>
             <div class="field-label">작업종료시간</div>
@@ -366,9 +368,9 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <!-- 소비기한 -->
         <div class="field-label" style="margin-top:10px;">소비기한</div>
         <div class="month-btns">
-          <div class="month-btn" onclick="setExpiry(6)">6개월</div>
-          <div class="month-btn" onclick="setExpiry(9)">9개월</div>
-          <div class="month-btn" onclick="setExpiry(12)">12개월</div>
+          <div class="month-btn" onclick="setExpiry(6,this)">6개월</div>
+          <div class="month-btn" onclick="setExpiry(9,this)">9개월</div>
+          <div class="month-btn" onclick="setExpiry(12,this)">12개월</div>
         </div>
         <input class="field-input readonly success" id="expiryDate" placeholder="소비기한 자동계산" readonly style="margin-bottom:0;">
       </div>
@@ -409,6 +411,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
             <select class="field-input" id="boxLot" onchange="onSubLotSelect('boxLot')">
               <option value="">-- 선택 --</option>
             </select>
+            <div class="stock-error-msg" id="boxLotWarning">⚠️ 박스 LOT 재고가 없습니다. 다른 LOT를 선택해주세요.</div>
           </div>
           <div>
             <div class="field-label">박스사용량</div>
@@ -748,13 +751,31 @@ function loadSubLots(){
 // 부자재 LOT 선택 시 재고 체크
 function onSubLotSelect(selId){
   const sel=document.getElementById(selId);
-  if(!sel||!sel.value) return;
+  if(!sel) return;
+  if(selId==='boxLot'){
+    markBoxLotStockStatus();
+    return;
+  }
+  if(!sel.value) return;
   const lot=sel.value;
   const remaining=getRealRemaining(lot);
   if(remaining<=0){
     alert('⚠️ 재고가 없습니다.\n\nLOT: '+lot+'\n잔량: '+remaining);
     sel.selectedIndex=0;
   }
+}
+
+function markBoxLotStockStatus(){
+  const sel=document.getElementById('boxLot');
+  const warning=document.getElementById('boxLotWarning');
+  if(!sel||!warning) return;
+  const lot=sel.value||'';
+  const ledger=window._subLedgerRecords||[];
+  const hasStockData=Array.isArray(ledger)&&ledger.length>0;
+  const noStock=!!lot && hasStockData && getRealRemaining(lot)<=0;
+  sel.classList.toggle('stock-error',noStock);
+  warning.style.display=noStock?'block':'none';
+  warning.textContent=noStock?`⚠️ 박스 LOT 재고 없음: ${lot}`:'';
 }
 
 // 포장 완료 전 부자재 재고 초과 검증
@@ -850,11 +871,8 @@ function initFormPage(){
       document.getElementById('sealerTemp').value=dev.sealerTemp||'';
     }
   }
-  // 시작시간 자동입력
-  if(!document.getElementById('startTime').value) {
-    const now=getNow();
-    document.getElementById('startTime').value=now;
-  }
+  // 포장 작업 시작시간은 전 제품 공통 고정값
+  document.getElementById('startTime').value='08:30';
 }
 function saveDeviceSetting(){
   const code=document.getElementById('devProductSel').value;
@@ -965,6 +983,47 @@ function loadLocal(){
   const d=localStorage.getItem('packRecords_'+getWorkDateKey());
   S.todayRecords = d ? JSON.parse(d) : [];
   updateStats(); renderTodayList();
+}
+
+// 제품별 일부 포장 기본값: 같은 태블릿에서 오프라인으로 기억
+const PRODUCT_PACK_TEMPLATE_KEY='packProductTemplates_v1';
+function loadProductPackTemplates(){
+  try{ return JSON.parse(localStorage.getItem(PRODUCT_PACK_TEMPLATE_KEY)||'{}')||{}; }
+  catch(e){ return {}; }
+}
+function saveProductPackTemplate(code, template){
+  if(!code) return;
+  const all=loadProductPackTemplates();
+  all[code]=template;
+  localStorage.setItem(PRODUCT_PACK_TEMPLATE_KEY,JSON.stringify(all));
+}
+function restoreTemplateSelect(id, value){
+  const sel=document.getElementById(id);
+  if(!sel||!value||value==='-') return;
+  if(![...sel.options].some(o=>o.value===value)){
+    const opt=document.createElement('option');
+    opt.value=value;
+    opt.textContent=value+' [현재 재고목록에 없음]';
+    sel.appendChild(opt);
+  }
+  sel.value=value;
+}
+function applyProductPackTemplate(code){
+  const template=loadProductPackTemplates()[code];
+  document.getElementById('startTime').value='08:30';
+  if(!template) return;
+  restoreTemplateSelect('bulkLot',template.bulkLot);
+  restoreTemplateSelect('boxLot',template.boxLot);
+  document.getElementById('perBox').value=template.perBox||'';
+  document.getElementById('itemWeight').value=template.itemWeight||'';
+  if(template.expiryMonths){
+    setExpiry(Number(template.expiryMonths),null);
+  }else if(template.expiryDate){
+    document.getElementById('expiryDate').value=template.expiryDate;
+  }
+  calcBoxes();
+  checkPackTypeConflict(template.bulkLot?'bulk':'reset');
+  markBoxLotStockStatus();
 }
 
 // 페이지 전환
@@ -1195,18 +1254,20 @@ function selectProduct(code){
     const el=document.getElementById(id); if(el) el.value=id==='filmQty'||id==='filmWaste'||id==='filmWastePcs'?'0':'';
   });
   document.getElementById('filmSummary').innerHTML='<span style="font-size:13px;color:var(--text3);">미입력</span>';
-  document.getElementById('startTime').value=getNow();
+  document.getElementById('startTime').value='08:30';
   // 필름/비닐 상호 비활성화 해제
   checkPackTypeConflict('reset');
 
   showPage('form');
+  applyProductPackTemplate(code);
 }
 
 // 소비기한 계산
-function setExpiry(months){
+function setExpiry(months, sourceEl){
   S.expiryMonths=months;
   document.querySelectorAll('.month-btn').forEach(b=>b.classList.remove('active'));
-  event.target.classList.add('active');
+  const btn=sourceEl||[...document.querySelectorAll('.month-btn')].find(b=>b.textContent.trim()===months+'개월');
+  if(btn) btn.classList.add('active');
   const today=getWorkDateKey();
   const yy=parseInt('20'+today.slice(0,2));
   const mm=parseInt(today.slice(2,4))-1;
@@ -1795,6 +1856,14 @@ function completePackaging(signImg=''){
     pkgBoxQty:document.getElementById('pkgBoxQty').value||0,
     signImg
   };
+  saveProductPackTemplate(pCode,{
+    bulkLot:record.bulkLot,
+    expiryMonths:S.expiryMonths||null,
+    expiryDate:record.expiryDate,
+    perBox:record.perBox,
+    itemWeight:record.itemWeight,
+    boxLot:record.boxLot
+  });
   if(window._testMode) record._isTest = true;
 
   S.todayRecords.push(record);
