@@ -180,7 +180,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v1.4 · 2026.08.21 16:28</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v1.7 · 2026.08.21 17:12</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -401,7 +401,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <!-- 잔량 -->
         <div style="margin-top:10px;">
           <div class="field-label">잔량 (개)</div>
-          <input class="field-input" type="number" id="remaining" placeholder="개">
+          <input class="field-input" type="number" id="remaining" placeholder="개" oninput="calcBoxes()">
         </div>
 
         <!-- 박스LOT / 박스사용량 -->
@@ -415,7 +415,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
           </div>
           <div>
             <div class="field-label">박스사용량</div>
-            <input class="field-input" type="number" id="boxQty" placeholder="개">
+            <input class="field-input readonly" type="number" id="boxQty" placeholder="자동계산" readonly>
           </div>
         </div>
 
@@ -429,7 +429,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
           </div>
           <div>
             <div class="field-label">패키지박스사용량</div>
-            <input class="field-input" type="number" id="pkgBoxQty" placeholder="개">
+            <input class="field-input readonly" type="number" id="pkgBoxQty" placeholder="자동계산" readonly>
           </div>
         </div>
       </div>
@@ -754,15 +754,20 @@ function onSubLotSelect(selId){
   if(!sel) return;
   if(selId==='boxLot'){
     markBoxLotStockStatus();
+    checkOuterBoxConflict();
     return;
   }
-  if(!sel.value) return;
+  if(!sel.value){
+    if(selId==='pkgBoxLot') checkOuterBoxConflict();
+    return;
+  }
   const lot=sel.value;
   const remaining=getRealRemaining(lot);
   if(remaining<=0){
     alert('⚠️ 재고가 없습니다.\n\nLOT: '+lot+'\n잔량: '+remaining);
     sel.selectedIndex=0;
   }
+  if(selId==='pkgBoxLot') checkOuterBoxConflict();
 }
 
 function markBoxLotStockStatus(){
@@ -776,6 +781,24 @@ function markBoxLotStockStatus(){
   sel.classList.toggle('stock-error',noStock);
   warning.style.display=noStock?'block':'none';
   warning.textContent=noStock?`⚠️ 박스 LOT 재고 없음: ${lot}`:'';
+}
+
+// 일반 박스와 패키지박스는 한 작업에서 둘 중 하나만 사용
+function checkOuterBoxConflict(){
+  const boxSel=document.getElementById('boxLot');
+  const pkgSel=document.getElementById('pkgBoxLot');
+  if(!boxSel||!pkgSel) return;
+  const hasBox=!!boxSel.value;
+  const hasPkg=!!pkgSel.value;
+  pkgSel.disabled=hasBox;
+  boxSel.disabled=hasPkg;
+  pkgSel.style.opacity=hasBox?'0.45':'1';
+  boxSel.style.opacity=hasPkg?'0.45':'1';
+  if(hasPkg){
+    boxSel.classList.remove('stock-error');
+    const warning=document.getElementById('boxLotWarning');
+    if(warning) warning.style.display='none';
+  }
 }
 
 // 포장 완료 전 부자재 재고 초과 검증
@@ -825,7 +848,31 @@ function validateSubStock(){
   return true;
 }
 
-// 설비세팅 입력 시 자동저장
+const DEVICE_SETTINGS_LOCAL_KEY='packDeviceSettings_v1';
+
+function loadLocalDeviceSettings(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(DEVICE_SETTINGS_LOCAL_KEY)||'[]');
+    return Array.isArray(saved)?saved:[];
+  }catch(e){
+    console.warn('로컬 설비세팅값을 불러오지 못했습니다.',e);
+    return [];
+  }
+}
+
+function persistDeviceSettings(settings){
+  window._deviceSettings=settings;
+  try{
+    localStorage.setItem(DEVICE_SETTINGS_LOCAL_KEY,JSON.stringify(settings));
+  }catch(e){
+    console.warn('로컬 설비세팅값을 저장하지 못했습니다.',e);
+  }
+  if(window._db){
+    window._db.collection('appData').doc('deviceSettings').set({data:JSON.stringify(settings),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  }
+}
+
+// 설비세팅 입력 시 제품별 자동저장
 function saveDeviceFromForm(){
   if(!S.product) return;
   const sealingC1=parseFloat(document.getElementById('sealingC1').value)||0;
@@ -837,8 +884,8 @@ function saveDeviceFromForm(){
   const idx=settings.findIndex(d=>d.code===S.product);
   const setting={code:S.product,sealingC1,sealingC2,sealingK1,sealingK2,sealerTemp};
   if(idx>=0) settings[idx]=setting; else settings.push(setting);
-  window._deviceSettings=settings;
-  if(window._db) window._db.collection('appData').doc('deviceSettings').set({data:JSON.stringify(settings),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  PACK_DEVICE_SETTINGS[S.product]=setting;
+  persistDeviceSettings(settings);
 }
 
 // 포장 입력 화면 초기화
@@ -886,8 +933,7 @@ function saveDeviceSetting(){
   const idx=settings.findIndex(d=>d.code===code);
   const setting={code,sealingC1,sealingC2,sealingK1,sealingK2,sealerTemp};
   if(idx>=0) settings[idx]=setting; else settings.push(setting);
-  window._deviceSettings=settings;
-  if(window._db) window._db.collection('appData').doc('deviceSettings').set({data:JSON.stringify(settings),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
+  persistDeviceSettings(settings);
   // PACK_DEVICE_SETTINGS도 갱신
   PACK_DEVICE_SETTINGS[code]=setting;
   alert('저장 완료!');
@@ -1011,6 +1057,7 @@ function restoreTemplateSelect(id, value){
 function applyProductPackTemplate(code){
   const template=loadProductPackTemplates()[code];
   document.getElementById('startTime').value='08:30';
+  checkOuterBoxConflict();
   if(!template) return;
   restoreTemplateSelect('bulkLot',template.bulkLot);
   restoreTemplateSelect('boxLot',template.boxLot);
@@ -1024,6 +1071,7 @@ function applyProductPackTemplate(code){
   calcBoxes();
   checkPackTypeConflict(template.bulkLot?'bulk':'reset');
   markBoxLotStockStatus();
+  checkOuterBoxConflict();
 }
 
 // 페이지 전환
@@ -1578,8 +1626,21 @@ function checkPackTypeConflict(src){
 function calcBoxes(){
   const pcs=parseInt(document.getElementById('qtyPcs').value)||0;
   const per=parseInt(document.getElementById('perBox').value)||0;
-  if(pcs&&per) document.getElementById('qtyBoxes').value=Math.floor(pcs/per);
-  else document.getElementById('qtyBoxes').value='';
+  const remaining=parseInt(document.getElementById('remaining').value)||0;
+  const qtyBoxes=document.getElementById('qtyBoxes');
+  const boxQty=document.getElementById('boxQty');
+  const pkgBoxQty=document.getElementById('pkgBoxQty');
+  if(pcs&&per){
+    const completedBoxes=Math.floor(pcs/per);
+    const usedBoxes=completedBoxes+(remaining>0?1:0);
+    qtyBoxes.value=completedBoxes;
+    boxQty.value=usedBoxes;
+    pkgBoxQty.value=usedBoxes;
+  }else{
+    qtyBoxes.value='';
+    boxQty.value='';
+    pkgBoxQty.value='';
+  }
 }
 
 
@@ -1851,9 +1912,9 @@ function completePackaging(signImg=''){
     bulkLot:document.getElementById('bulkLot')?.value||'-',
     bulkQty:document.getElementById('bulkQty').value||0,
     boxLot:document.getElementById('boxLot')?.value||'-',
-    boxQty:document.getElementById('boxQty').value||0,
+    boxQty:(document.getElementById('boxLot')?.value?document.getElementById('boxQty').value:0)||0,
     pkgBoxLot:document.getElementById('pkgBoxLot')?.value||'-',
-    pkgBoxQty:document.getElementById('pkgBoxQty').value||0,
+    pkgBoxQty:(document.getElementById('pkgBoxLot')?.value?document.getElementById('pkgBoxQty').value:0)||0,
     signImg
   };
   saveProductPackTemplate(pCode,{
@@ -1890,6 +1951,7 @@ function completePackaging(signImg=''){
 // ===== 동기화 =====
 // ===== Firebase 로드 =====
 async function loadFromFirebase(){
+  window._deviceSettings=loadLocalDeviceSettings();
   if(!window._db) return;
   try{
     const [workerSnap, packSnap, devSnap, subRecSnap, subItemSnap, subPkgSnap] = await Promise.all([
@@ -1902,7 +1964,10 @@ async function loadFromFirebase(){
     ]);
     if(workerSnap.exists && workerSnap.data().data) window._workerList = JSON.parse(workerSnap.data().data);
     if(packSnap.exists && packSnap.data().data) window._packSettings = JSON.parse(packSnap.data().data);
-    if(devSnap.exists && devSnap.data().data) window._deviceSettings = JSON.parse(devSnap.data().data);
+    if(devSnap.exists && devSnap.data().data){
+      window._deviceSettings = JSON.parse(devSnap.data().data);
+      try{ localStorage.setItem(DEVICE_SETTINGS_LOCAL_KEY,JSON.stringify(window._deviceSettings)); }catch(e){ console.warn(e); }
+    }
     if(subRecSnap.exists && subRecSnap.data().data) window._subLedgerRecords = JSON.parse(subRecSnap.data().data);
     if(subItemSnap.exists && subItemSnap.data().data) window._subItemDB = JSON.parse(subItemSnap.data().data);
     if(subPkgSnap.exists && subPkgSnap.data().data) window._subPackagingDB = JSON.parse(subPkgSnap.data().data);
