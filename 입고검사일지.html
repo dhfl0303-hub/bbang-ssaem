@@ -171,6 +171,7 @@ select.td-input{cursor:pointer;}
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.42);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.1 · 2026.08.21 09:00</div>
 
 <!-- 계산기 모달 -->
 <div class="modal-overlay" id="calcModal" onclick="closeModalOutside(event,'calcModal')">
@@ -1146,10 +1147,29 @@ async function saveRecord(){
 }
 
 // ===== 저장내역 =====
+function getHistoryDateKey(record){
+  const digits=String(record?.date||'').replace(/\D/g,'');
+  if(digits.length===8) return Number(digits);
+  if(digits.length===6) return Number('20'+digits);
+  return 0;
+}
+function getHistorySavedKey(record){
+  const parsed=Date.parse(record?.savedAt||'');
+  if(Number.isFinite(parsed)) return parsed;
+  return Number(record?.id||0);
+}
+function sortHistoryNewestFirst(){
+  records.sort((a,b)=>{
+    const byWorkDate=getHistoryDateKey(b)-getHistoryDateKey(a);
+    if(byWorkDate!==0) return byWorkDate;
+    return getHistorySavedKey(b)-getHistorySavedKey(a);
+  });
+}
 function renderHistory(){
   const list = document.getElementById('historyList');
   const empty = document.getElementById('historyEmpty');
   if(!records.length){ list.innerHTML=''; empty.style.display=''; return; }
+  sortHistoryNewestFirst();
   empty.style.display='none';
   list.innerHTML = records.map((r,i)=>`
     <div class="history-item">
