@@ -112,7 +112,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.3 · 2026.08.19 10:03</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.4 · 2026.08.25 14:41</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -313,6 +313,10 @@ function clearSign(){const canvas=document.getElementById('signCanvas');if(signC
 function goSign(){ showPage('sign'); setTimeout(initCanvas,100); }
 function completeWithSign(){
   signImg = hasSign ? document.getElementById('signCanvas').toDataURL('image/png') : '';
+  if(S._lastRecord){
+    S._lastRecord.signImg=signImg;
+    saveLocal();
+  }
   showComplete();
 }
 
@@ -339,8 +343,10 @@ function showComplete(){
 function genPrint(){
   const r = S._lastRecord;
   if(!r) return;
-  const today = new Date();
-  const dateStr = today.getFullYear()+'년 '+(today.getMonth()+1)+'월 '+today.getDate()+'일';
+  const workDate=String(r.date||'');
+  const dateStr = /^\d{6}$/.test(workDate)
+    ? `20${workDate.slice(0,2)}년 ${parseInt(workDate.slice(2,4),10)}월 ${parseInt(workDate.slice(4,6),10)}일`
+    : new Date(r.savedAt||Date.now()).toLocaleDateString('ko-KR');
   const ings = r.ingredients||[];
   const signHtml = signImg ? `<img src="${signImg}" style="height:50px;max-width:100%;">` : '';
   document.getElementById('printArea').innerHTML = `
@@ -397,6 +403,14 @@ function genPrint(){
     </div>`;
 }
 function printReport(){ window.print(); }
+function printSavedRecord(idx){
+  const record=S.todayRecords[idx];
+  if(!record){ alert('PDF로 출력할 기록을 찾을 수 없습니다.'); return; }
+  S._lastRecord=record;
+  signImg=record.signImg||record.signature||'';
+  genPrint();
+  setTimeout(()=>window.print(),50);
+}
 
 // ===== 폼 초기화 =====
 function initForm(){
@@ -902,7 +916,10 @@ function renderTodayList(){
           <thead><tr><th>원료명</th><th>수량(kg)</th><th>LOT</th><th>제조일자/소비기한</th></tr></thead>
           <tbody>${(r.ingredients||[]).map(i=>`<tr><td>${i.name}</td><td>${i.qty}</td><td>${i.lot||'-'}</td><td>${i.dateType==='mfg'?'제조':'소비'}: ${i.exp||'-'}</td></tr>`).join('')}</tbody>
         </table>
-        <button onclick="delRecord(${idx})" style="background:#fff0f0;color:var(--danger);border:1px solid #fcc;padding:8px 16px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:500;width:100%;">삭제</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button onclick="printSavedRecord(${idx})" style="background:var(--primary);color:#fff;border:none;padding:9px 16px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:700;width:100%;font-family:'Noto Sans KR',sans-serif;">🖨️ PDF 출력</button>
+          <button onclick="delRecord(${idx})" style="background:#fff0f0;color:var(--danger);border:1px solid #fcc;padding:8px 16px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:500;width:100%;">삭제</button>
+        </div>
       </div>
     </div>`;
   }).join('');
