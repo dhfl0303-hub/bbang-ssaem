@@ -200,7 +200,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v3.1 · 2026.08.26 13:23</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v3.3 · 2026.08.26 13:30</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -843,6 +843,22 @@ function renderOuterBoxRows(kind){
   addOuterBoxRow(kind);
   updateOuterBoxAllocations();
 }
+function restoreOuterBoxItems(kind,names){
+  const root=document.getElementById(kind+'UsageRows'); if(!root) return;
+  root.innerHTML='';
+  const saved=[...new Set((names||[]).filter(Boolean))];
+  (saved.length?saved:['']).forEach(name=>{
+    addOuterBoxRow(kind);
+    const sel=root.querySelector('.outer-box-row:last-child .outer-box-select');
+    if(!sel||!name) return;
+    if(![...sel.options].some(o=>o.value===name)){
+      const opt=document.createElement('option'); opt.value=name; opt.textContent=name+' [현재 품목목록에 없음]'; sel.appendChild(opt);
+    }
+    sel.value=name;
+    onOuterBoxItemSelect(sel);
+  });
+  updateOuterBoxAllocations();
+}
 let outerBoxRowSeq=0;
 function addOuterBoxRow(kind){
   const root=document.getElementById(kind+'UsageRows'); if(!root) return;
@@ -1201,7 +1217,24 @@ function applyProductPackTemplate(code){
   const template=loadProductPackTemplates()[code];
   document.getElementById('startTime').value='08:30';
   if(!template) return;
-  // 필름포장지와 벌크비닐은 작업마다 선택하는 대체 포장방식이므로 자동 선택하지 않음
+  // 처음 완료한 제품별 포장방식과 품목을 복원하되 LOT는 현재 재고에서 다시 FIFO 배정
+  if(template.packType==='film'&&template.filmItemCode){
+    const filmItem=(window._subItemDB||[]).find(i=>i.code===template.filmItemCode);
+    document.getElementById('filmItemCode').value=template.filmItemCode;
+    const parsed=parseFilmSpec(filmItem?.spec||'');
+    document.getElementById('filmUnitLen').value=parsed?.unitLen||'';
+    document.getElementById('filmRollLen').value=parsed?.rollLen||'';
+    document.getElementById('filmSummary').innerHTML=`<div style="font-size:12px;font-weight:700;color:var(--primary);">${filmItem?`[${filmItem.code}] ${filmItem.name}`:template.filmItemCode}<div style="font-size:11px;color:var(--text2);margin-top:4px;">제품별 저장값 · 생산수량 입력 후 필름 사용량을 확인해주세요.</div></div>`;
+  }else if(template.packType==='bulk'&&template.bulkItem){
+    const bulkSel=document.getElementById('bulkItem');
+    if(bulkSel){
+      if(![...bulkSel.options].some(o=>o.value===template.bulkItem)){
+        const opt=document.createElement('option'); opt.value=template.bulkItem; opt.textContent=template.bulkItem+' [현재 재고목록에 없음]'; bulkSel.appendChild(opt);
+      }
+      bulkSel.value=template.bulkItem;
+      updateBulkAllocation();
+    }
+  }
   document.getElementById('perBox').value=template.perBox||'';
   document.getElementById('itemWeight').value=template.itemWeight||'';
   if(template.expiryMonths){
@@ -1210,7 +1243,9 @@ function applyProductPackTemplate(code){
     document.getElementById('expiryDate').value=template.expiryDate;
   }
   calcBoxes();
-  checkPackTypeConflict('reset');
+  restoreOuterBoxItems('box',template.boxItems||[]);
+  restoreOuterBoxItems('pkgBox',template.pkgBoxItems||[]);
+  checkPackTypeConflict(template.packType||'reset');
 }
 
 // 페이지 전환
@@ -1546,6 +1581,14 @@ function openFilmPopup(){
 function closeFilmPopup(){
   document.getElementById('filmPopup').style.display='none';
 }
+function clearFilmSelection(){
+  ['filmLot','filmItemCode','filmUnitLen','filmRollLen'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['filmQty','filmWaste','filmWastePcs'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value='0'; });
+  window._filmFifoDist=[];
+  document.getElementById('filmSummary').innerHTML='<span style="font-size:13px;color:var(--text3);">미입력</span>';
+  closeFilmPopup();
+  checkPackTypeConflict('reset');
+}
 
 function onFilmItemChange(){
   const sel=document.getElementById('fpItem');
@@ -1752,7 +1795,7 @@ function checkPackTypeConflict(src){
   const filmOverlay=document.getElementById('filmDisabledOverlay');
   const bulkOverlay=document.getElementById('bulkDisabledOverlay');
   const filmBtn=document.getElementById('filmOpenBtn');
-  if(filmCode && filmQty>0){
+  if(filmCode){
     // 필름 입력됨 → 비닐 비활성화
     bulkOverlay.style.display='block';
     filmOverlay.style.display='none';
@@ -2071,6 +2114,9 @@ function completePackaging(signImg=''){
     signImg
   };
   saveProductPackTemplate(pCode,{
+    packType:record.filmItemCode?'film':record.bulkItem?'bulk':'',
+    filmItemCode:record.filmItemCode||'',
+    bulkItem:record.bulkItem||'',
     expiryMonths:S.expiryMonths||null,
     expiryDate:record.expiryDate,
     perBox:record.perBox,
@@ -2478,7 +2524,10 @@ async function verifyTestMode(){
         </div>
       </div>
 
-      <button onclick="applyFilmPopup()" style="width:100%;padding:14px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">✅ 적용</button>
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;">
+        <button type="button" onclick="clearFilmSelection()" style="padding:14px;border:1px solid #d68a92;border-radius:10px;background:#fff5f6;color:#b4232d;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">필름 사용 안 함</button>
+        <button onclick="applyFilmPopup()" style="padding:14px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">✅ 적용</button>
+      </div>
     </div>
   </div>
 </div>
