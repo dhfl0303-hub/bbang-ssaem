@@ -200,7 +200,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v3.3 · 2026.08.26 13:30</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v3.4 · 2026.08.26 13:38</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -374,7 +374,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <div id="bulkWrap" class="row" style="margin-top:10px;position:relative;">
           <div>
             <div class="field-label">벌크비닐 품목</div>
-            <select class="field-input" id="bulkItem" onchange="updateBulkAllocation()">
+            <select class="field-input" id="bulkItem" onchange="onBulkItemChange()">
               <option value="">-- 선택 --</option>
             </select>
             <div id="bulkLotResult" class="outer-box-lots" style="margin-top:7px;">품목과 사용량을 입력하면 선입선출 LOT가 표시됩니다.</div>
@@ -771,6 +771,11 @@ function updateBulkAllocation(){
     result.innerHTML=!item?'벌크비닐 품목을 선택해주세요.':qty<=0?'사용량을 입력하면 LOT가 자동 배정됩니다.':alloc.lots.map(x=>`${escapeHtml(x.lot)} · ${x.qty}개`).join('<br>')+(alloc.shortage?`<br><strong>재고 ${alloc.shortage}개 부족</strong>`:'');
   }
   checkPackTypeConflict(item?'bulk':'reset');
+}
+function onBulkItemChange(){
+  updateBulkAllocation();
+  const item=document.getElementById('bulkItem')?.value||'';
+  restoreMaterialOuterSettings('bulk',item,S.product||'');
 }
 
 // 부자재 LOT 선택 시 재고 체크
@@ -1202,6 +1207,26 @@ function saveProductPackTemplate(code, template){
   all[code]=template;
   localStorage.setItem(PRODUCT_PACK_TEMPLATE_KEY,JSON.stringify(all));
 }
+const MATERIAL_OUTER_TEMPLATE_KEY='packMaterialOuterTemplates_v1';
+function loadMaterialOuterTemplates(){
+  try{ return JSON.parse(localStorage.getItem(MATERIAL_OUTER_TEMPLATE_KEY)||'{}')||{}; }
+  catch(e){ return {}; }
+}
+function materialOuterKey(type,materialId,productCode){
+  if(!materialId) return '';
+  return type==='film'?`film:${materialId}`:`bulk:${productCode||''}:${materialId}`;
+}
+function saveMaterialOuterTemplate(type,materialId,productCode,template){
+  const key=materialOuterKey(type,materialId,productCode); if(!key) return;
+  const all=loadMaterialOuterTemplates(); all[key]=template;
+  localStorage.setItem(MATERIAL_OUTER_TEMPLATE_KEY,JSON.stringify(all));
+}
+function restoreMaterialOuterSettings(type,materialId,productCode){
+  const key=materialOuterKey(type,materialId,productCode);
+  const saved=key?loadMaterialOuterTemplates()[key]:null;
+  restoreOuterBoxItems('box',saved?.boxItems||[]);
+  restoreOuterBoxItems('pkgBox',saved?.pkgBoxItems||[]);
+}
 function restoreTemplateSelect(id, value){
   const sel=document.getElementById(id);
   if(!sel||!value||value==='-') return;
@@ -1217,24 +1242,7 @@ function applyProductPackTemplate(code){
   const template=loadProductPackTemplates()[code];
   document.getElementById('startTime').value='08:30';
   if(!template) return;
-  // 처음 완료한 제품별 포장방식과 품목을 복원하되 LOT는 현재 재고에서 다시 FIFO 배정
-  if(template.packType==='film'&&template.filmItemCode){
-    const filmItem=(window._subItemDB||[]).find(i=>i.code===template.filmItemCode);
-    document.getElementById('filmItemCode').value=template.filmItemCode;
-    const parsed=parseFilmSpec(filmItem?.spec||'');
-    document.getElementById('filmUnitLen').value=parsed?.unitLen||'';
-    document.getElementById('filmRollLen').value=parsed?.rollLen||'';
-    document.getElementById('filmSummary').innerHTML=`<div style="font-size:12px;font-weight:700;color:var(--primary);">${filmItem?`[${filmItem.code}] ${filmItem.name}`:template.filmItemCode}<div style="font-size:11px;color:var(--text2);margin-top:4px;">제품별 저장값 · 생산수량 입력 후 필름 사용량을 확인해주세요.</div></div>`;
-  }else if(template.packType==='bulk'&&template.bulkItem){
-    const bulkSel=document.getElementById('bulkItem');
-    if(bulkSel){
-      if(![...bulkSel.options].some(o=>o.value===template.bulkItem)){
-        const opt=document.createElement('option'); opt.value=template.bulkItem; opt.textContent=template.bulkItem+' [현재 재고목록에 없음]'; bulkSel.appendChild(opt);
-      }
-      bulkSel.value=template.bulkItem;
-      updateBulkAllocation();
-    }
-  }
+  // 포장방식·포장재·외포장은 제품이 아니라 선택한 포장재 기준으로 별도 복원
   document.getElementById('perBox').value=template.perBox||'';
   document.getElementById('itemWeight').value=template.itemWeight||'';
   if(template.expiryMonths){
@@ -1243,9 +1251,7 @@ function applyProductPackTemplate(code){
     document.getElementById('expiryDate').value=template.expiryDate;
   }
   calcBoxes();
-  restoreOuterBoxItems('box',template.boxItems||[]);
-  restoreOuterBoxItems('pkgBox',template.pkgBoxItems||[]);
-  checkPackTypeConflict(template.packType||'reset');
+  checkPackTypeConflict('reset');
 }
 
 // 페이지 전환
@@ -1782,6 +1788,8 @@ function applyFilmPopup(){
         / <span style="color:var(--primary);">총: ${totalQty.toFixed(3)}Rl</span>
       </div>
     </div>`;
+  // 필름은 인쇄된 제품명이 품목마다 다르므로 필름 품목 기준 외포장을 복원
+  restoreMaterialOuterSettings('film',itemCode,'');
   closeFilmPopup();
   checkPackTypeConflict('film');
 }
@@ -2114,16 +2122,17 @@ function completePackaging(signImg=''){
     signImg
   };
   saveProductPackTemplate(pCode,{
-    packType:record.filmItemCode?'film':record.bulkItem?'bulk':'',
-    filmItemCode:record.filmItemCode||'',
-    bulkItem:record.bulkItem||'',
     expiryMonths:S.expiryMonths||null,
     expiryDate:record.expiryDate,
     perBox:record.perBox,
-    itemWeight:record.itemWeight,
+    itemWeight:record.itemWeight
+  });
+  const outerTemplate={
     boxItems:[...new Set(record.boxLots.map(x=>x.name))],
     pkgBoxItems:[...new Set(record.pkgBoxLots.map(x=>x.name))]
-  });
+  };
+  if(record.filmItemCode) saveMaterialOuterTemplate('film',record.filmItemCode,'',outerTemplate);
+  else if(record.bulkItem) saveMaterialOuterTemplate('bulk',record.bulkItem,pCode,outerTemplate);
   if(window._testMode) record._isTest = true;
 
   S.todayRecords.push(record);
