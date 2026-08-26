@@ -152,16 +152,19 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
   .outer-box-section{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
   .outer-box-title{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f5f8fd;font-weight:800;color:var(--text1)}
   .outer-box-title span:last-child{font-size:13px;color:#1764b0}
-  .outer-box-row{display:grid;grid-template-columns:minmax(180px,1fr) minmax(150px,1fr);gap:10px;align-items:start;padding:10px 12px;border-top:1px solid var(--line)}
+  .outer-box-row{display:grid;grid-template-columns:minmax(180px,1fr) minmax(150px,1fr) 42px;gap:10px;align-items:start;padding:10px 12px;border-top:1px solid var(--line)}
   .outer-box-cell{min-width:0;display:flex;flex-direction:column}
   .outer-box-name,.outer-box-qty-label{height:22px;display:flex;align-items:center;font-size:14px;font-weight:800;margin-bottom:6px}
   .outer-box-qty-label{font-size:12px;color:var(--text2);font-weight:700}
   .outer-box-lots{min-height:46px;padding:10px 12px;border:1px solid #cbd7e8;border-radius:9px;background:#f8fafc;font-size:13px;line-height:1.55}
   .outer-box-lots.shortage{border-color:#dc3545;background:#fff1f2;color:#b4232d}
   .outer-box-qty{height:46px;margin:0!important}
+  .outer-box-select{height:46px;margin:0!important}
+  .outer-box-remove{height:46px;margin-top:28px;border:1px solid #f2a7ae;border-radius:9px;background:#fff4f5;color:#c92a3a;font-size:20px;cursor:pointer}
+  .outer-box-add{border:0;background:transparent;color:#1764b0;font-weight:800;font-size:13px;cursor:pointer;padding:4px 8px}
   .outer-box-target{margin-top:10px;padding:10px 12px;border-radius:9px;background:#eef5ff;color:#15599d;font-size:13px;font-weight:700}
   .outer-box-section.disabled{opacity:.42;pointer-events:none}
-  @media(max-width:640px){.outer-box-row{grid-template-columns:minmax(0,1fr) 118px;gap:8px;padding:9px}.outer-box-lots{font-size:12px;padding:9px}.outer-box-name{font-size:13px}}
+  @media(max-width:640px){.outer-box-row{grid-template-columns:minmax(0,1fr) 105px 38px;gap:7px;padding:9px}.outer-box-lots{font-size:12px;padding:9px}.outer-box-remove{width:38px}.outer-box-select,.outer-box-qty{padding-left:9px!important;padding-right:9px!important}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -193,7 +196,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.2 · 2026.08.26 11:41</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.3 · 2026.08.26 11:55</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -419,11 +422,11 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 
         <!-- 박스 종류별 사용량 입력 / LOT 선입선출 자동 배정 -->
         <div class="outer-box-section" style="margin-top:14px;">
-          <div class="outer-box-title"><span>박스 사용</span><span id="boxUsageTotal">합계 0개</span></div>
+          <div class="outer-box-title"><span>박스 사용</span><span><span id="boxUsageTotal">합계 0개</span><button type="button" class="outer-box-add" onclick="addOuterBoxRow('box')">＋ 박스 추가</button></span></div>
           <div id="boxUsageRows" class="outer-box-rows"></div>
         </div>
         <div class="outer-box-section" style="margin-top:12px;">
-          <div class="outer-box-title"><span>패키지박스 사용</span><span id="pkgBoxUsageTotal">합계 0개</span></div>
+          <div class="outer-box-title"><span>패키지박스 사용</span><span><span id="pkgBoxUsageTotal">합계 0개</span><button type="button" class="outer-box-add" onclick="addOuterBoxRow('pkgBox')">＋ 박스 추가</button></span></div>
           <div id="pkgBoxUsageRows" class="outer-box-rows"></div>
         </div>
         <div id="outerBoxTarget" class="outer-box-target">필요 박스 수: 0개 · 박스 종류별 사용 개수를 입력하면 LOT가 선입선출로 자동 배정됩니다.</div>
@@ -754,13 +757,34 @@ function outerBoxKey(kind){ return kind==='box'?'boxLots':'pkgBoxLots'; }
 function outerBoxCats(kind){ return kind==='box'?['박스']:['패키지박스']; }
 function outerBoxItems(kind){
   const cats=outerBoxCats(kind), db=window._subItemDB||[], names=[];
-  db.forEach(i=>{ if(cats.includes(i.category)&&i.name&&!names.includes(i.name)) names.push(i.name); });
+  db.forEach(i=>{
+    const cat=String(i.category||''), name=String(i.name||'');
+    const matched=kind==='box'?cat==='박스':cat.includes('패키지박스');
+    if(matched&&name&&!names.includes(name)) names.push(name);
+  });
+  const packagingDB=window._subPackagingDB||{};
+  Object.entries(packagingDB).forEach(([cat,items])=>{
+    const matched=kind==='box'?cat==='박스':String(cat).includes('패키지박스');
+    if(!matched) return;
+    (items||[]).forEach(i=>{ const name=typeof i==='string'?i:i?.name; if(name&&!names.includes(name)) names.push(name); });
+  });
   getAvailableSubLots(cats).forEach(i=>{ if(i.name&&!names.includes(i.name)) names.push(i.name); });
   return names;
 }
+function getAvailableLotsByItem(itemName){
+  const recs=window._subLedgerRecords||[], inQty={},outQty={},meta={};
+  recs.forEach(r=>{
+    if(r.name!==itemName||!r.lot) return;
+    if(r.type==='init'||r.type==='in'){ inQty[r.lot]=(inQty[r.lot]||0)+(parseFloat(r.qty)||0); if(!meta[r.lot]) meta[r.lot]=r; }
+    if(r.type==='out'||r.type==='dispose') outQty[r.lot]=(outQty[r.lot]||0)+(parseFloat(r.qty)||0);
+  });
+  const session=getSessionSubUsage();
+  return Object.keys(inQty).map(lot=>({name:itemName,lot,date:meta[lot]?.date||'',mfg:meta[lot]?.mfg||'',remaining:Math.round(((inQty[lot]||0)-(outQty[lot]||0)-(session[lot]||0))*1000)/1000}))
+    .filter(x=>x.remaining>0).sort((a,b)=>(a.date||'9999-99-99').localeCompare(b.date||'9999-99-99')||(a.mfg||'999999').localeCompare(b.mfg||'999999')||a.lot.localeCompare(b.lot));
+}
 function allocateOuterBoxLots(kind,itemName,qty){
   let need=Math.max(0,parseInt(qty)||0); const result=[];
-  getAvailableSubLots(outerBoxCats(kind)).filter(x=>x.name===itemName).forEach(x=>{
+  getAvailableLotsByItem(itemName).forEach(x=>{
     if(need<=0) return;
     const used=Math.min(need,Math.floor(x.remaining));
     if(used>0){ result.push({name:itemName,lot:x.lot,qty:used,date:x.date||''}); need-=used; }
@@ -769,11 +793,35 @@ function allocateOuterBoxLots(kind,itemName,qty){
 }
 function renderOuterBoxRows(kind){
   const root=document.getElementById(kind+'UsageRows'); if(!root) return;
-  const items=outerBoxItems(kind);
-  root.innerHTML=items.length?items.map((name,i)=>`<div class="outer-box-row">
-    <div class="outer-box-cell"><div class="outer-box-name">${escapeHtml(name)}</div><div class="outer-box-lots" id="${kind}LotResult${i}">사용 개수를 입력하면 LOT가 자동 배정됩니다.</div></div>
-    <div class="outer-box-cell"><div class="outer-box-qty-label">사용량(개)</div><input class="field-input outer-box-qty" type="number" min="0" step="1" inputmode="numeric" data-kind="${kind}" data-item="${escapeHtml(name)}" data-index="${i}" placeholder="0" oninput="onOuterBoxQtyInput(this)" onwheel="this.blur()"></div>
-  </div>`).join(''):'<div style="padding:14px;color:#b4232d">등록된 '+(kind==='box'?'박스':'패키지박스')+' 품목이 없습니다.</div>';
+  root.innerHTML='';
+  addOuterBoxRow(kind);
+  updateOuterBoxAllocations();
+}
+let outerBoxRowSeq=0;
+function addOuterBoxRow(kind){
+  const root=document.getElementById(kind+'UsageRows'); if(!root) return;
+  const idx=++outerBoxRowSeq, items=outerBoxItems(kind);
+  const row=document.createElement('div'); row.className='outer-box-row'; row.dataset.kind=kind;
+  row.innerHTML=`<div class="outer-box-cell"><div class="outer-box-qty-label">${kind==='box'?'박스':'패키지박스'} 선택</div>
+    <select class="field-input outer-box-select" data-kind="${kind}" data-index="${idx}" onchange="onOuterBoxItemSelect(this)"><option value="">-- 선택 --</option>${items.map(name=>`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}</select>
+    <div class="outer-box-lots" id="${kind}LotResult${idx}" style="margin-top:7px">박스를 선택하면 선입선출 LOT가 표시됩니다.</div></div>
+    <div class="outer-box-cell"><div class="outer-box-qty-label">사용량(개)</div><input class="field-input outer-box-qty" type="number" min="0" step="1" inputmode="numeric" data-kind="${kind}" data-item="" data-index="${idx}" placeholder="0" oninput="onOuterBoxQtyInput(this)" onwheel="this.blur()" disabled></div>
+    <button type="button" class="outer-box-remove" onclick="removeOuterBoxRow(this)" title="삭제">×</button>`;
+  root.appendChild(row); updateOuterBoxAllocations();
+}
+function removeOuterBoxRow(btn){
+  const row=btn.closest('.outer-box-row'), root=row?.parentElement; if(!row||!root) return;
+  row.remove(); if(!root.querySelector('.outer-box-row')) addOuterBoxRow(root.id.startsWith('pkgBox')?'pkgBox':'box');
+  updateOuterBoxAllocations();
+}
+function onOuterBoxItemSelect(sel){
+  const row=sel.closest('.outer-box-row'), input=row?.querySelector('.outer-box-qty');
+  if(!input) return;
+  if(sel.value&&[...document.querySelectorAll(`.outer-box-select[data-kind="${sel.dataset.kind}"]`)].some(other=>other!==sel&&other.value===sel.value)){
+    alert('이미 추가한 박스입니다.'); sel.value='';
+  }
+  input.dataset.item=sel.value; input.disabled=!sel.value;
+  if(!sel.value) input.value='';
   updateOuterBoxAllocations();
 }
 function collectOuterBoxLots(kind){
@@ -797,7 +845,7 @@ function updateOuterBoxAllocations(){
       const alloc=allocateOuterBoxLots(kind,input.dataset.item,qty);
       const result=document.getElementById(kind+'LotResult'+input.dataset.index); if(!result) return;
       result.classList.toggle('shortage',alloc.shortage>0);
-      result.innerHTML=qty===0?'사용 개수를 입력하면 LOT가 자동 배정됩니다.':alloc.lots.map(x=>`${escapeHtml(x.lot)} · ${x.qty}개`).join('<br>')+(alloc.shortage?`<br><strong>재고 ${alloc.shortage}개 부족</strong>`:'');
+      result.innerHTML=!input.dataset.item?'박스를 선택하면 선입선출 LOT가 표시됩니다.':qty===0?'사용 개수를 입력하면 LOT가 자동 배정됩니다.':alloc.lots.map(x=>`${escapeHtml(x.lot)} · ${x.qty}개`).join('<br>')+(alloc.shortage?`<br><strong>재고 ${alloc.shortage}개 부족</strong>`:'');
     });
     const totalEl=document.getElementById(kind+'UsageTotal'); if(totalEl) totalEl.textContent=`합계 ${total}개`;
     const hiddenQty=document.getElementById(kind==='box'?'boxQty':'pkgBoxQty'); if(hiddenQty) hiddenQty.value=total||'';
