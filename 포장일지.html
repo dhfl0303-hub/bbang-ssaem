@@ -200,7 +200,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.6 · 2026.08.26 12:28</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.7 · 2026.08.26 12:34</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -1929,9 +1929,14 @@ function goSign(){
 }
 
 function completeWithSign(){
-  const canvas=document.getElementById('signCanvas');
-  const signImg=hasSign?canvas.toDataURL('image/png'):'';
-  completePackaging(signImg);
+  try{
+    const canvas=document.getElementById('signCanvas');
+    const signImg=hasSign?canvas.toDataURL('image/png'):'';
+    completePackaging(signImg);
+  }catch(e){
+    console.error('포장 완료 처리 오류',e);
+    alert('포장 완료 처리 중 오류가 발생했습니다.\n\n'+(e?.message||e));
+  }
 }
 
 // 포장 완료
@@ -1952,6 +1957,7 @@ function completePackaging(signImg=''){
   const pCode = code||S.batchLot?.split('-')[1]||'P';
   const existCount=S.todayRecords.filter(r=>r.productCode===pCode).length;
   const lot=`포장-${pCode}-${today}-${String(existCount+1).padStart(3,'0')}`;
+  const syncId='PACK-'+(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
 
   const record={
     syncId, lot, productCode:pCode, product:productName,
