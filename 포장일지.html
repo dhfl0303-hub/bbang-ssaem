@@ -149,6 +149,19 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 .device-btn.active .device-check{color:var(--primary);}
 .print-area{display:none;}
 @media print{body *{display:none!important;}.print-area{display:block!important;}.print-area *{display:revert!important;}@page{margin:10mm;size:A4 portrait;}}
+  .outer-box-section{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+  .outer-box-title{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f5f8fd;font-weight:800;color:var(--text1)}
+  .outer-box-title span:last-child{font-size:13px;color:#1764b0}
+  .outer-box-row{display:grid;grid-template-columns:minmax(180px,1fr) minmax(150px,1fr);gap:10px;align-items:start;padding:10px 12px;border-top:1px solid var(--line)}
+  .outer-box-cell{min-width:0;display:flex;flex-direction:column}
+  .outer-box-name,.outer-box-qty-label{height:22px;display:flex;align-items:center;font-size:14px;font-weight:800;margin-bottom:6px}
+  .outer-box-qty-label{font-size:12px;color:var(--text2);font-weight:700}
+  .outer-box-lots{min-height:46px;padding:10px 12px;border:1px solid #cbd7e8;border-radius:9px;background:#f8fafc;font-size:13px;line-height:1.55}
+  .outer-box-lots.shortage{border-color:#dc3545;background:#fff1f2;color:#b4232d}
+  .outer-box-qty{height:46px;margin:0!important}
+  .outer-box-target{margin-top:10px;padding:10px 12px;border-radius:9px;background:#eef5ff;color:#15599d;font-size:13px;font-weight:700}
+  .outer-box-section.disabled{opacity:.42;pointer-events:none}
+  @media(max-width:640px){.outer-box-row{grid-template-columns:minmax(0,1fr) 118px;gap:8px;padding:9px}.outer-box-lots{font-size:12px;padding:9px}.outer-box-name{font-size:13px}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -180,7 +193,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.1 · 2026.08.26 11:26</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.2 · 2026.08.26 11:41</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -404,40 +417,18 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
           <input class="field-input" type="number" id="remaining" placeholder="개" oninput="calcBoxes()">
         </div>
 
-        <!-- 박스LOT / 박스사용량 -->
-        <div class="row" style="margin-top:10px;">
-          <div>
-            <div class="field-label">박스 LOT</div>
-            <input type="hidden" id="boxItem" value="">
-            <div id="boxItemName" style="font-weight:800;font-size:14px;color:var(--text1);margin-bottom:6px;">박스 품목 미설정</div>
-            <select class="field-input" id="boxLot" onchange="onSubLotSelect('boxLot')">
-              <option value="">-- 자동 LOT 대기 --</option>
-            </select>
-            <div id="boxLotMeta" style="font-size:12px;color:var(--text2);margin-top:5px;"></div>
-            <div class="stock-error-msg" id="boxLotWarning">⚠️ 박스 LOT 재고가 없습니다. 다른 LOT를 선택해주세요.</div>
-          </div>
-          <div>
-            <div class="field-label">박스사용량</div>
-            <input class="field-input readonly" type="number" id="boxQty" placeholder="자동계산" readonly>
-          </div>
+        <!-- 박스 종류별 사용량 입력 / LOT 선입선출 자동 배정 -->
+        <div class="outer-box-section" style="margin-top:14px;">
+          <div class="outer-box-title"><span>박스 사용</span><span id="boxUsageTotal">합계 0개</span></div>
+          <div id="boxUsageRows" class="outer-box-rows"></div>
         </div>
-
-        <!-- 패키지박스LOT / 패키지박스사용량 -->
-        <div class="row" style="margin-top:10px;">
-          <div>
-            <div class="field-label">패키지박스 LOT</div>
-            <input type="hidden" id="pkgBoxItem" value="">
-            <div id="pkgBoxItemName" style="font-weight:800;font-size:14px;color:var(--text1);margin-bottom:6px;">패키지박스 품목 미설정</div>
-            <select class="field-input" id="pkgBoxLot" onchange="onSubLotSelect('pkgBoxLot')">
-              <option value="">-- 자동 LOT 대기 --</option>
-            </select>
-            <div id="pkgBoxLotMeta" style="font-size:12px;color:var(--text2);margin-top:5px;"></div>
-          </div>
-          <div>
-            <div class="field-label">패키지박스사용량</div>
-            <input class="field-input readonly" type="number" id="pkgBoxQty" placeholder="자동계산" readonly>
-          </div>
+        <div class="outer-box-section" style="margin-top:12px;">
+          <div class="outer-box-title"><span>패키지박스 사용</span><span id="pkgBoxUsageTotal">합계 0개</span></div>
+          <div id="pkgBoxUsageRows" class="outer-box-rows"></div>
         </div>
+        <div id="outerBoxTarget" class="outer-box-target">필요 박스 수: 0개 · 박스 종류별 사용 개수를 입력하면 LOT가 선입선출로 자동 배정됩니다.</div>
+        <input type="hidden" id="boxItem"><input type="hidden" id="boxLot"><input type="hidden" id="boxQty">
+        <input type="hidden" id="pkgBoxItem"><input type="hidden" id="pkgBoxLot"><input type="hidden" id="pkgBoxQty">
       </div>
     </div>
 
@@ -670,6 +661,8 @@ function getSessionSubUsage(){
     if(r.bulkLot && r.bulkLot!=='-') usage[r.bulkLot]=(usage[r.bulkLot]||0)+(parseFloat(r.bulkQty)||0);
     if(r.boxLot && r.boxLot!=='-') usage[r.boxLot]=(usage[r.boxLot]||0)+(parseFloat(r.boxQty)||0);
     if(r.pkgBoxLot && r.pkgBoxLot!=='-') usage[r.pkgBoxLot]=(usage[r.pkgBoxLot]||0)+(parseFloat(r.pkgBoxQty)||0);
+    (r.boxLots||[]).forEach(x=>{ if(x.lot) usage[x.lot]=(usage[x.lot]||0)+(parseFloat(x.qty)||0); });
+    (r.pkgBoxLots||[]).forEach(x=>{ if(x.lot) usage[x.lot]=(usage[x.lot]||0)+(parseFloat(x.qty)||0); });
     // 필름 FIFO 분배
     if(r.filmLots && r.filmLots.length){
       r.filmLots.forEach(fd=>{ if(fd.lot) usage[fd.lot]=(usage[fd.lot]||0)+(fd.qty||0); });
@@ -726,50 +719,12 @@ function getAvailableSubLots(cats){
   return lots.sort((a,b)=>(a.date||'9999-99-99').localeCompare(b.date||'9999-99-99')||(a.mfg||'999999').localeCompare(b.mfg||'999999')||(a.lot||'').localeCompare(b.lot||''));
 }
 
-function updateOuterBoxLotMeta(lotId){
-  const lot=document.getElementById(lotId)?.value||'';
-  const meta=document.getElementById(lotId==='boxLot'?'boxLotMeta':'pkgBoxLotMeta');
-  if(!meta) return;
-  const info=getAvailableSubLots(lotId==='boxLot'?['박스']:['패키지박스']).find(r=>r.lot===lot);
-  meta.innerHTML=info?`<strong>입고일</strong>: ${info.date||'-'} &nbsp;·&nbsp; <strong>현재 재고</strong>: ${info.remaining}${info.unit}`:'';
-}
-function fillOuterBoxLots(lotId,itemId){
-  const lotSel=document.getElementById(lotId), itemName=document.getElementById(itemId)?.value||'';
-  if(!lotSel) return;
-  const allLots=getAvailableSubLots(lotId==='boxLot'?['박스']:['패키지박스']);
-  if(!itemName){
-    lotSel.innerHTML='<option value="">-- 최초 1회 LOT 선택 --</option>'+allLots.map(r=>`<option value="${r.lot}">${r.name} - ${r.lot} [재고:${r.remaining}${r.unit}]</option>`).join('');
-    updateOuterBoxLotMeta(lotId);return;
-  }
-  const lots=allLots.filter(r=>r.name===itemName);
-  lotSel.innerHTML=lots.length?lots.map(r=>{
-    const isOI=r.lot.includes('-OF-')||r.lot.includes('-OI-');
-    return `<option value="${r.lot}">${r.lot}${isOI?' (초기재고)':''} [재고:${r.remaining}${r.unit}]</option>`;
-  }).join(''):'<option value="">-- 재고 LOT 없음 --</option>';
-  if(lots.length) lotSel.value=lots[0].lot;
-  updateOuterBoxLotMeta(lotId);
-}
-
-// 박스 품목을 먼저 선택하고 해당 품목의 LOT만 표시
 function loadSubLots(){
   const bulkSel=document.getElementById('bulkLot');
   const bulkLots=getAvailableSubLots(['비닐','PE봉투']);
   if(bulkSel) bulkSel.innerHTML='<option value="">-- 선택 --</option>'+bulkLots.map(r=>`<option value="${r.lot}">${r.name} - ${r.lot} [재고:${r.remaining}${r.unit}]</option>`).join('');
-  const template=loadProductPackTemplates()[S.product]||{};
-  [['boxItem','boxItemName','boxLot',['박스'],template.boxItem,template.boxLot],['pkgBoxItem','pkgBoxItemName','pkgBoxLot',['패키지박스'],template.pkgBoxItem,template.pkgBoxLot]].forEach(([itemId,nameId,lotId,cats,savedItem,savedLot])=>{
-    const itemInput=document.getElementById(itemId); if(!itemInput) return;
-    const lots=getAvailableSubLots(cats);
-    const oldRec=savedLot&&(window._subLedgerRecords||[]).find(r=>r.lot===savedLot);
-    const prior=[...(S.todayRecords||[])].reverse().find(r=>r.productCode===S.product&&(lotId==='boxLot'?r.boxLot&&r.boxLot!=='-':r.pkgBoxLot&&r.pkgBoxLot!=='-'));
-    const priorLot=prior&&(lotId==='boxLot'?prior.boxLot:prior.pkgBoxLot);
-    const priorRec=priorLot&&(window._subLedgerRecords||[]).find(r=>r.lot===priorLot);
-    const wantedItem=savedItem||oldRec?.name||(lotId==='boxLot'?prior?.boxItem:prior?.pkgBoxItem)||priorRec?.name||'';
-    itemInput.value=wantedItem;
-    const nameEl=document.getElementById(nameId);
-    if(nameEl) nameEl.textContent=wantedItem||((lotId==='boxLot'?'박스':'패키지박스')+' 품목 미설정');
-    fillOuterBoxLots(lotId,itemId);
-  });
-  checkOuterBoxConflict();
+  renderOuterBoxRows('box');
+  renderOuterBoxRows('pkgBox');
 }
 
 // 부자재 LOT 선택 시 재고 체크
@@ -785,60 +740,73 @@ function onSubLotSelect(selId){
       if(nameEl) nameEl.textContent=rec.name;
     }
   }
-  updateOuterBoxLotMeta(selId);
-  if(selId==='boxLot'){
-    markBoxLotStockStatus();
-    checkOuterBoxConflict();
-    return;
-  }
-  if(!sel.value){
-    if(selId==='pkgBoxLot') checkOuterBoxConflict();
-    return;
-  }
+  if(selId==='boxLot') return;
+  if(!sel.value) return;
   const lot=sel.value;
   const remaining=getRealRemaining(lot);
   if(remaining<=0){
     alert('⚠️ 재고가 없습니다.\n\nLOT: '+lot+'\n잔량: '+remaining);
     sel.selectedIndex=0;
   }
-  if(selId==='pkgBoxLot') checkOuterBoxConflict();
 }
 
-function markBoxLotStockStatus(){
-  const sel=document.getElementById('boxLot');
-  const warning=document.getElementById('boxLotWarning');
-  if(!sel||!warning) return;
-  const lot=sel.value||'';
-  const ledger=window._subLedgerRecords||[];
-  const hasStockData=Array.isArray(ledger)&&ledger.length>0;
-  const noStock=!!lot && hasStockData && getRealRemaining(lot)<=0;
-  sel.classList.toggle('stock-error',noStock);
-  warning.style.display=noStock?'block':'none';
-  warning.textContent=noStock?`⚠️ 박스 LOT 재고 없음: ${lot}`:'';
+function outerBoxKey(kind){ return kind==='box'?'boxLots':'pkgBoxLots'; }
+function outerBoxCats(kind){ return kind==='box'?['박스']:['패키지박스']; }
+function outerBoxItems(kind){
+  const cats=outerBoxCats(kind), db=window._subItemDB||[], names=[];
+  db.forEach(i=>{ if(cats.includes(i.category)&&i.name&&!names.includes(i.name)) names.push(i.name); });
+  getAvailableSubLots(cats).forEach(i=>{ if(i.name&&!names.includes(i.name)) names.push(i.name); });
+  return names;
 }
-
-// 일반 박스와 패키지박스는 한 작업에서 둘 중 하나만 사용
-function checkOuterBoxConflict(){
-  const boxSel=document.getElementById('boxLot');
-  const pkgSel=document.getElementById('pkgBoxLot');
-  const boxItem=document.getElementById('boxItem');
-  const pkgItem=document.getElementById('pkgBoxItem');
-  if(!boxSel||!pkgSel) return;
-  const hasBox=!!boxSel.value;
-  const hasPkg=!!pkgSel.value;
-  pkgSel.disabled=hasBox;
-  boxSel.disabled=hasPkg;
-  if(pkgItem) pkgItem.disabled=hasBox;
-  if(boxItem) boxItem.disabled=hasPkg;
-  pkgSel.style.opacity=hasBox?'0.45':'1';
-  boxSel.style.opacity=hasPkg?'0.45':'1';
-  if(pkgItem) pkgItem.style.opacity=hasBox?'0.45':'1';
-  if(boxItem) boxItem.style.opacity=hasPkg?'0.45':'1';
-  if(hasPkg){
-    boxSel.classList.remove('stock-error');
-    const warning=document.getElementById('boxLotWarning');
-    if(warning) warning.style.display='none';
-  }
+function allocateOuterBoxLots(kind,itemName,qty){
+  let need=Math.max(0,parseInt(qty)||0); const result=[];
+  getAvailableSubLots(outerBoxCats(kind)).filter(x=>x.name===itemName).forEach(x=>{
+    if(need<=0) return;
+    const used=Math.min(need,Math.floor(x.remaining));
+    if(used>0){ result.push({name:itemName,lot:x.lot,qty:used,date:x.date||''}); need-=used; }
+  });
+  return {lots:result,shortage:need};
+}
+function renderOuterBoxRows(kind){
+  const root=document.getElementById(kind+'UsageRows'); if(!root) return;
+  const items=outerBoxItems(kind);
+  root.innerHTML=items.length?items.map((name,i)=>`<div class="outer-box-row">
+    <div class="outer-box-cell"><div class="outer-box-name">${escapeHtml(name)}</div><div class="outer-box-lots" id="${kind}LotResult${i}">사용 개수를 입력하면 LOT가 자동 배정됩니다.</div></div>
+    <div class="outer-box-cell"><div class="outer-box-qty-label">사용량(개)</div><input class="field-input outer-box-qty" type="number" min="0" step="1" inputmode="numeric" data-kind="${kind}" data-item="${escapeHtml(name)}" data-index="${i}" placeholder="0" oninput="onOuterBoxQtyInput(this)" onwheel="this.blur()"></div>
+  </div>`).join(''):'<div style="padding:14px;color:#b4232d">등록된 '+(kind==='box'?'박스':'패키지박스')+' 품목이 없습니다.</div>';
+  updateOuterBoxAllocations();
+}
+function collectOuterBoxLots(kind){
+  const result=[];
+  document.querySelectorAll(`.outer-box-qty[data-kind="${kind}"]`).forEach(input=>{
+    const qty=Math.max(0,parseInt(input.value)||0); if(!qty) return;
+    const alloc=allocateOuterBoxLots(kind,input.dataset.item,qty);
+    alloc.lots.forEach(x=>result.push(x));
+  });
+  return result;
+}
+function onOuterBoxQtyInput(input){
+  input.value=input.value===''?'':String(Math.max(0,parseInt(input.value)||0));
+  updateOuterBoxAllocations();
+}
+function updateOuterBoxAllocations(){
+  ['box','pkgBox'].forEach(kind=>{
+    let total=0;
+    document.querySelectorAll(`.outer-box-qty[data-kind="${kind}"]`).forEach(input=>{
+      const qty=Math.max(0,parseInt(input.value)||0); total+=qty;
+      const alloc=allocateOuterBoxLots(kind,input.dataset.item,qty);
+      const result=document.getElementById(kind+'LotResult'+input.dataset.index); if(!result) return;
+      result.classList.toggle('shortage',alloc.shortage>0);
+      result.innerHTML=qty===0?'사용 개수를 입력하면 LOT가 자동 배정됩니다.':alloc.lots.map(x=>`${escapeHtml(x.lot)} · ${x.qty}개`).join('<br>')+(alloc.shortage?`<br><strong>재고 ${alloc.shortage}개 부족</strong>`:'');
+    });
+    const totalEl=document.getElementById(kind+'UsageTotal'); if(totalEl) totalEl.textContent=`합계 ${total}개`;
+    const hiddenQty=document.getElementById(kind==='box'?'boxQty':'pkgBoxQty'); if(hiddenQty) hiddenQty.value=total||'';
+  });
+  const boxTotal=parseInt(document.getElementById('boxQty')?.value)||0, pkgTotal=parseInt(document.getElementById('pkgBoxQty')?.value)||0;
+  document.querySelector('.outer-box-section:has(#pkgBoxUsageRows)')?.classList.toggle('disabled',boxTotal>0);
+  document.querySelector('.outer-box-section:has(#boxUsageRows)')?.classList.toggle('disabled',pkgTotal>0);
+  const target=(parseInt(document.getElementById('qtyBoxes')?.value)||0)+((parseInt(document.getElementById('remaining')?.value)||0)>0?1:0);
+  const msg=document.getElementById('outerBoxTarget'); if(msg) msg.textContent=`필요 박스 수: ${target}개 · 현재 입력: ${boxTotal+pkgTotal}개`;
 }
 
 // 포장 완료 전 부자재 재고 초과 검증
@@ -851,20 +819,16 @@ function validateSubStock(){
     const rem=getRealRemaining(bulkLot);
     if(bulkQty>rem) checks.push({name:'벌크비닐',lot:bulkLot,use:bulkQty,rem});
   }
-  // 박스
-  const boxLot=document.getElementById('boxLot')?.value||'';
-  const boxQty=parseFloat(document.getElementById('boxQty')?.value)||0;
-  if(boxLot && boxLot!=='-' && boxQty>0){
-    const rem=getRealRemaining(boxLot);
-    if(boxQty>rem) checks.push({name:'박스',lot:boxLot,use:boxQty,rem});
-  }
-  // 패키지박스
-  const pkgBoxLot=document.getElementById('pkgBoxLot')?.value||'';
-  const pkgBoxQty=parseFloat(document.getElementById('pkgBoxQty')?.value)||0;
-  if(pkgBoxLot && pkgBoxLot!=='-' && pkgBoxQty>0){
-    const rem=getRealRemaining(pkgBoxLot);
-    if(pkgBoxQty>rem) checks.push({name:'패키지박스',lot:pkgBoxLot,use:pkgBoxQty,rem});
-  }
+  const boxTotal=parseInt(document.getElementById('boxQty')?.value)||0;
+  const pkgBoxTotal=parseInt(document.getElementById('pkgBoxQty')?.value)||0;
+  const target=(parseInt(document.getElementById('qtyBoxes')?.value)||0)+((parseInt(document.getElementById('remaining')?.value)||0)>0?1:0);
+  if(boxTotal>0&&pkgBoxTotal>0){ alert('일반 박스와 패키지박스는 동시에 사용할 수 없습니다.'); return false; }
+  if(target>0&&boxTotal+pkgBoxTotal!==target){ alert(`박스 사용량 합계가 맞지 않습니다.\n\n필요: ${target}개\n입력: ${boxTotal+pkgBoxTotal}개`); return false; }
+  ['box','pkgBox'].forEach(kind=>document.querySelectorAll(`.outer-box-qty[data-kind="${kind}"]`).forEach(input=>{
+    const qty=parseInt(input.value)||0; if(!qty) return;
+    const alloc=allocateOuterBoxLots(kind,input.dataset.item,qty);
+    if(alloc.shortage>0) checks.push({name:input.dataset.item,lot:'선입선출 LOT',use:qty,rem:qty-alloc.shortage});
+  }));
   // 필름 (FIFO 분배 기준)
   const filmDist=window._filmFifoDist||[];
   if(filmDist.length){
@@ -1097,13 +1061,8 @@ function restoreTemplateSelect(id, value){
 function applyProductPackTemplate(code){
   const template=loadProductPackTemplates()[code];
   document.getElementById('startTime').value='08:30';
-  checkOuterBoxConflict();
   if(!template) return;
   restoreTemplateSelect('bulkLot',template.bulkLot);
-  if(template.boxItem&&document.getElementById('boxItem')) document.getElementById('boxItem').value=template.boxItem;
-  if(template.pkgBoxItem&&document.getElementById('pkgBoxItem')) document.getElementById('pkgBoxItem').value=template.pkgBoxItem;
-  fillOuterBoxLots('boxLot','boxItem',template.boxLot);
-  fillOuterBoxLots('pkgBoxLot','pkgBoxItem',template.pkgBoxLot);
   document.getElementById('perBox').value=template.perBox||'';
   document.getElementById('itemWeight').value=template.itemWeight||'';
   if(template.expiryMonths){
@@ -1113,8 +1072,6 @@ function applyProductPackTemplate(code){
   }
   calcBoxes();
   checkPackTypeConflict(template.bulkLot?'bulk':'reset');
-  markBoxLotStockStatus();
-  checkOuterBoxConflict();
 }
 
 // 페이지 전환
@@ -1673,19 +1630,13 @@ function calcBoxes(){
   const per=parseInt(document.getElementById('perBox').value)||0;
   const remaining=parseInt(document.getElementById('remaining').value)||0;
   const qtyBoxes=document.getElementById('qtyBoxes');
-  const boxQty=document.getElementById('boxQty');
-  const pkgBoxQty=document.getElementById('pkgBoxQty');
   if(pcs&&per){
     const completedBoxes=Math.floor(pcs/per);
-    const usedBoxes=completedBoxes+(remaining>0?1:0);
     qtyBoxes.value=completedBoxes;
-    boxQty.value=usedBoxes;
-    pkgBoxQty.value=usedBoxes;
   }else{
     qtyBoxes.value='';
-    boxQty.value='';
-    pkgBoxQty.value='';
   }
+  updateOuterBoxAllocations();
 }
 
 
@@ -1765,15 +1716,15 @@ function genPrint(r){
       </tr>
       <tr>
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">박스LOT</td>
-        <td style="border:1px solid #999;padding:4px 8px">${r.boxLot||'-'}</td>
+        <td style="border:1px solid #999;padding:4px 8px">${(r.boxLots||[]).map(x=>`${x.name} ${x.lot}(${x.qty}개)`).join('<br>')||r.boxLot||'-'}</td>
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">박스사용량</td>
-        <td style="border:1px solid #999;padding:4px 8px">${r.boxQty||0}개</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.boxUsageTotal??r.boxQty??0}개</td>
       </tr>
       <tr>
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">패키지박스LOT</td>
-        <td style="border:1px solid #999;padding:4px 8px">${r.pkgBoxLot||'-'}</td>
+        <td style="border:1px solid #999;padding:4px 8px">${(r.pkgBoxLots||[]).map(x=>`${x.name} ${x.lot}(${x.qty}개)`).join('<br>')||r.pkgBoxLot||'-'}</td>
         <td style="border:1px solid #999;padding:4px 8px;background:#f5f5f5">패키지박스사용량</td>
-        <td style="border:1px solid #999;padding:4px 8px">${r.pkgBoxQty||0}개</td>
+        <td style="border:1px solid #999;padding:4px 8px">${r.pkgBoxUsageTotal??r.pkgBoxQty??0}개</td>
       </tr>
     </table>
   </div>`;
@@ -1956,12 +1907,12 @@ function completePackaging(signImg=''){
     filmWastePcs:parseInt(document.getElementById('filmWastePcs')?.value)||0,
     bulkLot:document.getElementById('bulkLot')?.value||'-',
     bulkQty:document.getElementById('bulkQty').value||0,
-    boxItem:document.getElementById('boxItem')?.value||'',
-    boxLot:document.getElementById('boxLot')?.value||'-',
-    boxQty:(document.getElementById('boxLot')?.value?document.getElementById('boxQty').value:0)||0,
-    pkgBoxItem:document.getElementById('pkgBoxItem')?.value||'',
-    pkgBoxLot:document.getElementById('pkgBoxLot')?.value||'-',
-    pkgBoxQty:(document.getElementById('pkgBoxLot')?.value?document.getElementById('pkgBoxQty').value:0)||0,
+    boxItem:'', boxLot:'-', boxQty:0,
+    boxLots:collectOuterBoxLots('box'),
+    boxUsageTotal:parseInt(document.getElementById('boxQty')?.value)||0,
+    pkgBoxItem:'', pkgBoxLot:'-', pkgBoxQty:0,
+    pkgBoxLots:collectOuterBoxLots('pkgBox'),
+    pkgBoxUsageTotal:parseInt(document.getElementById('pkgBoxQty')?.value)||0,
     signImg
   };
   saveProductPackTemplate(pCode,{
@@ -1970,10 +1921,8 @@ function completePackaging(signImg=''){
     expiryDate:record.expiryDate,
     perBox:record.perBox,
     itemWeight:record.itemWeight,
-    boxItem:record.boxItem,
-    boxLot:record.boxLot,
-    pkgBoxItem:record.pkgBoxItem,
-    pkgBoxLot:record.pkgBoxLot
+    boxItems:[...new Set(record.boxLots.map(x=>x.name))],
+    pkgBoxItems:[...new Set(record.pkgBoxLots.map(x=>x.name))]
   });
   if(window._testMode) record._isTest = true;
 
@@ -2118,14 +2067,16 @@ async function syncToServer(){
       }
       [{lot:bulkLot,cat:'비닐',qty:parseFloat(rec.bulkQty)||0},
        {lot:boxLot,cat:'박스',qty:parseFloat(rec.boxQty)||0},
-       {lot:pkgBoxLot,cat:'패키지박스',qty:parseFloat(rec.pkgBoxQty)||0}]
+       {lot:pkgBoxLot,cat:'패키지박스',qty:parseFloat(rec.pkgBoxQty)||0},
+       ...(rec.boxLots||[]).map(x=>({lot:x.lot,cat:'박스',qty:parseFloat(x.qty)||0,name:x.name})),
+       ...(rec.pkgBoxLots||[]).map(x=>({lot:x.lot,cat:'패키지박스',qty:parseFloat(x.qty)||0,name:x.name}))]
         .filter(x=>x.lot&&x.qty>0)
         .forEach((x,xi)=>{
           const sourceLineId=rec.syncId?`${rec.syncId}-SUB-${xi+1}-${x.cat}`:'';
           const exists = sourceLineId?subRecs.find(r=>r.sourceLineId===sourceLineId):subRecs.find(r=>r.type==='out'&&r.lot===x.lot&&r.packLot===rec.lot);
           if(!exists){
             const matched=subRecs.find(r=>r.lot===x.lot&&(r.type==='in'||r.type==='init'));
-            const itemName=matched?matched.name:x.cat;
+            const itemName=x.name||(matched?matched.name:x.cat);
             subRecs.push({date:isoDate,name:itemName,lot:x.lot,qty:x.qty,packLot:rec.lot,sourceId:rec.syncId||'',sourceLineId,type:'out'});
           }
         });
@@ -2191,14 +2142,16 @@ async function syncSinglePack(idx){
     [{lot:filmLot,cat:'필름포장지',qty:getFilmQtyFromRecord(rec)},
      {lot:bulkLot,cat:'비닐',qty:parseFloat(rec.bulkQty)||0},
      {lot:boxLot,cat:'박스',qty:parseFloat(rec.boxQty)||0},
-     {lot:pkgBoxLot,cat:'패키지박스',qty:parseFloat(rec.pkgBoxQty)||0}]
+     {lot:pkgBoxLot,cat:'패키지박스',qty:parseFloat(rec.pkgBoxQty)||0},
+     ...(rec.boxLots||[]).map(x=>({lot:x.lot,cat:'박스',qty:parseFloat(x.qty)||0,name:x.name})),
+     ...(rec.pkgBoxLots||[]).map(x=>({lot:x.lot,cat:'패키지박스',qty:parseFloat(x.qty)||0,name:x.name}))]
       .filter(x=>x.lot&&x.qty>0)
       .forEach((x,xi)=>{
         const sourceLineId=rec.syncId?`${rec.syncId}-SINGLE-${xi+1}`:'';
         const exists=sourceLineId?subRecs.find(r=>r.sourceLineId===sourceLineId):subRecs.find(r=>r.type==='out'&&r.lot===x.lot&&r.packLot===rec.lot);
         if(!exists){
           const matched=subRecs.find(r=>r.lot===x.lot&&(r.type==='in'||r.type==='init'));
-          const itemName=matched?matched.name:x.cat;
+          const itemName=x.name||(matched?matched.name:x.cat);
           subRecs.push({date:isoDate,name:itemName,lot:x.lot,qty:x.qty,packLot:rec.lot,sourceId:rec.syncId||'',sourceLineId,type:'out'});
         }
       });
