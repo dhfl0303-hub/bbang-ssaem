@@ -200,7 +200,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.5 · 2026.08.26 12:22</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.6 · 2026.08.26 12:28</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -818,14 +818,28 @@ function addOuterBoxRow(kind){
   row.innerHTML=`<div class="outer-box-cell"><div class="outer-box-qty-label">${kind==='box'?'박스':'패키지박스'} 선택</div>
     <select class="field-input outer-box-select" data-kind="${kind}" data-index="${idx}" onchange="onOuterBoxItemSelect(this)"><option value="">-- 선택 --</option>${items.map(name=>`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}</select>
     <div class="outer-box-lots" id="${kind}LotResult${idx}" style="margin-top:7px">박스를 선택하면 선입선출 LOT가 표시됩니다.</div></div>
-    <div class="outer-box-cell"><div class="outer-box-qty-label">사용량(개)</div><input class="field-input outer-box-qty" type="number" min="0" step="1" inputmode="numeric" data-kind="${kind}" data-item="" data-index="${idx}" placeholder="0" oninput="onOuterBoxQtyInput(this)" onwheel="this.blur()" disabled></div>
+    <div class="outer-box-cell"><div class="outer-box-qty-label">사용량(개·자동)</div><input class="field-input outer-box-qty readonly" type="number" min="0" step="1" inputmode="numeric" data-kind="${kind}" data-item="" data-index="${idx}" placeholder="자동계산" readonly disabled></div>
     <button type="button" class="outer-box-remove" onclick="removeOuterBoxRow(this)" title="삭제">×</button>`;
   root.appendChild(row); updateOuterBoxAllocations();
 }
 function removeOuterBoxRow(btn){
   const row=btn.closest('.outer-box-row'), root=row?.parentElement; if(!row||!root) return;
-  row.remove(); if(!root.querySelector('.outer-box-row')) addOuterBoxRow(root.id.startsWith('pkgBox')?'pkgBox':'box');
+  const kind=root.id.startsWith('pkgBox')?'pkgBox':'box';
+  row.remove(); if(!root.querySelector('.outer-box-row')) addOuterBoxRow(kind);
+  syncOuterBoxUsageToProduction(kind);
   updateOuterBoxAllocations();
+}
+function getRequiredOuterBoxCount(){
+  return (parseInt(document.getElementById('qtyBoxes')?.value)||0)+((parseInt(document.getElementById('remaining')?.value)||0)>0?1:0);
+}
+function syncOuterBoxUsageToProduction(preferredKind){
+  const kinds=preferredKind?[preferredKind]:['box','pkgBox'];
+  kinds.forEach(kind=>{
+    const selected=[...document.querySelectorAll(`.outer-box-qty[data-kind="${kind}"]`)].filter(input=>input.dataset.item);
+    if(!selected.length) return;
+    const target=getRequiredOuterBoxCount();
+    selected.forEach((input,index)=>{ input.value=index===0&&target>0?String(target):''; });
+  });
 }
 function onOuterBoxItemSelect(sel){
   const row=sel.closest('.outer-box-row'), input=row?.querySelector('.outer-box-qty');
@@ -835,6 +849,7 @@ function onOuterBoxItemSelect(sel){
   }
   input.dataset.item=sel.value; input.disabled=!sel.value;
   if(!sel.value) input.value='';
+  syncOuterBoxUsageToProduction(sel.dataset.kind);
   updateOuterBoxAllocations();
 }
 function collectOuterBoxLots(kind){
@@ -848,6 +863,7 @@ function collectOuterBoxLots(kind){
 }
 function onOuterBoxQtyInput(input){
   input.value=input.value===''?'':String(Math.max(0,parseInt(input.value)||0));
+  syncOuterBoxUsageToProduction();
   updateOuterBoxAllocations();
 }
 function updateOuterBoxAllocations(){
@@ -1697,6 +1713,7 @@ function calcBoxes(){
   }else{
     qtyBoxes.value='';
   }
+  syncOuterBoxUsageToProduction();
   updateOuterBoxAllocations();
 }
 
