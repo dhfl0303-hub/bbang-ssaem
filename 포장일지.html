@@ -200,7 +200,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.7 · 2026.08.26 12:34</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.9 · 2026.08.26 12:48</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -969,8 +969,36 @@ function saveDeviceFromForm(){
   persistDeviceSettings(settings);
 }
 
+// 새 포장 작성 시 이전 작업값을 지우고 작업일자와 현재 제품/LOT만 유지
+function resetPackagingEntry(){
+  const emptyIds=[
+    'workers','endTime','qtyPcs','sealingC1','sealingC2','sealingK1','sealingK2','sealerTemp',
+    'bulkQty','expiryDate','qtyBoxes','perBox','itemWeight','remaining',
+    'filmLot','filmItemCode','filmUnitLen','filmRollLen',
+    'boxItem','boxLot','boxQty','pkgBoxItem','pkgBoxLot','pkgBoxQty'
+  ];
+  emptyIds.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['filmQty','filmWaste','filmWastePcs'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value='0'; });
+  const bulkLot=document.getElementById('bulkLot'); if(bulkLot) bulkLot.selectedIndex=0;
+
+  S.expiryMonths=null;
+  window._filmFifoDist=[];
+  document.querySelectorAll('.month-btn').forEach(btn=>btn.classList.remove('active'));
+  const filmSummary=document.getElementById('filmSummary');
+  if(filmSummary) filmSummary.innerHTML='<span style="font-size:13px;color:var(--text3);">미입력</span>';
+
+  Object.keys(SELECTED_DEVICES).forEach(id=>{
+    SELECTED_DEVICES[id]=false;
+    document.getElementById('dev-'+id)?.classList.remove('active');
+    const check=document.getElementById('check-'+id); if(check) check.textContent='○';
+  });
+  document.getElementById('startTime').value='08:30';
+  checkPackTypeConflict('reset');
+}
+
 // 포장 입력 화면 초기화
 function initFormPage(){
+  resetPackagingEntry();
   loadBatchLots();
   loadSubLots();
   // 배합LOT 자동 선택
@@ -1251,6 +1279,8 @@ function groupBatchByProduct(recs){
 }
 function selectBatchGroup(gi){
   const g=window._batchGroups[gi]; if(!g) return;
+  // 다른 제품을 누르는 즉시 직전 작성 화면의 값을 먼저 제거
+  resetPackagingEntry();
   const mainRec=g.recs[0]; const code=mainRec.productCode;
   const mainLot=mainRec.batchRecords?mainRec.batchRecords[0]?.lot||mainRec.lot:mainRec.lot;
   const allLots=[];
@@ -1267,6 +1297,8 @@ function selectBatchGroup(gi){
 }
 
 function selectBatchLot(code, lot, lotType){
+  // 다른 제품을 누르는 즉시 직전 작성 화면의 값을 먼저 제거
+  resetPackagingEntry();
   S.product=code;
   S.batchLot=lot;
   S.batchLotType=lotType||'배합'; // '배합' or '투입'
@@ -1343,6 +1375,8 @@ function toggleAcc(idx){
 
 // 제품 선택
 function selectProduct(code){
+  // 제품 선택형 진입에서도 직전 제품의 작성값을 남기지 않음
+  resetPackagingEntry();
   S.product=code; S.expiryMonths=null;
   const p=RECIPE_DB[code];
   const today=getWorkDateKey();
@@ -2026,6 +2060,8 @@ function completePackaging(signImg=''){
     </table>`;
 
   genPrint(record);
+  // 완료기록과 출력물은 보존하고, 다음 제품 작성용 화면 값만 즉시 초기화
+  resetPackagingEntry();
   showPage('done');
 }
 
