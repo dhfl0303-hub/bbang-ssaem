@@ -87,7 +87,7 @@ tr:hover td{background:var(--bg);}
   <button class="topbar-back" onclick="location.href='통합관리.html'">← 통합관리</button>
   <div class="topbar-title">📦 부자재수불부</div>
   <div style="display:flex;align-items:center;gap:10px;">
-    <span style="color:rgba(255,255,255,0.4);font-size:10px;">v1.1.0 | 2026-07-21</span>
+    <span style="color:rgba(255,255,255,0.4);font-size:10px;">v1.2 · 2026.08.26 09:31</span>
     <div id="topbarDate" style="color:rgba(255,255,255,0.7);font-size:12px;"></div>
   </div>
 </div>
@@ -602,11 +602,13 @@ function toggleAllChk(src,code){document.querySelectorAll('.chk-out-'+code).forE
 
 // ===== 저장 =====
 async function saveLedger(){
+  localStorage.setItem('subLedgerRecords',JSON.stringify(ledgerRecords));
   if(!window._db)return;
   try{await window._db.collection('appData').doc('subLedgerRecords').set({data:JSON.stringify(ledgerRecords),updatedAt:new Date().toISOString()});}
   catch(e){console.warn('저장 실패',e);alert('저장 실패: 네트워크를 확인해주세요');}
 }
 function saveItemDB(){
+  localStorage.setItem('subItemDB',JSON.stringify(SUB_ITEM_DB));
   if(!window._db)return Promise.resolve();
   return window._db.collection('appData').doc('subItemDB').set({data:JSON.stringify(SUB_ITEM_DB),updatedAt:new Date().toISOString()}).catch(e=>console.warn(e));
 }
@@ -1024,14 +1026,22 @@ function printLedger(){
 
 // ===== Firebase 로드 =====
 async function loadFromFirebase(){
+  try{ledgerRecords=JSON.parse(localStorage.getItem('subLedgerRecords')||'[]');}catch(e){ledgerRecords=[];}
+  try{SUB_ITEM_DB=JSON.parse(localStorage.getItem('subItemDB')||'[]');}catch(e){SUB_ITEM_DB=[];}
   if(!window._db)return;
   try{
     const [ledgerSnap,itemSnap]=await Promise.all([
       window._db.collection('appData').doc('subLedgerRecords').get(),
       window._db.collection('appData').doc('subItemDB').get()
     ]);
-    if(ledgerSnap.exists&&ledgerSnap.data().data)ledgerRecords=JSON.parse(ledgerSnap.data().data);
-    if(itemSnap.exists&&itemSnap.data().data)SUB_ITEM_DB=JSON.parse(itemSnap.data().data);
+    if(ledgerSnap.exists&&ledgerSnap.data().data){
+      ledgerRecords=JSON.parse(ledgerSnap.data().data);
+      localStorage.setItem('subLedgerRecords',JSON.stringify(ledgerRecords));
+    }
+    if(itemSnap.exists&&itemSnap.data().data){
+      SUB_ITEM_DB=JSON.parse(itemSnap.data().data);
+      localStorage.setItem('subItemDB',JSON.stringify(SUB_ITEM_DB));
+    }
     else await saveItemDB();
   }catch(e){console.warn('Firebase 로드 실패',e);}
 }

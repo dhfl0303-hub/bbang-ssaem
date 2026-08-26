@@ -145,7 +145,7 @@ async function syncToServer(){
     <div class="tab active" onclick="switchTab('write')">✏️ 작성</div>
     <div class="tab" onclick="switchTab('history')">📁 저장내역</div>
   </div>
-  <span style="font-size:10px;color:var(--text3);">v1.2.0 | 2026-07-21</span>
+  <span style="font-size:10px;color:var(--text3);">v1.3 · 2026.08.26 09:31</span>
 </div>
 
 <!-- ===== 작성 탭 ===== -->
@@ -388,7 +388,7 @@ async function syncToServer(){
 
 <script>
 // ===== 부자재 품목 (수불부 SUB_ITEM_DB에서 로드) =====
-let SUB_ITEM_DB = []; // Firebase appData/subItemDB 에서 로드
+let SUB_ITEM_DB = JSON.parse(localStorage.getItem('subItemDB') || '[]'); // 수불부 로컬 DB 우선, Firebase로 갱신
 const SUB_ITEMS = [
   {name:'필름포장지'},
   {name:'벌크비닐'},
@@ -664,10 +664,14 @@ function onItemChange(id){
   const disp=document.getElementById('lot-code-disp-'+id);
   if(disp) disp.textContent='-';
   // 포장재명 목록 — 수불부 SUB_ITEM_DB에서 카테고리 매칭
-  const catMap={'필름포장지':'필름포장지','벌크비닐':'벌크비닐','박스':'박스','패키지박스':'패키지박스'};
+  // 수불부는 벌크비닐 분류를 "비닐"로 저장하므로 두 명칭을 같은 분류로 취급한다.
+  const catMap={'필름포장지':'필름포장지','벌크비닐':'비닐','박스':'박스','패키지박스':'패키지박스'};
   const cat=catMap[itemName]||itemName;
   const specSel=document.getElementById('spec-'+id);
-  const items=SUB_ITEM_DB.filter(i=>i.category===cat);
+  const items=SUB_ITEM_DB.filter(i=>{
+    const itemCat=i.category==='벌크비닐'?'비닐':i.category;
+    return itemCat===cat;
+  });
   specSel.innerHTML='<option value="">포장재명 선택</option>'+
     items.map(i=>`<option value="${i.code}" data-name="${i.name}">[${i.code}] ${i.name}</option>`).join('');
   document.getElementById('lot-date-'+id).value=getInDateYYMMDD();
@@ -1250,6 +1254,7 @@ async function loadSubItemDB(){
     ]);
     if(itemSnap.exists && itemSnap.data().data){
       SUB_ITEM_DB = JSON.parse(itemSnap.data().data);
+      localStorage.setItem('subItemDB', JSON.stringify(SUB_ITEM_DB));
     }
     if(pkgSnap.exists && pkgSnap.data().data){
       const fbPkg = JSON.parse(pkgSnap.data().data);
