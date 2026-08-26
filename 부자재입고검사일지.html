@@ -145,7 +145,7 @@ async function syncToServer(){
     <div class="tab active" onclick="switchTab('write')">✏️ 작성</div>
     <div class="tab" onclick="switchTab('history')">📁 저장내역</div>
   </div>
-  <span style="font-size:10px;color:var(--text3);">v1.3 · 2026.08.26 09:31</span>
+  <span style="font-size:10px;color:var(--text3);">v1.4 · 2026.08.26 09:40</span>
 </div>
 
 <!-- ===== 작성 탭 ===== -->
@@ -489,6 +489,17 @@ function setSlash(id, on){
   document.getElementById('slashBtn-'+id).classList.toggle('slash-active', on);
 }
 function toggleSlash(id){ setSlash(id, !slashState[id]); }
+
+function moveToNextRowField(event, field, id){
+  if(event.key!=='Enter') return;
+  event.preventDefault();
+  let next=document.getElementById(field+'-'+(id+1));
+  if(!next){
+    addRow();
+    next=document.getElementById(field+'-'+(id+1));
+  }
+  if(next){next.focus();next.select?.();}
+}
 function clearCanvas(id){
   setSlash(id, false);
   const canvas = document.getElementById('canvas-'+id);
@@ -623,10 +634,11 @@ function addRow(){
     <td>
       <input class="td-input" id="mfg-${id}" placeholder="YYMMDD" maxlength="6"
         oninput="this.value=this.value.replace(/\D/g,'').slice(0,6);onMfgInput(${id})"
+        onkeydown="moveToNextRowField(event,'mfg',${id})"
         style="text-align:center;">
       <div id="mfg-display-${id}" style="font-size:10px;color:var(--text2);padding:1px 4px;"></div>
     </td>
-    <td><input class="td-input" type="number" id="qty-${id}" placeholder="0" style="text-align:center;" min="0"></td>
+    <td><input class="td-input" type="number" id="qty-${id}" placeholder="0" style="text-align:center;" min="0" onkeydown="moveToNextRowField(event,'qty',${id})"></td>
     <td>
       <select class="td-input" id="unit-${id}">
         <option value="Rl">Rl</option>
@@ -818,6 +830,7 @@ function resetForm(){
     const hint=document.getElementById('hint-'+id);
     if(hint) hint.style.display='';
   });
+  setSlash('write',true);
   // 부적합/조치 초기화
   document.getElementById('nonconformity').value='';
   document.getElementById('corrective').value='';
@@ -1208,6 +1221,7 @@ function init(){
   // 검사자명 복원
   document.getElementById('inInspector').value=localStorage.getItem('sub_inspector')||'';
   initCanvases();
+  setSlash('write',true);
   initSignModal();
   renderHistory();
   for(let i=0;i<5;i++) addRow();
