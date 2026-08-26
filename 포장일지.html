@@ -180,7 +180,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v1.9 · 2026.08.26 11:01</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.1 · 2026.08.26 11:26</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -300,7 +300,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 
         <!-- 생산수량(개) -->
         <div class="field-label" style="margin-top:10px;">생산수량 (개)</div>
-        <input class="field-input" type="number" id="qtyPcs" placeholder="개" oninput="calcBoxes()" style="margin-bottom:14px;">
+        <input class="field-input" type="number" id="qtyPcs" placeholder="개" oninput="calcBoxes()" onwheel="this.blur()" style="margin-bottom:14px;">
 
         <!-- 설비세팅값 -->
         <div class="field-label">설비세팅값</div>
@@ -407,12 +407,13 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <!-- 박스LOT / 박스사용량 -->
         <div class="row" style="margin-top:10px;">
           <div>
-            <div class="field-label">박스 품목</div>
-            <select class="field-input" id="boxItem" onchange="onOuterBoxItemChange('boxLot','boxItem')"><option value="">-- 박스 품목 선택 --</option></select>
-            <div class="field-label" style="margin-top:6px;">박스 LOT</div>
+            <div class="field-label">박스 LOT</div>
+            <input type="hidden" id="boxItem" value="">
+            <div id="boxItemName" style="font-weight:800;font-size:14px;color:var(--text1);margin-bottom:6px;">박스 품목 미설정</div>
             <select class="field-input" id="boxLot" onchange="onSubLotSelect('boxLot')">
-              <option value="">-- 품목을 먼저 선택 --</option>
+              <option value="">-- 자동 LOT 대기 --</option>
             </select>
+            <div id="boxLotMeta" style="font-size:12px;color:var(--text2);margin-top:5px;"></div>
             <div class="stock-error-msg" id="boxLotWarning">⚠️ 박스 LOT 재고가 없습니다. 다른 LOT를 선택해주세요.</div>
           </div>
           <div>
@@ -424,12 +425,13 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <!-- 패키지박스LOT / 패키지박스사용량 -->
         <div class="row" style="margin-top:10px;">
           <div>
-            <div class="field-label">패키지박스 품목</div>
-            <select class="field-input" id="pkgBoxItem" onchange="onOuterBoxItemChange('pkgBoxLot','pkgBoxItem')"><option value="">-- 패키지박스 품목 선택 --</option></select>
-            <div class="field-label" style="margin-top:6px;">패키지박스 LOT</div>
+            <div class="field-label">패키지박스 LOT</div>
+            <input type="hidden" id="pkgBoxItem" value="">
+            <div id="pkgBoxItemName" style="font-weight:800;font-size:14px;color:var(--text1);margin-bottom:6px;">패키지박스 품목 미설정</div>
             <select class="field-input" id="pkgBoxLot" onchange="onSubLotSelect('pkgBoxLot')">
-              <option value="">-- 품목을 먼저 선택 --</option>
+              <option value="">-- 자동 LOT 대기 --</option>
             </select>
+            <div id="pkgBoxLotMeta" style="font-size:12px;color:var(--text2);margin-top:5px;"></div>
           </div>
           <div>
             <div class="field-label">패키지박스사용량</div>
@@ -724,18 +726,29 @@ function getAvailableSubLots(cats){
   return lots.sort((a,b)=>(a.date||'9999-99-99').localeCompare(b.date||'9999-99-99')||(a.mfg||'999999').localeCompare(b.mfg||'999999')||(a.lot||'').localeCompare(b.lot||''));
 }
 
-function fillOuterBoxLots(lotId,itemId,selectedLot){
+function updateOuterBoxLotMeta(lotId){
+  const lot=document.getElementById(lotId)?.value||'';
+  const meta=document.getElementById(lotId==='boxLot'?'boxLotMeta':'pkgBoxLotMeta');
+  if(!meta) return;
+  const info=getAvailableSubLots(lotId==='boxLot'?['박스']:['패키지박스']).find(r=>r.lot===lot);
+  meta.innerHTML=info?`<strong>입고일</strong>: ${info.date||'-'} &nbsp;·&nbsp; <strong>현재 재고</strong>: ${info.remaining}${info.unit}`:'';
+}
+function fillOuterBoxLots(lotId,itemId){
   const lotSel=document.getElementById(lotId), itemName=document.getElementById(itemId)?.value||'';
   if(!lotSel) return;
-  if(!itemName){lotSel.innerHTML='<option value="">-- 품목을 먼저 선택 --</option>';return;}
-  const lots=getAvailableSubLots(lotId==='boxLot'?['박스']:['패키지박스']).filter(r=>r.name===itemName);
-  lotSel.innerHTML='<option value="">-- LOT 선택 --</option>'+lots.map(r=>{
+  const allLots=getAvailableSubLots(lotId==='boxLot'?['박스']:['패키지박스']);
+  if(!itemName){
+    lotSel.innerHTML='<option value="">-- 최초 1회 LOT 선택 --</option>'+allLots.map(r=>`<option value="${r.lot}">${r.name} - ${r.lot} [재고:${r.remaining}${r.unit}]</option>`).join('');
+    updateOuterBoxLotMeta(lotId);return;
+  }
+  const lots=allLots.filter(r=>r.name===itemName);
+  lotSel.innerHTML=lots.length?lots.map(r=>{
     const isOI=r.lot.includes('-OF-')||r.lot.includes('-OI-');
     return `<option value="${r.lot}">${r.lot}${isOI?' (초기재고)':''} [재고:${r.remaining}${r.unit}]</option>`;
-  }).join('');
-  if(selectedLot&&lots.some(r=>r.lot===selectedLot)) lotSel.value=selectedLot;
+  }).join(''):'<option value="">-- 재고 LOT 없음 --</option>';
+  if(lots.length) lotSel.value=lots[0].lot;
+  updateOuterBoxLotMeta(lotId);
 }
-function onOuterBoxItemChange(lotId,itemId){fillOuterBoxLots(lotId,itemId,'');markBoxLotStockStatus();checkOuterBoxConflict();}
 
 // 박스 품목을 먼저 선택하고 해당 품목의 LOT만 표시
 function loadSubLots(){
@@ -743,25 +756,36 @@ function loadSubLots(){
   const bulkLots=getAvailableSubLots(['비닐','PE봉투']);
   if(bulkSel) bulkSel.innerHTML='<option value="">-- 선택 --</option>'+bulkLots.map(r=>`<option value="${r.lot}">${r.name} - ${r.lot} [재고:${r.remaining}${r.unit}]</option>`).join('');
   const template=loadProductPackTemplates()[S.product]||{};
-  [['boxItem','boxLot',['박스'],template.boxItem,template.boxLot],['pkgBoxItem','pkgBoxLot',['패키지박스'],template.pkgBoxItem,template.pkgBoxLot]].forEach(([itemId,lotId,cats,savedItem,savedLot])=>{
-    const itemSel=document.getElementById(itemId); if(!itemSel) return;
+  [['boxItem','boxItemName','boxLot',['박스'],template.boxItem,template.boxLot],['pkgBoxItem','pkgBoxItemName','pkgBoxLot',['패키지박스'],template.pkgBoxItem,template.pkgBoxLot]].forEach(([itemId,nameId,lotId,cats,savedItem,savedLot])=>{
+    const itemInput=document.getElementById(itemId); if(!itemInput) return;
     const lots=getAvailableSubLots(cats);
     const oldRec=savedLot&&(window._subLedgerRecords||[]).find(r=>r.lot===savedLot);
-    const wantedItem=savedItem||oldRec?.name||'';
-    const names=[...new Set(lots.map(r=>r.name))];
-    itemSel.innerHTML='<option value="">-- 품목 선택 --</option>'+names.map(name=>{
-      const total=lots.filter(r=>r.name===name).reduce((s,r)=>s+r.remaining,0);
-      return `<option value="${name}">${name} [총재고:${Math.round(total*1000)/1000}EA]</option>`;
-    }).join('');
-    if(wantedItem&&names.includes(wantedItem)) itemSel.value=wantedItem;
-    fillOuterBoxLots(lotId,itemId,savedLot);
+    const prior=[...(S.todayRecords||[])].reverse().find(r=>r.productCode===S.product&&(lotId==='boxLot'?r.boxLot&&r.boxLot!=='-':r.pkgBoxLot&&r.pkgBoxLot!=='-'));
+    const priorLot=prior&&(lotId==='boxLot'?prior.boxLot:prior.pkgBoxLot);
+    const priorRec=priorLot&&(window._subLedgerRecords||[]).find(r=>r.lot===priorLot);
+    const wantedItem=savedItem||oldRec?.name||(lotId==='boxLot'?prior?.boxItem:prior?.pkgBoxItem)||priorRec?.name||'';
+    itemInput.value=wantedItem;
+    const nameEl=document.getElementById(nameId);
+    if(nameEl) nameEl.textContent=wantedItem||((lotId==='boxLot'?'박스':'패키지박스')+' 품목 미설정');
+    fillOuterBoxLots(lotId,itemId);
   });
+  checkOuterBoxConflict();
 }
 
 // 부자재 LOT 선택 시 재고 체크
 function onSubLotSelect(selId){
   const sel=document.getElementById(selId);
   if(!sel) return;
+  const itemId=selId==='boxLot'?'boxItem':selId==='pkgBoxLot'?'pkgBoxItem':'';
+  if(itemId&&sel.value&&!document.getElementById(itemId)?.value){
+    const rec=(window._subLedgerRecords||[]).find(r=>r.lot===sel.value);
+    if(rec?.name){
+      document.getElementById(itemId).value=rec.name;
+      const nameEl=document.getElementById(selId==='boxLot'?'boxItemName':'pkgBoxItemName');
+      if(nameEl) nameEl.textContent=rec.name;
+    }
+  }
+  updateOuterBoxLotMeta(selId);
   if(selId==='boxLot'){
     markBoxLotStockStatus();
     checkOuterBoxConflict();
