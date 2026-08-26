@@ -200,7 +200,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v3.7 · 2026.08.26 14:19</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v3.8 · 2026.08.26 14:31</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -314,7 +314,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
           </div>
           <div>
             <div class="field-label">작업종료시간</div>
-            <input class="field-input" id="endTime" placeholder="1430" maxlength="4" inputmode="numeric" oninput="fmtTime(this)" onblur="fmtTime(this)" onfocus="unfmtTime(this)">
+            <input class="field-input" id="endTime" value="" placeholder="1430" maxlength="4" inputmode="numeric" autocomplete="off" autocorrect="off" spellcheck="false" oninput="fmtTime(this)" onblur="fmtTime(this)" onfocus="unfmtTime(this)">
           </div>
         </div>
 
@@ -1217,7 +1217,20 @@ function saveProductPackTemplate(code, template){
   if(!code) return;
   const all=loadProductPackTemplates();
   all[code]={...(all[code]||{}),...template};
+  // 작업 종료시간은 제품 기본값으로 저장하지 않는다.
+  delete all[code].endTime;
   localStorage.setItem(PRODUCT_PACK_TEMPLATE_KEY,JSON.stringify(all));
+}
+function clearSavedEndTimeDefaults(){
+  const all=loadProductPackTemplates();
+  let changed=false;
+  Object.values(all).forEach(template=>{
+    if(template&&Object.prototype.hasOwnProperty.call(template,'endTime')){
+      delete template.endTime;
+      changed=true;
+    }
+  });
+  if(changed) localStorage.setItem(PRODUCT_PACK_TEMPLATE_KEY,JSON.stringify(all));
 }
 const MATERIAL_OUTER_TEMPLATE_KEY='packMaterialOuterTemplates_v1';
 function loadMaterialOuterTemplates(){
@@ -1324,6 +1337,7 @@ function goHome(){
 
 // 메인
 function initMain(){
+  clearSavedEndTimeDefaults();
   const s=loadSettings();
   document.getElementById('workDateInput').value = getTodayKey();
   _workDateKey = getTodayKey();
