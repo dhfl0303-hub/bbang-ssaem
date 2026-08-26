@@ -200,7 +200,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v3.5 · 2026.08.26 13:51</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v3.7 · 2026.08.26 14:19</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -1216,7 +1216,7 @@ function loadProductPackTemplates(){
 function saveProductPackTemplate(code, template){
   if(!code) return;
   const all=loadProductPackTemplates();
-  all[code]=template;
+  all[code]={...(all[code]||{}),...template};
   localStorage.setItem(PRODUCT_PACK_TEMPLATE_KEY,JSON.stringify(all));
 }
 const MATERIAL_OUTER_TEMPLATE_KEY='packMaterialOuterTemplates_v1';
@@ -1238,6 +1238,7 @@ function restoreMaterialOuterSettings(type,materialId,productCode){
   const saved=key?loadMaterialOuterTemplates()[key]:null;
   restoreOuterBoxItems('box',saved?.boxItems||[]);
   restoreOuterBoxItems('pkgBox',saved?.pkgBoxItems||[]);
+  return !!saved;
 }
 function restoreTemplateSelect(id, value){
   const sel=document.getElementById(id);
@@ -1251,10 +1252,36 @@ function restoreTemplateSelect(id, value){
   sel.value=value;
 }
 function applyProductPackTemplate(code){
-  const template=loadProductPackTemplates()[code];
+  const template=loadProductPackTemplates()[code]||{};
+  const latest=[...(S.todayRecords||[])].reverse().find(r=>r.productCode===code)||null;
   document.getElementById('startTime').value='08:30';
-  if(!template) return;
-  // 포장방식·포장재·외포장은 제품이 아니라 선택한 포장재 기준으로 별도 복원
+  document.getElementById('endTime').value='';
+  // 제품에는 포장방식과 포장재 품목만 연결하고 외포장은 포장재 기준으로 복원
+  const packType=template.packType||(latest?.filmItemCode?'film':latest?.bulkItem?'bulk':'');
+  const filmItemCode=template.filmItemCode||latest?.filmItemCode||'';
+  const bulkItem=template.bulkItem||latest?.bulkItem||'';
+  if(packType==='film'&&filmItemCode){
+    const filmItem=(window._subItemDB||[]).find(i=>i.code===filmItemCode);
+    document.getElementById('filmItemCode').value=filmItemCode;
+    const parsed=parseFilmSpec(filmItem?.spec||'');
+    document.getElementById('filmUnitLen').value=parsed?.unitLen||'';
+    document.getElementById('filmRollLen').value=parsed?.rollLen||'';
+    document.getElementById('filmSummary').innerHTML=`<div style="font-size:12px;font-weight:700;color:var(--primary);">${filmItem?`[${filmItem.code}] ${filmItem.name}`:filmItemCode}<div style="font-size:11px;color:var(--text2);margin-top:4px;">저장된 필름 품목 · 생산수량 입력 후 사용량을 확인해주세요.</div></div>`;
+    if(!restoreMaterialOuterSettings('film',filmItemCode,'')&&latest){
+      const seed={boxItems:[...new Set((latest.boxLots||[]).map(x=>x.name).filter(Boolean))],pkgBoxItems:[...new Set((latest.pkgBoxLots||[]).map(x=>x.name).filter(Boolean))]};
+      saveMaterialOuterTemplate('film',filmItemCode,'',seed); restoreMaterialOuterSettings('film',filmItemCode,'');
+    }
+  }else if(packType==='bulk'&&bulkItem){
+    const sel=document.getElementById('bulkItem');
+    if(sel){
+      if(![...sel.options].some(o=>o.value===bulkItem)){ const opt=document.createElement('option'); opt.value=bulkItem; opt.textContent=bulkItem+' [현재 품목목록에 없음]'; sel.appendChild(opt); }
+      sel.value=bulkItem; updateBulkAllocation();
+    }
+    if(!restoreMaterialOuterSettings('bulk',bulkItem,code)&&latest){
+      const seed={boxItems:[...new Set((latest.boxLots||[]).map(x=>x.name).filter(Boolean))],pkgBoxItems:[...new Set((latest.pkgBoxLots||[]).map(x=>x.name).filter(Boolean))]};
+      saveMaterialOuterTemplate('bulk',bulkItem,code,seed); restoreMaterialOuterSettings('bulk',bulkItem,code);
+    }
+  }
   document.getElementById('perBox').value=template.perBox||'';
   document.getElementById('itemWeight').value=template.itemWeight||'';
   if(template.expiryMonths){
@@ -1263,7 +1290,7 @@ function applyProductPackTemplate(code){
     document.getElementById('expiryDate').value=template.expiryDate;
   }
   calcBoxes();
-  checkPackTypeConflict('reset');
+  checkPackTypeConflict(packType||'reset');
 }
 
 // 페이지 전환
@@ -1524,7 +1551,10 @@ function setExpiry(months, sourceEl){
   const ey=exp.getFullYear();
   const em=String(exp.getMonth()+1).padStart(2,'0');
   const ed=String(exp.getDate()).padStart(2,'0');
-  document.getElementById('expiryDate').value=`${ey}.${em}.${ed}`;
+  const expiryDate=`${ey}.${em}.${ed}`;
+  document.getElementById('expiryDate').value=expiryDate;
+  // 월수 선택 즉시 제품별 고정값으로 저장 (다른 고정값은 병합하여 유지)
+  if(S.product) saveProductPackTemplate(S.product,{expiryMonths:months,expiryDate});
 }
 
 // 필름사용량 표시 (신규: filmQty / 레거시: filmQtyInt+filmQtyFrac 호환)
@@ -2134,6 +2164,9 @@ function completePackaging(signImg=''){
     signImg
   };
   saveProductPackTemplate(pCode,{
+    packType:record.filmItemCode?'film':record.bulkItem?'bulk':'',
+    filmItemCode:record.filmItemCode||'',
+    bulkItem:record.bulkItem||'',
     expiryMonths:S.expiryMonths||null,
     expiryDate:record.expiryDate,
     perBox:record.perBox,
