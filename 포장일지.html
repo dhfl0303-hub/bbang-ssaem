@@ -200,7 +200,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v3.0 · 2026.08.26 12:54</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v3.1 · 2026.08.26 13:23</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -1201,17 +1201,7 @@ function applyProductPackTemplate(code){
   const template=loadProductPackTemplates()[code];
   document.getElementById('startTime').value='08:30';
   if(!template) return;
-  let bulkItem=template.bulkItem||'';
-  if(!bulkItem&&template.bulkLot){
-    bulkItem=(window._subLedgerRecords||[]).find(r=>r.lot===template.bulkLot)?.name||'';
-  }
-  const bulkItemSel=document.getElementById('bulkItem');
-  if(bulkItemSel&&bulkItem){
-    if(![...bulkItemSel.options].some(o=>o.value===bulkItem)){
-      const opt=document.createElement('option'); opt.value=bulkItem; opt.textContent=bulkItem+' [현재 재고목록에 없음]'; bulkItemSel.appendChild(opt);
-    }
-    bulkItemSel.value=bulkItem;
-  }
+  // 필름포장지와 벌크비닐은 작업마다 선택하는 대체 포장방식이므로 자동 선택하지 않음
   document.getElementById('perBox').value=template.perBox||'';
   document.getElementById('itemWeight').value=template.itemWeight||'';
   if(template.expiryMonths){
@@ -1220,7 +1210,7 @@ function applyProductPackTemplate(code){
     document.getElementById('expiryDate').value=template.expiryDate;
   }
   calcBoxes();
-  updateBulkAllocation();
+  checkPackTypeConflict('reset');
 }
 
 // 페이지 전환
@@ -2081,8 +2071,6 @@ function completePackaging(signImg=''){
     signImg
   };
   saveProductPackTemplate(pCode,{
-    bulkItem:record.bulkItem,
-    bulkLot:record.bulkLot,
     expiryMonths:S.expiryMonths||null,
     expiryDate:record.expiryDate,
     perBox:record.perBox,
