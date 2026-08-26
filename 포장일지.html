@@ -180,7 +180,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v1.7 · 2026.08.21 17:12</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v1.8 · 2026.08.26 10:37</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -720,6 +720,11 @@ function loadSubLots(){
       const rCat=r.category||nameTocat[r.name]||'';
       return (catItems.includes(r.name)||cats.includes(rCat));
     });
+    // 제품별로 이전에 선택한 박스 품목을 기억해 같은 품목의 LOT만 표시한다.
+    const template=loadProductPackTemplates()[S.product]||{};
+    const rememberedLot=selId==='boxLot'?template.boxLot:(selId==='pkgBoxLot'?template.pkgBoxLot:'');
+    const rememberedRec=rememberedLot&&recs.find(r=>r.lot===rememberedLot);
+    const rememberedName=rememberedRec?.name||'';
     const seen=new Set();
     const lots=[];
     catRecs.forEach(r=>{
@@ -727,23 +732,26 @@ function loadSubLots(){
       if(seen.has(key)||(r.type!=='init'&&r.type!=='in')) return;
       seen.add(key);
       const remaining=Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
+      if(remaining<=0) return;
+      if(rememberedName&&r.name!==rememberedName) return;
       const item=itemDB.find(i=>i.name===r.name);
       const unit=item?.unit||'EA';
       lots.push({name:r.name,lot:r.lot,remaining,unit,type:r.type,date:r.date||'',mfg:r.mfg||''});
     });
-    // 재고 있는 것 먼저, 입고일 빠른 순
+    // 선입선출: 입고일 → 제조일 → LOT 순으로 오래된 재고부터 표시
     lots.sort((a,b)=>{
-      if(a.remaining>0&&b.remaining<=0) return -1;
-      if(a.remaining<=0&&b.remaining>0) return 1;
-      return (a.date||'').localeCompare(b.date||'');
+      const dateCmp=(a.date||'9999-99-99').localeCompare(b.date||'9999-99-99');
+      if(dateCmp) return dateCmp;
+      const mfgCmp=(a.mfg||'999999').localeCompare(b.mfg||'999999');
+      if(mfgCmp) return mfgCmp;
+      return (a.lot||'').localeCompare(b.lot||'');
     });
     sel.innerHTML='<option value="">-- 선택 --</option>'+
       lots.map(r=>{
         const isOI=r.lot&&(r.lot.includes('-OF-')||r.lot.includes('-OI-'));
-        const stockLbl=r.remaining>0?` [재고:${r.remaining}${r.unit}]`:' [재고없음]';
+        const stockLbl=` [재고:${r.remaining}${r.unit}]`;
         const label=isOI?`${r.name} - ${r.lot} (초기재고)${stockLbl}`:`${r.name} - ${r.lot}${stockLbl}`;
-        const style=r.remaining<=0?'color:var(--text3);':'';
-        return `<option value="${r.lot||r.name}" style="${style}">${label}</option>`;
+        return `<option value="${r.lot||r.name}">${label}</option>`;
       }).join('');
   });
 }
@@ -1061,6 +1069,7 @@ function applyProductPackTemplate(code){
   if(!template) return;
   restoreTemplateSelect('bulkLot',template.bulkLot);
   restoreTemplateSelect('boxLot',template.boxLot);
+  restoreTemplateSelect('pkgBoxLot',template.pkgBoxLot);
   document.getElementById('perBox').value=template.perBox||'';
   document.getElementById('itemWeight').value=template.itemWeight||'';
   if(template.expiryMonths){
@@ -1186,6 +1195,7 @@ function selectBatchGroup(gi){
   const existCount=S.todayRecords.filter(r=>r.productCode===pCode).length;
   document.getElementById('packLot')&&(document.getElementById('packLot').textContent=`포장-${pCode}-${today}-${String(existCount+1).padStart(3,'0')}`);
   showPage('form');
+  applyProductPackTemplate(code);
 }
 
 function selectBatchLot(code, lot, lotType){
@@ -1210,6 +1220,7 @@ function selectBatchLot(code, lot, lotType){
   const existCount=S.todayRecords.filter(r=>r.productCode===pCode).length;
   document.getElementById('packLot')&&(document.getElementById('packLot').textContent=`포장-${pCode}-${today}-${String(existCount+1).padStart(3,'0')}`);
   showPage('form');
+  applyProductPackTemplate(code);
 }
 function updateStats(){
   const total=S.todayRecords.reduce((s,r)=>s+(r.qtyPcs||0),0);
@@ -1923,7 +1934,8 @@ function completePackaging(signImg=''){
     expiryDate:record.expiryDate,
     perBox:record.perBox,
     itemWeight:record.itemWeight,
-    boxLot:record.boxLot
+    boxLot:record.boxLot,
+    pkgBoxLot:record.pkgBoxLot
   });
   if(window._testMode) record._isTest = true;
 
