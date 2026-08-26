@@ -164,6 +164,10 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
   .outer-box-add{border:0;background:transparent;color:#1764b0;font-weight:800;font-size:13px;cursor:pointer;padding:4px 8px}
   .outer-box-target{margin-top:10px;padding:10px 12px;border-radius:9px;background:#eef5ff;color:#15599d;font-size:13px;font-weight:700}
   .outer-box-section.disabled{opacity:.42;pointer-events:none}
+  /* 모든 숫자칸은 직접 입력만 사용: 증감 화살표 제거 */
+  input[type="number"]{-moz-appearance:textfield;appearance:textfield}
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
   @media(max-width:640px){.outer-box-row{grid-template-columns:minmax(0,1fr) 105px 38px;gap:7px;padding:9px}.outer-box-lots{font-size:12px;padding:9px}.outer-box-remove{width:38px}.outer-box-select,.outer-box-qty{padding-left:9px!important;padding-right:9px!important}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -196,7 +200,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.3 · 2026.08.26 11:55</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v2.5 · 2026.08.26 12:22</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -496,6 +500,12 @@ let S = {
   todayRecords:[], expiryMonths:null
 };
 
+// 숫자 입력칸 위에서 휠을 굴려도 값이 바뀌지 않고 화면만 스크롤되게 처리
+document.addEventListener('wheel',e=>{
+  const input=e.target?.closest?.('input[type="number"]');
+  if(input&&document.activeElement===input) input.blur();
+},{capture:true,passive:true});
+
 // 날짜
 let _workDateKey = '';
 function getToday(){
@@ -755,6 +765,9 @@ function onSubLotSelect(selId){
 
 function outerBoxKey(kind){ return kind==='box'?'boxLots':'pkgBoxLots'; }
 function outerBoxCats(kind){ return kind==='box'?['박스']:['패키지박스']; }
+function escapeHtml(value){
+  return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
 function outerBoxItems(kind){
   const cats=outerBoxCats(kind), db=window._subItemDB||[], names=[];
   db.forEach(i=>{
