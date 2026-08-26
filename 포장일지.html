@@ -180,7 +180,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </div>
 
 <div class="content">
-<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v1.8 · 2026.08.26 10:37</div>
+<div class="mes-version" style="position:fixed;top:58px;right:8px;z-index:99;background:rgba(0,0,0,0.45);color:#fff;font-size:10px;padding:2px 7px;border-radius:6px;pointer-events:none;">v1.9 · 2026.08.26 11:01</div>
 
   <!-- 메인 -->
   <div class="page active" id="page-main">
@@ -407,9 +407,11 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <!-- 박스LOT / 박스사용량 -->
         <div class="row" style="margin-top:10px;">
           <div>
-            <div class="field-label">박스LOT</div>
+            <div class="field-label">박스 품목</div>
+            <select class="field-input" id="boxItem" onchange="onOuterBoxItemChange('boxLot','boxItem')"><option value="">-- 박스 품목 선택 --</option></select>
+            <div class="field-label" style="margin-top:6px;">박스 LOT</div>
             <select class="field-input" id="boxLot" onchange="onSubLotSelect('boxLot')">
-              <option value="">-- 선택 --</option>
+              <option value="">-- 품목을 먼저 선택 --</option>
             </select>
             <div class="stock-error-msg" id="boxLotWarning">⚠️ 박스 LOT 재고가 없습니다. 다른 LOT를 선택해주세요.</div>
           </div>
@@ -422,9 +424,11 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
         <!-- 패키지박스LOT / 패키지박스사용량 -->
         <div class="row" style="margin-top:10px;">
           <div>
-            <div class="field-label">패키지박스LOT</div>
+            <div class="field-label">패키지박스 품목</div>
+            <select class="field-input" id="pkgBoxItem" onchange="onOuterBoxItemChange('pkgBoxLot','pkgBoxItem')"><option value="">-- 패키지박스 품목 선택 --</option></select>
+            <div class="field-label" style="margin-top:6px;">패키지박스 LOT</div>
             <select class="field-input" id="pkgBoxLot" onchange="onSubLotSelect('pkgBoxLot')">
-              <option value="">-- 선택 --</option>
+              <option value="">-- 품목을 먼저 선택 --</option>
             </select>
           </div>
           <div>
@@ -688,18 +692,12 @@ function getRealRemaining(lot){
   return Math.round((inQ - outQ - (sessionUsage[lot]||0))*1000)/1000;
 }
 
-// 부자재 LOT 셀렉트 채우기 (잔여재고 표시)
-function loadSubLots(){
+// 재고가 남은 부자재 LOT를 선입선출 순서로 계산
+function getAvailableSubLots(cats){
   const recs=window._subLedgerRecords||[];
-  const catMap={
-    'bulkLot':['비닐','PE봉투'],
-    'boxLot':['박스'],
-    'pkgBoxLot':['패키지박스']
-  };
   const itemDB=window._subItemDB||[];
   const nameTocat={};
   itemDB.forEach(i=>{ if(i.name&&i.category) nameTocat[i.name]=i.category; });
-  // LOT별 입고/출고 합산
   const inQty={}, outQty={};
   recs.forEach(r=>{
     if(!r.lot) return;
@@ -711,48 +709,52 @@ function loadSubLots(){
   Object.entries(sessionUsage).forEach(([lot,qty])=>{
     outQty[lot]=(outQty[lot]||0)+qty;
   });
-  Object.entries(catMap).forEach(([selId,cats])=>{
-    const sel=document.getElementById(selId);
-    if(!sel) return;
-    const catItems=itemDB.filter(i=>cats.includes(i.category)).map(i=>i.name);
-    const catRecs=recs.filter(r=>{
-      if(!r.name) return false;
-      const rCat=r.category||nameTocat[r.name]||'';
-      return (catItems.includes(r.name)||cats.includes(rCat));
-    });
-    // 제품별로 이전에 선택한 박스 품목을 기억해 같은 품목의 LOT만 표시한다.
-    const template=loadProductPackTemplates()[S.product]||{};
-    const rememberedLot=selId==='boxLot'?template.boxLot:(selId==='pkgBoxLot'?template.pkgBoxLot:'');
-    const rememberedRec=rememberedLot&&recs.find(r=>r.lot===rememberedLot);
-    const rememberedName=rememberedRec?.name||'';
-    const seen=new Set();
-    const lots=[];
-    catRecs.forEach(r=>{
-      const key=r.lot||r.name;
-      if(seen.has(key)||(r.type!=='init'&&r.type!=='in')) return;
-      seen.add(key);
-      const remaining=Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
-      if(remaining<=0) return;
-      if(rememberedName&&r.name!==rememberedName) return;
-      const item=itemDB.find(i=>i.name===r.name);
-      const unit=item?.unit||'EA';
-      lots.push({name:r.name,lot:r.lot,remaining,unit,type:r.type,date:r.date||'',mfg:r.mfg||''});
-    });
-    // 선입선출: 입고일 → 제조일 → LOT 순으로 오래된 재고부터 표시
-    lots.sort((a,b)=>{
-      const dateCmp=(a.date||'9999-99-99').localeCompare(b.date||'9999-99-99');
-      if(dateCmp) return dateCmp;
-      const mfgCmp=(a.mfg||'999999').localeCompare(b.mfg||'999999');
-      if(mfgCmp) return mfgCmp;
-      return (a.lot||'').localeCompare(b.lot||'');
-    });
-    sel.innerHTML='<option value="">-- 선택 --</option>'+
-      lots.map(r=>{
-        const isOI=r.lot&&(r.lot.includes('-OF-')||r.lot.includes('-OI-'));
-        const stockLbl=` [재고:${r.remaining}${r.unit}]`;
-        const label=isOI?`${r.name} - ${r.lot} (초기재고)${stockLbl}`:`${r.name} - ${r.lot}${stockLbl}`;
-        return `<option value="${r.lot||r.name}">${label}</option>`;
-      }).join('');
+  const catItems=itemDB.filter(i=>cats.includes(i.category)).map(i=>i.name);
+  const seen=new Set(), lots=[];
+  recs.forEach(r=>{
+    if(!r.name||!r.lot||(r.type!=='init'&&r.type!=='in')||seen.has(r.lot)) return;
+    const rCat=r.category||nameTocat[r.name]||'';
+    if(!catItems.includes(r.name)&&!cats.includes(rCat)) return;
+    seen.add(r.lot);
+    const remaining=Math.round(((inQty[r.lot]||0)-(outQty[r.lot]||0))*1000)/1000;
+    if(remaining<=0) return;
+    const item=itemDB.find(i=>i.name===r.name);
+    lots.push({name:r.name,lot:r.lot,remaining,unit:item?.unit||'EA',type:r.type,date:r.date||'',mfg:r.mfg||''});
+  });
+  return lots.sort((a,b)=>(a.date||'9999-99-99').localeCompare(b.date||'9999-99-99')||(a.mfg||'999999').localeCompare(b.mfg||'999999')||(a.lot||'').localeCompare(b.lot||''));
+}
+
+function fillOuterBoxLots(lotId,itemId,selectedLot){
+  const lotSel=document.getElementById(lotId), itemName=document.getElementById(itemId)?.value||'';
+  if(!lotSel) return;
+  if(!itemName){lotSel.innerHTML='<option value="">-- 품목을 먼저 선택 --</option>';return;}
+  const lots=getAvailableSubLots(lotId==='boxLot'?['박스']:['패키지박스']).filter(r=>r.name===itemName);
+  lotSel.innerHTML='<option value="">-- LOT 선택 --</option>'+lots.map(r=>{
+    const isOI=r.lot.includes('-OF-')||r.lot.includes('-OI-');
+    return `<option value="${r.lot}">${r.lot}${isOI?' (초기재고)':''} [재고:${r.remaining}${r.unit}]</option>`;
+  }).join('');
+  if(selectedLot&&lots.some(r=>r.lot===selectedLot)) lotSel.value=selectedLot;
+}
+function onOuterBoxItemChange(lotId,itemId){fillOuterBoxLots(lotId,itemId,'');markBoxLotStockStatus();checkOuterBoxConflict();}
+
+// 박스 품목을 먼저 선택하고 해당 품목의 LOT만 표시
+function loadSubLots(){
+  const bulkSel=document.getElementById('bulkLot');
+  const bulkLots=getAvailableSubLots(['비닐','PE봉투']);
+  if(bulkSel) bulkSel.innerHTML='<option value="">-- 선택 --</option>'+bulkLots.map(r=>`<option value="${r.lot}">${r.name} - ${r.lot} [재고:${r.remaining}${r.unit}]</option>`).join('');
+  const template=loadProductPackTemplates()[S.product]||{};
+  [['boxItem','boxLot',['박스'],template.boxItem,template.boxLot],['pkgBoxItem','pkgBoxLot',['패키지박스'],template.pkgBoxItem,template.pkgBoxLot]].forEach(([itemId,lotId,cats,savedItem,savedLot])=>{
+    const itemSel=document.getElementById(itemId); if(!itemSel) return;
+    const lots=getAvailableSubLots(cats);
+    const oldRec=savedLot&&(window._subLedgerRecords||[]).find(r=>r.lot===savedLot);
+    const wantedItem=savedItem||oldRec?.name||'';
+    const names=[...new Set(lots.map(r=>r.name))];
+    itemSel.innerHTML='<option value="">-- 품목 선택 --</option>'+names.map(name=>{
+      const total=lots.filter(r=>r.name===name).reduce((s,r)=>s+r.remaining,0);
+      return `<option value="${name}">${name} [총재고:${Math.round(total*1000)/1000}EA]</option>`;
+    }).join('');
+    if(wantedItem&&names.includes(wantedItem)) itemSel.value=wantedItem;
+    fillOuterBoxLots(lotId,itemId,savedLot);
   });
 }
 
@@ -795,13 +797,19 @@ function markBoxLotStockStatus(){
 function checkOuterBoxConflict(){
   const boxSel=document.getElementById('boxLot');
   const pkgSel=document.getElementById('pkgBoxLot');
+  const boxItem=document.getElementById('boxItem');
+  const pkgItem=document.getElementById('pkgBoxItem');
   if(!boxSel||!pkgSel) return;
   const hasBox=!!boxSel.value;
   const hasPkg=!!pkgSel.value;
   pkgSel.disabled=hasBox;
   boxSel.disabled=hasPkg;
+  if(pkgItem) pkgItem.disabled=hasBox;
+  if(boxItem) boxItem.disabled=hasPkg;
   pkgSel.style.opacity=hasBox?'0.45':'1';
   boxSel.style.opacity=hasPkg?'0.45':'1';
+  if(pkgItem) pkgItem.style.opacity=hasBox?'0.45':'1';
+  if(boxItem) boxItem.style.opacity=hasPkg?'0.45':'1';
   if(hasPkg){
     boxSel.classList.remove('stock-error');
     const warning=document.getElementById('boxLotWarning');
@@ -1068,8 +1076,10 @@ function applyProductPackTemplate(code){
   checkOuterBoxConflict();
   if(!template) return;
   restoreTemplateSelect('bulkLot',template.bulkLot);
-  restoreTemplateSelect('boxLot',template.boxLot);
-  restoreTemplateSelect('pkgBoxLot',template.pkgBoxLot);
+  if(template.boxItem&&document.getElementById('boxItem')) document.getElementById('boxItem').value=template.boxItem;
+  if(template.pkgBoxItem&&document.getElementById('pkgBoxItem')) document.getElementById('pkgBoxItem').value=template.pkgBoxItem;
+  fillOuterBoxLots('boxLot','boxItem',template.boxLot);
+  fillOuterBoxLots('pkgBoxLot','pkgBoxItem',template.pkgBoxLot);
   document.getElementById('perBox').value=template.perBox||'';
   document.getElementById('itemWeight').value=template.itemWeight||'';
   if(template.expiryMonths){
@@ -1303,7 +1313,7 @@ function selectProduct(code){
   });
   document.getElementById('qtyBoxes').value='';
   // select 필드 초기화
-  ['batchLotSel','bulkLot','boxLot','pkgBoxLot'].forEach(id=>{
+  ['batchLotSel','bulkLot','boxItem','boxLot','pkgBoxItem','pkgBoxLot'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.selectedIndex=0;
   });
@@ -1922,8 +1932,10 @@ function completePackaging(signImg=''){
     filmWastePcs:parseInt(document.getElementById('filmWastePcs')?.value)||0,
     bulkLot:document.getElementById('bulkLot')?.value||'-',
     bulkQty:document.getElementById('bulkQty').value||0,
+    boxItem:document.getElementById('boxItem')?.value||'',
     boxLot:document.getElementById('boxLot')?.value||'-',
     boxQty:(document.getElementById('boxLot')?.value?document.getElementById('boxQty').value:0)||0,
+    pkgBoxItem:document.getElementById('pkgBoxItem')?.value||'',
     pkgBoxLot:document.getElementById('pkgBoxLot')?.value||'-',
     pkgBoxQty:(document.getElementById('pkgBoxLot')?.value?document.getElementById('pkgBoxQty').value:0)||0,
     signImg
@@ -1934,7 +1946,9 @@ function completePackaging(signImg=''){
     expiryDate:record.expiryDate,
     perBox:record.perBox,
     itemWeight:record.itemWeight,
+    boxItem:record.boxItem,
     boxLot:record.boxLot,
+    pkgBoxItem:record.pkgBoxItem,
     pkgBoxLot:record.pkgBoxLot
   });
   if(window._testMode) record._isTest = true;
