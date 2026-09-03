@@ -181,21 +181,33 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
-  firebase.initializeApp({
-    apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
-    authDomain:"bbang-ssaem-prod.firebaseapp.com",
-    projectId:"bbang-ssaem-prod",
-    storageBucket:"bbang-ssaem-prod.firebasestorage.app",
-    messagingSenderId:"685237617449",
-    appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
-  });
-  window._db = firebase.firestore();
+  window._firebaseInitError='';
+  try{
+    if(typeof firebase==='undefined') throw new Error('Firebase 프로그램을 불러오지 못했습니다.');
+    if(!firebase.apps.length){
+      firebase.initializeApp({
+        apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
+        authDomain:"bbang-ssaem-prod.firebaseapp.com",
+        projectId:"bbang-ssaem-prod",
+        storageBucket:"bbang-ssaem-prod.firebasestorage.app",
+        messagingSenderId:"685237617449",
+        appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
+      });
+    }
+    window._db=firebase.firestore();
+    // 태블릿·모바일 및 일부 사내망에서 기본 실시간 통신이 끊기는 현상을 방지한다.
+    window._db.settings({experimentalForceLongPolling:true});
+  }catch(e){
+    window._db=null;
+    window._firebaseInitError=e?.message||String(e);
+    console.error('Firebase 초기화 실패',e);
+  }
 </script>
 <link rel="stylesheet" href="mes-responsive.css">
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.1 · 2026.08.19 10:03</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.2 · 2026.09.03 10:23</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -2274,7 +2286,8 @@ async function refreshLedgerRecords(){
   const btn = document.getElementById('refreshStockBtn');
   if(btn){ btn.textContent='⏳ 갱신 중...'; btn.disabled=true; }
   try{
-    if(!window._db) throw new Error('Firebase 없음');
+    if(!window._db) throw new Error(window._firebaseInitError||'Firebase 연결을 만들지 못했습니다.');
+    if(typeof window._db.enableNetwork==='function') await window._db.enableNetwork();
     const snap = await window._db.collection('appData').doc('ledgerRecords').get();
     if(snap.exists && snap.data().data){
       window._ledgerRecords = JSON.parse(snap.data().data);
@@ -2298,6 +2311,7 @@ async function refreshLedgerRecords(){
   }catch(e){
     console.warn('재고 갱신 실패',e);
     if(btn){ btn.textContent='❌ 실패'; setTimeout(()=>{ btn.textContent='🔄 재고 갱신'; btn.disabled=false; },2000); }
+    alert('재고 데이터를 읽지 못했습니다.\n\n'+(e?.message||e));
   }
 }
 
