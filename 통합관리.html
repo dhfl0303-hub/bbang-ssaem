@@ -202,7 +202,7 @@ tr:hover td{background:var(--bg);}
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.9 · 2026.08.19 10:03</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.0 · 2026.09.03 13:37</div>
 <!-- 로그인 화면 -->
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0d3f75;z-index:9999;align-items:center;justify-content:center;">
   <div style="width:340px;">
@@ -4078,15 +4078,19 @@ async function addMissingStockForCurrentLot(){
 }
 
 // ===== 폐기 처리 =====
+function roundKg3(value){
+  return Math.round((Number(value||0)+Number.EPSILON)*1000)/1000;
+}
 function openDispose(idx){
   const s = ingStock[idx];
   if(!s) return;
   closeAllModals();
   document.getElementById('dispName').value = s.name;
   document.getElementById('dispLot').value = s.lot||'-';
-  document.getElementById('dispCurQty').value = s.qty.toFixed(3)+' kg';
+  const currentQty=roundKg3(s.qty);
+  document.getElementById('dispCurQty').value = currentQty.toFixed(3)+' kg';
   document.getElementById('dispDate').value = new Date().toISOString().slice(0,10);
-  document.getElementById('dispQty').value = s.qty;
+  document.getElementById('dispQty').value = currentQty.toFixed(3);
   document.getElementById('dispReason').value = '기한초과';
   document.getElementById('dispReasonEtc').value = '';
   document.getElementById('dispReasonEtcRow').style.display = 'none';
@@ -4110,11 +4114,12 @@ async function saveDispose(){
   const s = ingStock[idx];
   if(!s){ alert('원료 정보를 찾을 수 없습니다'); return; }
   const date = document.getElementById('dispDate').value;
-  const qty = parseFloat(document.getElementById('dispQty').value)||0;
+  const qty = roundKg3(parseFloat(document.getElementById('dispQty').value)||0);
+  const currentQty = roundKg3(s.qty);
   let reason = document.getElementById('dispReason').value;
   if(reason==='기타') reason = document.getElementById('dispReasonEtc').value.trim()||'기타';
   if(!qty||qty<=0){ alert('폐기량을 입력해주세요'); return; }
-  if(qty>s.qty){ alert('폐기량이 현재고보다 큽니다'); return; }
+  if(qty>currentQty){ alert('폐기량이 현재고보다 큽니다'); return; }
   // ledgerRecords에 dispose 추가
   ledgerRecords.push({
     date, name:s.name, code:s.code||'', qty, lot:s.lot||'',
@@ -4126,7 +4131,7 @@ async function saveDispose(){
   closeModal('disposeModal');
   renderIngStock();
   renderDisposeLog();
-  alert(s.name+' '+qty+'kg 폐기 처리 완료');
+  alert(s.name+' '+qty.toFixed(3)+'kg 폐기 처리 완료');
 }
 
 function renderDisposeLog(){
@@ -4142,7 +4147,7 @@ function renderDisposeLog(){
       <td style="font-size:12px">${r.date||'-'}</td>
       <td><span class="badge badge-blue" style="font-size:10px">${r.code||'-'}</span></td>
       <td style="font-weight:600">${(r.name||'').replace(/\n/g,' ')}</td>
-      <td style="color:var(--danger);font-weight:700">${r.qty}kg</td>
+      <td style="color:var(--danger);font-weight:700">${roundKg3(r.qty).toFixed(3)}kg</td>
       <td style="font-size:11px">${r.lot||'-'}</td>
       <td><span class="badge badge-red">${r.reason||'-'}</span></td>
       <td class="tc"><button class="btn btn-sm btn-danger" onclick="deleteDispose('${r.date||''}','${(r.name||'').replace(/'/g,'&#39;')}','${r.lot||''}',${r.qty})">삭제</button></td>

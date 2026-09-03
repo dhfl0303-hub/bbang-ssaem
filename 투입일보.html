@@ -112,7 +112,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.4 · 2026.08.25 14:41</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.5 · 2026.09.03 13:45</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -1034,17 +1034,32 @@ function renderAdminLogs(){
 }
 
 // ===== Firebase 로드 =====
+// 브라우저 저장공간이 가득 차더라도 Firebase에서 읽은 최신 데이터는 계속 사용한다.
+function cacheJsonSafely(key, value){
+  try{
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  }catch(e){
+    console.warn('브라우저 캐시 저장 생략:', key, e);
+    return false;
+  }
+}
+function readCachedJson(key, fallback){
+  try{
+    const raw=localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  }catch(e){
+    console.warn('브라우저 캐시 읽기 실패:', key, e);
+    return fallback;
+  }
+}
 async function loadFromFirebase(){
   if(!window._db){
     // 오프라인: localStorage 캐시에서 로드
-    const cachedLedger = localStorage.getItem('ledgerRecords');
-    window._ledgerRecords = cachedLedger ? JSON.parse(cachedLedger) : [];
-    const cachedIncoming = localStorage.getItem('incomingRecords');
-    window._incomingRecords = cachedIncoming ? JSON.parse(cachedIncoming) : [];
-    const cachedIngDB = localStorage.getItem('ingredientDB');
-    if(cachedIngDB) INGREDIENT_DB = JSON.parse(cachedIngDB);
-    const cachedInputDB = localStorage.getItem('inputDB');
-    if(cachedInputDB) INPUT_DB = JSON.parse(cachedInputDB);
+    window._ledgerRecords = readCachedJson('ledgerRecords', []);
+    window._incomingRecords = readCachedJson('incomingRecords', []);
+    INGREDIENT_DB = readCachedJson('ingredientDB', INGREDIENT_DB);
+    INPUT_DB = readCachedJson('inputDB', INPUT_DB);
     return;
   }
   try{
@@ -1056,30 +1071,26 @@ async function loadFromFirebase(){
     ]);
     if(ingSnap.exists && ingSnap.data().data){
       INGREDIENT_DB = JSON.parse(ingSnap.data().data);
-      localStorage.setItem('ingredientDB', JSON.stringify(INGREDIENT_DB));
+      cacheJsonSafely('ingredientDB', INGREDIENT_DB);
     }
     if(inputDBSnap.exists && inputDBSnap.data().data){
       INPUT_DB = JSON.parse(inputDBSnap.data().data);
-      localStorage.setItem('inputDB', JSON.stringify(INPUT_DB));
+      cacheJsonSafely('inputDB', INPUT_DB);
     }
     if(incomingSnap.exists && incomingSnap.data().data){
       window._incomingRecords = JSON.parse(incomingSnap.data().data);
-      localStorage.setItem('incomingRecords', JSON.stringify(window._incomingRecords));
+      cacheJsonSafely('incomingRecords', window._incomingRecords);
     } else window._incomingRecords = [];
     if(ledgerSnap.exists && ledgerSnap.data().data){
       window._ledgerRecords = JSON.parse(ledgerSnap.data().data);
-      localStorage.setItem('ledgerRecords', JSON.stringify(window._ledgerRecords));
+      cacheJsonSafely('ledgerRecords', window._ledgerRecords);
     } else window._ledgerRecords = [];
   }catch(e){
     console.warn('Firebase 로드 실패, 캐시 사용',e);
-    const cachedLedger = localStorage.getItem('ledgerRecords');
-    window._ledgerRecords = cachedLedger ? JSON.parse(cachedLedger) : [];
-    const cachedIncoming = localStorage.getItem('incomingRecords');
-    window._incomingRecords = cachedIncoming ? JSON.parse(cachedIncoming) : [];
-    const cachedIngDB = localStorage.getItem('ingredientDB');
-    if(cachedIngDB) INGREDIENT_DB = JSON.parse(cachedIngDB);
-    const cachedInputDB = localStorage.getItem('inputDB');
-    if(cachedInputDB) INPUT_DB = JSON.parse(cachedInputDB);
+    window._ledgerRecords = readCachedJson('ledgerRecords', window._ledgerRecords||[]);
+    window._incomingRecords = readCachedJson('incomingRecords', window._incomingRecords||[]);
+    INGREDIENT_DB = readCachedJson('ingredientDB', INGREDIENT_DB);
+    INPUT_DB = readCachedJson('inputDB', INPUT_DB);
   }
 }
 
@@ -1109,11 +1120,11 @@ async function refreshInputStock(){
     ]);
     if(incomingSnap.exists && incomingSnap.data().data){
       window._incomingRecords = JSON.parse(incomingSnap.data().data);
-      localStorage.setItem('incomingRecords', JSON.stringify(window._incomingRecords));
+      cacheJsonSafely('incomingRecords', window._incomingRecords);
     }
     if(ledgerSnap.exists && ledgerSnap.data().data){
       window._ledgerRecords = JSON.parse(ledgerSnap.data().data);
-      localStorage.setItem('ledgerRecords', JSON.stringify(window._ledgerRecords));
+      cacheJsonSafely('ledgerRecords', window._ledgerRecords);
     }
     if(btn){ btn.textContent='✅ 갱신 완료'; setTimeout(()=>{ btn.textContent='🔄 재고 갱신'; btn.disabled=false; },1500); }
   }catch(e){
