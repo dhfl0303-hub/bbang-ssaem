@@ -181,33 +181,21 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
-  window._firebaseInitError='';
-  try{
-    if(typeof firebase==='undefined') throw new Error('Firebase 프로그램을 불러오지 못했습니다.');
-    if(!firebase.apps.length){
-      firebase.initializeApp({
-        apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
-        authDomain:"bbang-ssaem-prod.firebaseapp.com",
-        projectId:"bbang-ssaem-prod",
-        storageBucket:"bbang-ssaem-prod.firebasestorage.app",
-        messagingSenderId:"685237617449",
-        appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
-      });
-    }
-    window._db=firebase.firestore();
-    // 태블릿·모바일 및 일부 사내망에서 기본 실시간 통신이 끊기는 현상을 방지한다.
-    window._db.settings({experimentalForceLongPolling:true});
-  }catch(e){
-    window._db=null;
-    window._firebaseInitError=e?.message||String(e);
-    console.error('Firebase 초기화 실패',e);
-  }
+  firebase.initializeApp({
+    apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
+    authDomain:"bbang-ssaem-prod.firebaseapp.com",
+    projectId:"bbang-ssaem-prod",
+    storageBucket:"bbang-ssaem-prod.firebasestorage.app",
+    messagingSenderId:"685237617449",
+    appId:"1:685237617449:web:5a3ad7e2be508f677e2d38"
+  });
+  window._db = firebase.firestore();
 </script>
 <link rel="stylesheet" href="mes-responsive.css">
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.2 · 2026.09.03 10:23</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.2 · 2026.09.03 10:52</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -454,6 +442,44 @@ function getToday(){
 function getTodayKey(){ const d=new Date(); return String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
 function getWorkDateKey(){ return (_workDateKey && _workDateKey.length===6) ? _workDateKey : getTodayKey(); }
 function getNow(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+const REBUILDABLE_CACHE_KEYS=['recipeDB','ingredientDB','inputDB','currentIngStock','ledgerRecords'];
+function isStorageQuotaError(e){
+  return e&&(e.name==='QuotaExceededError'||e.code===22||e.code===1014);
+}
+function clearRebuildableCaches(exceptKey=''){
+  REBUILDABLE_CACHE_KEYS.forEach(key=>{ if(key!==exceptKey) localStorage.removeItem(key); });
+}
+function clearOldSyncedWorkRecords(currentKey){
+  const removeKeys=[];
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i)||'';
+    if(key===currentKey||!/^(batchRecords_|inputRecords_|packRecords_)\d{6}$/.test(key)) continue;
+    try{
+      const rows=JSON.parse(localStorage.getItem(key)||'[]');
+      if(Array.isArray(rows)&&rows.length&&rows.every(r=>r._synced===true)) removeKeys.push(key);
+    }catch(e){}
+  }
+  removeKeys.forEach(key=>localStorage.removeItem(key));
+}
+function saveRebuildableCache(key,value){
+  try{ localStorage.setItem(key,value); return true; }
+  catch(e){
+    if(!isStorageQuotaError(e)) throw e;
+    clearRebuildableCaches(key);
+    try{ localStorage.setItem(key,value); return true; }
+    catch(e2){ console.warn(key+' 캐시 저장 생략',e2); return false; }
+  }
+}
+function saveCriticalLocal(key,value){
+  try{ localStorage.setItem(key,value); return; }
+  catch(e){
+    if(!isStorageQuotaError(e)) throw e;
+    clearRebuildableCaches();
+    clearOldSyncedWorkRecords(key);
+    try{ localStorage.setItem(key,value); return; }
+    catch(e2){ throw new Error('기기 저장공간이 부족합니다. 오래된 동기화 완료 기록을 정리한 뒤 다시 저장해주세요.'); }
+  }
+}
 function onWorkDateInput(input){
   const raw = input.value.replace(/\D/g,'').slice(0,6);
   input.value = raw;
@@ -520,19 +546,19 @@ function saveSettings(){
 function initDB(){
   const s=localStorage.getItem('recipeDB');
   DB = s ? JSON.parse(s) : JSON.parse(JSON.stringify(RECIPE_DB_INIT));
-  if(!s) localStorage.setItem('recipeDB',JSON.stringify(DB));
+  if(!s) saveRebuildableCache('recipeDB',JSON.stringify(DB));
   // 시작 시 배합비 자동 다운로드 (온라인일 때만 성공, 오프라인이면 기존 localStorage 유지)
   if(window._db){
     window._db.collection('appData').doc('ingredientDB').get().then(snap=>{
       if(snap.exists&&snap.data().data){
         LIVE_INGREDIENT_DB=JSON.parse(snap.data().data);
-        localStorage.setItem('ingredientDB',JSON.stringify(LIVE_INGREDIENT_DB));
+        saveRebuildableCache('ingredientDB',JSON.stringify(LIVE_INGREDIENT_DB));
       }
     }).catch(()=>{ LIVE_INGREDIENT_DB=JSON.parse(localStorage.getItem('ingredientDB')||'[]'); });
     window._db.collection('appData').doc('recipeDB').get().then(snap=>{
       if(snap.exists && snap.data().data){
         DB = JSON.parse(snap.data().data);
-        localStorage.setItem('recipeDB', JSON.stringify(DB));
+        saveRebuildableCache('recipeDB', JSON.stringify(DB));
         try{ renderProductList(Object.keys(DB)); }catch(e){}
       }
     }).catch(()=>{});
@@ -547,7 +573,7 @@ function initDB(){
     window._db.collection('appData').doc('ledgerRecords').get().then(snap=>{
       if(snap.exists && snap.data().data){
         window._ledgerRecords = JSON.parse(snap.data().data);
-        localStorage.setItem('ledgerRecords', JSON.stringify(window._ledgerRecords));
+        saveRebuildableCache('ledgerRecords', JSON.stringify(window._ledgerRecords));
       } else { window._ledgerRecords = []; }
     }).catch(()=>{
       // 오프라인: localStorage 캐시 사용
@@ -558,7 +584,7 @@ function initDB(){
     window._db.collection('appData').doc('ingStock').get().then(snap=>{
       if(snap.exists && snap.data().data){
         window._currentIngStock=JSON.parse(snap.data().data);
-        localStorage.setItem('currentIngStock',JSON.stringify(window._currentIngStock));
+        saveRebuildableCache('currentIngStock',JSON.stringify(window._currentIngStock));
       }else window._currentIngStock=[];
     }).catch(()=>{
       const cached=localStorage.getItem('currentIngStock');
@@ -575,7 +601,10 @@ function initDB(){
 }
 
 // 로컬 저장
-function saveLocal(){ localStorage.setItem('batchRecords_'+getWorkDateKey(),JSON.stringify(S.todayRecords)); updateStats(); }
+function saveLocal(){
+  saveCriticalLocal('batchRecords_'+getWorkDateKey(),JSON.stringify(S.todayRecords));
+  updateStats();
+}
 function loadLocal(){
   const d=localStorage.getItem('batchRecords_'+getWorkDateKey());
   S.todayRecords = d ? JSON.parse(d) : [];
@@ -2239,7 +2268,15 @@ function saveInputDispose(){
 }
 
 function goSign(){showPage('sign');setTimeout(initCanvas,100);}
-function completeWithSign(){signImg=hasSign?document.getElementById('signCanvas').toDataURL('image/png'):'';showComplete();}
+function completeWithSign(){
+  try{
+    signImg=hasSign?document.getElementById('signCanvas').toDataURL('image/png'):'';
+    showComplete();
+  }catch(e){
+    console.error('배합 저장 실패',e);
+    alert('배합 기록을 저장하지 못했습니다.\n\n'+(e?.message||e));
+  }
+}
 
 initDB();
 initMain();
@@ -2286,20 +2323,19 @@ async function refreshLedgerRecords(){
   const btn = document.getElementById('refreshStockBtn');
   if(btn){ btn.textContent='⏳ 갱신 중...'; btn.disabled=true; }
   try{
-    if(!window._db) throw new Error(window._firebaseInitError||'Firebase 연결을 만들지 못했습니다.');
-    if(typeof window._db.enableNetwork==='function') await window._db.enableNetwork();
+    if(!window._db) throw new Error('Firebase 없음');
     const snap = await window._db.collection('appData').doc('ledgerRecords').get();
     if(snap.exists && snap.data().data){
       window._ledgerRecords = JSON.parse(snap.data().data);
-      localStorage.setItem('ledgerRecords', JSON.stringify(window._ledgerRecords));
+      saveRebuildableCache('ledgerRecords', JSON.stringify(window._ledgerRecords));
     }
     const stockSnap=await window._db.collection('appData').doc('ingStock').get();
     if(stockSnap.exists && stockSnap.data().data){
       window._currentIngStock=JSON.parse(stockSnap.data().data);
-      localStorage.setItem('currentIngStock',JSON.stringify(window._currentIngStock));
+      saveRebuildableCache('currentIngStock',JSON.stringify(window._currentIngStock));
     }else{
       window._currentIngStock=[];
-      localStorage.setItem('currentIngStock','[]');
+      saveRebuildableCache('currentIngStock','[]');
     }
     // 현재 배합 화면에 있으면 LOT 드롭다운 즉시 갱신
     const batchPage = document.getElementById('page-batch');
@@ -2311,7 +2347,6 @@ async function refreshLedgerRecords(){
   }catch(e){
     console.warn('재고 갱신 실패',e);
     if(btn){ btn.textContent='❌ 실패'; setTimeout(()=>{ btn.textContent='🔄 재고 갱신'; btn.disabled=false; },2000); }
-    alert('재고 데이터를 읽지 못했습니다.\n\n'+(e?.message||e));
   }
 }
 
@@ -2544,13 +2579,13 @@ async function syncToServer(){
       const rSnap = await db.collection('appData').doc('recipeDB').get();
       if(rSnap.exists && rSnap.data().data){
         DB = JSON.parse(rSnap.data().data);
-        localStorage.setItem('recipeDB', JSON.stringify(DB));
+        saveRebuildableCache('recipeDB', JSON.stringify(DB));
       }
     }catch(e){ console.warn('배합비 다운로드 실패(기존 데이터 유지)', e); }
 
     // 5. 동기화 후 ledgerRecords 재로드 (최신 재고 반영)
     window._ledgerRecords = ledgerRecords;
-    localStorage.setItem('ledgerRecords', JSON.stringify(ledgerRecords));
+    saveRebuildableCache('ledgerRecords', JSON.stringify(ledgerRecords));
 
     // 6. 동기화 완료된 기록에 _synced 표시 → 다음 동기화 시 중복 방지
     for(const key of keys){
@@ -2674,7 +2709,7 @@ async function syncSingleBatch(idx){
       const rSnap2 = await db.collection('appData').doc('recipeDB').get();
       if(rSnap2.exists && rSnap2.data().data){
         DB = JSON.parse(rSnap2.data().data);
-        localStorage.setItem('recipeDB', JSON.stringify(DB));
+        saveRebuildableCache('recipeDB', JSON.stringify(DB));
       }
     }catch(e){ console.warn('배합비 다운로드 실패(기존 데이터 유지)', e); }
 
@@ -2682,7 +2717,7 @@ async function syncSingleBatch(idx){
     rec._synced=true;
     saveLocal();
     window._ledgerRecords=ledgerRecords;
-    localStorage.setItem('ledgerRecords',JSON.stringify(ledgerRecords));
+    saveRebuildableCache('ledgerRecords',JSON.stringify(ledgerRecords));
     renderTodayList();
   }catch(e){
     console.error('개별 동기화 실패',e);
@@ -2697,7 +2732,7 @@ async function downloadRecipeDB(){
     const snap = await window._db.collection('appData').doc('recipeDB').get();
     if(snap.exists && snap.data().data){
       DB = JSON.parse(snap.data().data);
-      localStorage.setItem('recipeDB', JSON.stringify(DB));
+      saveRebuildableCache('recipeDB', JSON.stringify(DB));
       renderProductList(Object.keys(DB));
       alert('배합비 다운로드 완료!');
     } else {
