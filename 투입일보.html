@@ -113,7 +113,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.6 · 2026.09.22 10:51</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.7 · 2026.09.22 15:29</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -770,14 +770,72 @@ function saveInputRecord(){
   };
   S.todayRecords.push(record);
   S._lastRecord = record; // 완료 화면용
-  saveLocal();
+  if(!saveLocal()){
+    S.todayRecords.pop();
+    S._lastRecord = null;
+    return;
+  }
   goSign();
 }
 
 // ===== 로컬 저장 =====
+function isStorageQuotaError(e){
+  return e&&(e.name==='QuotaExceededError'||e.code===22||e.code===1014);
+}
+function clearRebuildableInputCaches(){
+  ['ledgerRecords','incomingRecords','ingredientDB','inputDB','currentIngStock','recipeDB'].forEach(key=>{
+    try{ localStorage.removeItem(key); }catch(e){}
+  });
+}
+function clearOldSyncedInputRecords(currentKey){
+  const removable=[];
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i);
+    if(!key||key===currentKey||!key.startsWith('inputRecords_')) continue;
+    try{
+      const records=JSON.parse(localStorage.getItem(key)||'[]');
+      if(Array.isArray(records)&&records.length&&records.every(r=>r&&r._synced===true)) removable.push(key);
+    }catch(e){}
+  }
+  removable.sort().forEach(key=>{
+    try{ localStorage.removeItem(key); }catch(e){}
+  });
+}
 function saveLocal(){
-  localStorage.setItem('inputRecords_'+getWorkDateKey(), JSON.stringify(S.todayRecords));
+  const key='inputRecords_'+getWorkDateKey();
+  const data=JSON.stringify(S.todayRecords);
+  try{
+    localStorage.setItem(key,data);
+  }catch(e){
+    if(!isStorageQuotaError(e)){
+      console.error('투입기록 저장 실패',e);
+      alert('투입기록을 저장하지 못했습니다: '+e.message);
+      return false;
+    }
+    // 서버에서 다시 받을 수 있는 캐시만 먼저 정리한다.
+    clearRebuildableInputCaches();
+    try{
+      localStorage.setItem(key,data);
+    }catch(e2){
+      if(isStorageQuotaError(e2)){
+        // 다른 날짜 기록은 서버 동기화 완료가 확인된 자료만 정리한다.
+        clearOldSyncedInputRecords(key);
+        try{
+          localStorage.setItem(key,data);
+        }catch(e3){
+          console.error('투입기록 저장공간 부족',e3);
+          alert('기기 저장공간이 부족하여 완료할 수 없습니다.\n\n동기화되지 않은 투입기록은 삭제하지 않았습니다. 관리자에게 저장공간 정리를 요청해주세요.');
+          return false;
+        }
+      }else{
+        console.error('투입기록 저장 실패',e2);
+        alert('투입기록을 저장하지 못했습니다: '+e2.message);
+        return false;
+      }
+    }
+  }
   updateStats();
+  return true;
 }
 function loadLocal(){
   const d = localStorage.getItem('inputRecords_'+getWorkDateKey());
