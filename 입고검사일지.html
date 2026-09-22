@@ -156,6 +156,7 @@ select.td-input{cursor:pointer;}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="mes-ledger-storage.js"></script>
 <script>
   firebase.initializeApp({
     apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
@@ -171,7 +172,7 @@ select.td-input{cursor:pointer;}
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.42);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.3 · 2026.08.21 09:08</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.42);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.4 · 2026.09.22 10:51</div>
 
 <!-- 계산기 모달 -->
 <div class="modal-overlay" id="calcModal" onclick="closeModalOutside(event,'calcModal')">
@@ -863,7 +864,7 @@ function validateExp6(v){ return /^\d{6}$/.test(v); }
 // ===== 기존 로트 목록 (관리자화면 ledgerRecords 공유) =====
 function getExistingLots(ingName){
   try{
-    const records = JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
+    const records = window._ledgerRecords||JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
     const lots = [];
     records.filter(r=>r.name===ingName&&r.exp).forEach(r=>{
       const key = r.lot||'';
@@ -1689,11 +1690,13 @@ function saveSuppliersToFirebase(){
 async function loadFromFirebase(){
   if(!window._db) return false;
   try{
-    const [recSnap, supSnap, ingSnap] = await Promise.all([
+    const [recSnap, supSnap, ingSnap, monthlyLedger] = await Promise.all([
       window._db.collection('appData').doc('incomingRecords').get(),
       window._db.collection('appData').doc('suppliers_incoming').get(),
-      window._db.collection('appData').doc('ingredientDB').get()
+      window._db.collection('appData').doc('ingredientDB').get(),
+      MESLedgerStore.load(window._db)
     ]);
+    window._ledgerRecords=monthlyLedger;
     if(recSnap.exists && recSnap.data().data){
       records = JSON.parse(recSnap.data().data);
       let migrated=false;

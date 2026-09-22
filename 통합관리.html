@@ -187,6 +187,7 @@ tr:hover td{background:var(--bg);}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="mes-ledger-storage.js"></script>
 <script>
   firebase.initializeApp({
     apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
@@ -202,7 +203,7 @@ tr:hover td{background:var(--bg);}
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.0 · 2026.09.03 13:37</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.1 · 2026.09.22 10:51</div>
 <!-- 로그인 화면 -->
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0d3f75;z-index:9999;align-items:center;justify-content:center;">
   <div style="width:340px;">
@@ -1199,7 +1200,7 @@ function initLedger(){
 }
 function saveLedger(){
   if(!window._db) return Promise.reject(new Error('Firebase 연결 없음'));
-  return window._db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledgerRecords),updatedAt:new Date().toISOString()});
+  return MESLedgerStore.save(window._db,ledgerRecords);
 }
 
 function getIngByCode(code){ return INGREDIENT_DB.find(i=>i.code===code); }
@@ -1635,14 +1636,19 @@ async function loadFromFirebase(){
     window._fbCache = {};
     // 핵심 데이터 한번에 로드
     const keys = [
-      'incomingRecords','ledgerRecords','recipeDB','lotMapping','ingStock',
+      'incomingRecords','recipeDB','lotMapping','ingStock',
       'deviceSettings','customIngredients','editedIngredients',
       '완제품_lots','완제품_products','완제품_clients',
       'subIncomingRecords','subLedgerRecords','subItemDB','subsidiaryStock',
       'workerList','packSettings','batchSettings','ingredientDB','inputDB',
       'productNameMapping'
     ];
-    const snaps = await Promise.all(keys.map(k=>window._db.collection('appData').doc(k).get()));
+    const [snaps,monthlyLedger] = await Promise.all([
+      Promise.all(keys.map(k=>window._db.collection('appData').doc(k).get())),
+      MESLedgerStore.load(window._db)
+    ]);
+    ledgerRecords=monthlyLedger;
+    window._fbCache.ledgerRecords=monthlyLedger;
     const rolloverSnap=await window._db.collection('appData').doc('ledgerRolloverMeta').get();
     window._rolloverIgnoredIncomingIds=new Set();
     if(rolloverSnap.exists&&rolloverSnap.data().ignoredIncomingIds){
@@ -1654,7 +1660,6 @@ async function loadFromFirebase(){
         const parsed = JSON.parse(snap.data().data);
         window._fbCache[key] = parsed;
         // 전역 변수에도 반영
-        if(key==='ledgerRecords') ledgerRecords = parsed;
         if(key==='incomingRecords') incomingRecords = parsed;
         if(key==='recipeDB') DB = parsed;
         if(key==='lotMapping') lotMapping = parsed;
@@ -2996,7 +3001,7 @@ async function deleteOneBatchRecord(recordIndex){
       if(!tombs.includes(token)) tombs.push(token);
       if(tombs.length>1000) tombs=tombs.slice(-1000);
       const fbBatch=window._db.batch();
-      fbBatch.set(window._db.collection('appData').doc('ledgerRecords'),{data:JSON.stringify(nextLedger),updatedAt:new Date().toISOString()});
+      await MESLedgerStore.stage(fbBatch,window._db,nextLedger);
       if(remaining.length){
         fbBatch.set(window._db.collection('appData').doc(docKey),{data:JSON.stringify(remaining),updatedAt:new Date().toISOString()});
       }else{

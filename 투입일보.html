@@ -97,6 +97,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="mes-ledger-storage.js"></script>
 <script>
   firebase.initializeApp({
     apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
@@ -112,7 +113,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.5 · 2026.09.03 13:45</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v1.6 · 2026.09.22 10:51</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -841,8 +842,7 @@ async function syncToServer(){
     }
 
     // 2. ledgerRecords 출고 반영
-    let ledgerSnap = await db.collection('appData').doc('ledgerRecords').get();
-    let ledgerRecords = (ledgerSnap.exists && ledgerSnap.data().data) ? JSON.parse(ledgerSnap.data().data) : [];
+    let ledgerRecords = await MESLedgerStore.load(db);
 
     // 삭제된 투입LOT에 해당하는 출고 기록 제거
     if(deletedInputLots.length){
@@ -864,7 +864,7 @@ async function syncToServer(){
         }
       });
     });
-    await db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledgerRecords),updatedAt:new Date().toISOString()});
+    await MESLedgerStore.save(db,ledgerRecords);
 
     // 동기화 완료된 기록에 _synced 표시 → 다음 동기화 시 중복 방지
     for(const key of keys){
@@ -950,8 +950,7 @@ async function syncSingleInput(idx){
     const db = window._db;
 
     // 1. ledgerRecords 로드
-    let ledgerSnap=await db.collection('appData').doc('ledgerRecords').get();
-    let ledgerRecords=(ledgerSnap.exists&&ledgerSnap.data().data)?JSON.parse(ledgerSnap.data().data):[];
+    let ledgerRecords=await MESLedgerStore.load(db);
 
     // 2. 이 레코드의 출고만 반영
     rec.ingredients.forEach(ing=>{
@@ -967,7 +966,7 @@ async function syncSingleInput(idx){
     });
 
     // 3. Firebase 저장
-    await db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledgerRecords),updatedAt:new Date().toISOString()});
+    await MESLedgerStore.save(db,ledgerRecords);
 
     // 4. 투입기록 Firebase 업로드
     const todayKey='inputRecords_'+getWorkDateKey();
@@ -1063,11 +1062,11 @@ async function loadFromFirebase(){
     return;
   }
   try{
-    const [ingSnap, inputDBSnap, incomingSnap, ledgerSnap] = await Promise.all([
+    const [ingSnap, inputDBSnap, incomingSnap, ledgerRecords] = await Promise.all([
       window._db.collection('appData').doc('ingredientDB').get(),
       window._db.collection('appData').doc('inputDB').get(),
       window._db.collection('appData').doc('incomingRecords').get(),
-      window._db.collection('appData').doc('ledgerRecords').get()
+      MESLedgerStore.load(window._db)
     ]);
     if(ingSnap.exists && ingSnap.data().data){
       INGREDIENT_DB = JSON.parse(ingSnap.data().data);
@@ -1081,10 +1080,8 @@ async function loadFromFirebase(){
       window._incomingRecords = JSON.parse(incomingSnap.data().data);
       cacheJsonSafely('incomingRecords', window._incomingRecords);
     } else window._incomingRecords = [];
-    if(ledgerSnap.exists && ledgerSnap.data().data){
-      window._ledgerRecords = JSON.parse(ledgerSnap.data().data);
-      cacheJsonSafely('ledgerRecords', window._ledgerRecords);
-    } else window._ledgerRecords = [];
+    window._ledgerRecords = ledgerRecords;
+    cacheJsonSafely('ledgerRecords', window._ledgerRecords);
   }catch(e){
     console.warn('Firebase 로드 실패, 캐시 사용',e);
     window._ledgerRecords = readCachedJson('ledgerRecords', window._ledgerRecords||[]);
@@ -1114,18 +1111,16 @@ async function refreshInputStock(){
   if(btn){ btn.textContent='⏳ 갱신 중...'; btn.disabled=true; }
   try{
     if(!window._db) throw new Error('Firebase 없음');
-    const [incomingSnap, ledgerSnap] = await Promise.all([
+    const [incomingSnap, ledgerRecords] = await Promise.all([
       window._db.collection('appData').doc('incomingRecords').get(),
-      window._db.collection('appData').doc('ledgerRecords').get()
+      MESLedgerStore.load(window._db)
     ]);
     if(incomingSnap.exists && incomingSnap.data().data){
       window._incomingRecords = JSON.parse(incomingSnap.data().data);
       cacheJsonSafely('incomingRecords', window._incomingRecords);
     }
-    if(ledgerSnap.exists && ledgerSnap.data().data){
-      window._ledgerRecords = JSON.parse(ledgerSnap.data().data);
-      cacheJsonSafely('ledgerRecords', window._ledgerRecords);
-    }
+    window._ledgerRecords = ledgerRecords;
+    cacheJsonSafely('ledgerRecords', window._ledgerRecords);
     if(btn){ btn.textContent='✅ 갱신 완료'; setTimeout(()=>{ btn.textContent='🔄 재고 갱신'; btn.disabled=false; },1500); }
   }catch(e){
     console.warn('재고 갱신 실패',e);

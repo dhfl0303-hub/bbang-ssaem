@@ -180,6 +180,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="mes-ledger-storage.js"></script>
 <script>
   firebase.initializeApp({
     apiKey:"AIzaSyBv12pDBChMGliS4cElj9DaWJ2858sDfYs",
@@ -195,7 +196,7 @@ html,body{height:100%;font-family:"Noto Sans KR",sans-serif;background:var(--bg)
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.2 · 2026.09.03 10:52</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:9999;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.3 · 2026.09.22 10:51</div>
 
 <!-- 상단바 -->
 <div class="topbar">
@@ -570,11 +571,9 @@ function initDB(){
       else INPUT_DB = {};
     }).catch(()=>{ INPUT_DB={}; });
     // ledgerRecords Firebase에서 로드 (OI LOT 드롭다운용) + localStorage 캐싱
-    window._db.collection('appData').doc('ledgerRecords').get().then(snap=>{
-      if(snap.exists && snap.data().data){
-        window._ledgerRecords = JSON.parse(snap.data().data);
-        saveRebuildableCache('ledgerRecords', JSON.stringify(window._ledgerRecords));
-      } else { window._ledgerRecords = []; }
+    MESLedgerStore.load(window._db).then(records=>{
+      window._ledgerRecords = records;
+      saveRebuildableCache('ledgerRecords', JSON.stringify(window._ledgerRecords));
     }).catch(()=>{
       // 오프라인: localStorage 캐시 사용
       const cached = localStorage.getItem('ledgerRecords');
@@ -1560,7 +1559,7 @@ function completeBatch(){
 // 원료수불부 출고 자동반영
 function syncBatchToLedger(){
   try{
-    let ledgerRecords=JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
+    let ledgerRecords=window._ledgerRecords||JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
     const today=getWorkDateKey();
     const isoDate=`20${today.slice(0,2)}-${today.slice(2,4)}-${today.slice(4,6)}`;
     const INGREDIENT_DB_LOCAL=JSON.parse(localStorage.getItem('customIngredients')||'[]');
@@ -1606,7 +1605,8 @@ function syncBatchToLedger(){
       }
     });
 
-    localStorage.setItem('ledgerRecords',JSON.stringify(ledgerRecords));
+    window._ledgerRecords=ledgerRecords;
+    saveRebuildableCache('ledgerRecords',JSON.stringify(ledgerRecords));
   }catch(err){ console.error('수불부 반영 오류',err); }
 }
 
@@ -1798,10 +1798,7 @@ function goInputIng(){
 function getIngDropdownOptions(selectedName){
   const allItems = [...INGREDIENT_DB_STATIC_LIST];
   const existNames = new Set(allItems.map(i=>i.name));
-  const ledger = JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
-  if(window._ledgerRecords && window._ledgerRecords.length > ledger.length){
-    window._ledgerRecords.forEach(r=>ledger.push(r));
-  }
+  const ledger = window._ledgerRecords||JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
   ledger.forEach(r=>{
     if((r.type==='init'||r.type==='in') && r.name && !existNames.has(r.name)){
       existNames.add(r.name);
@@ -2185,10 +2182,7 @@ function renderInputDisposeModal(){
 function getIngDatalistOptions(){
   const allItems = [...INGREDIENT_DB_STATIC_LIST];
   const existNames = new Set(allItems.map(i=>i.name));
-  const ledger = JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
-  if(window._ledgerRecords && window._ledgerRecords.length > ledger.length){
-    window._ledgerRecords.forEach(r=>ledger.push(r));
-  }
+  const ledger = window._ledgerRecords||JSON.parse(localStorage.getItem('ledgerRecords')||'[]');
   ledger.forEach(r=>{
     if((r.type==='init'||r.type==='in') && r.name && !existNames.has(r.name)){
       existNames.add(r.name);
@@ -2303,9 +2297,9 @@ async function deleteBatchRecord(idx){
       const removed=before-ledger.length;
       if(removed>0){
         window._ledgerRecords=ledger;
-        localStorage.setItem('ledgerRecords',JSON.stringify(ledger));
+        saveRebuildableCache('ledgerRecords',JSON.stringify(ledger));
         if(window._db){
-          try{ await window._db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledger),updatedAt:new Date().toISOString()}); }
+          try{ await MESLedgerStore.save(window._db,ledger); }
           catch(e){ console.warn('수불부 출고삭제 Firebase 반영 실패',e); }
         }
       }
@@ -2324,11 +2318,8 @@ async function refreshLedgerRecords(){
   if(btn){ btn.textContent='⏳ 갱신 중...'; btn.disabled=true; }
   try{
     if(!window._db) throw new Error('Firebase 없음');
-    const snap = await window._db.collection('appData').doc('ledgerRecords').get();
-    if(snap.exists && snap.data().data){
-      window._ledgerRecords = JSON.parse(snap.data().data);
-      saveRebuildableCache('ledgerRecords', JSON.stringify(window._ledgerRecords));
-    }
+    window._ledgerRecords = await MESLedgerStore.load(window._db);
+    saveRebuildableCache('ledgerRecords', JSON.stringify(window._ledgerRecords));
     const stockSnap=await window._db.collection('appData').doc('ingStock').get();
     if(stockSnap.exists && stockSnap.data().data){
       window._currentIngStock=JSON.parse(stockSnap.data().data);
@@ -2465,8 +2456,7 @@ async function syncToServer(){
     let recs = allRecs.filter(r=>!r._synced);
 
     // 최신 Firebase 장부로 LOT 잔량을 재검사한다. 오래된 오프라인 잔량이면 다음 LOT로 재배분한다.
-    let ledgerSnap = await db.collection('appData').doc('ledgerRecords').get();
-    let ledgerRecords = (ledgerSnap.exists && ledgerSnap.data().data) ? JSON.parse(ledgerSnap.data().data) : [];
+    let ledgerRecords = await MESLedgerStore.load(db);
     let latestStock=[];
     try{
       const stockSnap=await db.collection('appData').doc('ingStock').get();
@@ -2550,7 +2540,7 @@ async function syncToServer(){
 
       // 폐기량은 생산수율에만 반영 (원료수불부 차감 없음)
     });
-    await db.collection('appData').doc('ledgerRecords').set({ data: JSON.stringify(ledgerRecords), updatedAt: new Date().toISOString() });
+    await MESLedgerStore.save(db,ledgerRecords);
 
     // 4-1. 폐기대장 Firebase 업로드 (통합관리 연동)
     try{
@@ -2630,8 +2620,7 @@ async function syncSingleBatch(idx){
     const lastBatchLot=(rec.batchRecords||[]).length?rec.batchRecords[rec.batchRecords.length-1].lot:('배합-'+(rec.productCode||'')+'-'+rawDate);
 
     // 1. ledgerRecords 로드
-    let ledgerSnap=await db.collection('appData').doc('ledgerRecords').get();
-    let ledgerRecords=(ledgerSnap.exists&&ledgerSnap.data().data)?JSON.parse(ledgerSnap.data().data):[];
+    let ledgerRecords=await MESLedgerStore.load(db);
 
     // 개별 동기화도 Firebase 최신 잔량으로 다시 검증하고 필요하면 LOT를 재배분한다.
     let latestStock=[];
@@ -2690,7 +2679,7 @@ async function syncSingleBatch(idx){
     });
 
     // 3. Firebase 저장
-    await db.collection('appData').doc('ledgerRecords').set({data:JSON.stringify(ledgerRecords),updatedAt:new Date().toISOString()});
+    await MESLedgerStore.save(db,ledgerRecords);
 
     // 4. 배합기록 Firebase 업로드
     const todayKey='batchRecords_'+getWorkDateKey();
