@@ -1,0 +1,5 @@
+.qm-tabs{flex-wrap:wrap}
+.qm-settings{display:block}.qm-setting-intro h2{margin:0 0 6px;font-size:20px}.qm-setting-intro p{font-size:14px;color:#637b8c;line-height:1.5}
+.qm-setting-row{display:grid;grid-template-columns:1.2fr 1fr 1.2fr;gap:12px;align-items:center;background:#fff;border:1px solid #dce5eb;border-radius:10px;padding:16px;margin:10px 0}
+.qm-setting-row select,.qm-setting-row input{width:100%;min-width:0}.qm-due{grid-column:2/-1;color:#176c75}.qm-setting-footer{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:16px 0}.qm-setting-footer span{font-size:14px;color:#176c75}
+@media(max-width:650px){.qm-setting-row{grid-template-columns:1fr 1.2fr;padding:12px;gap:10px}.qm-setting-row>strong{grid-column:1/-1}.qm-due{grid-column:1/-1}.qm-tabs button{padding:8px 10px;font-size:14px}}

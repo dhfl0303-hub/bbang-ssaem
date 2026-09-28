@@ -1,0 +1,6 @@
+.qm-archive{border:1px solid #cedbe2;border-radius:10px;padding:14px;margin:10px 0;background:white}
+.qm-archive p{font-size:13px;color:#527080;margin:7px 0}
+.qm-archive-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.qm-archive-actions select{width:auto;min-width:110px}
+.qm-archive-actions button:last-child{color:#bd2940;border-color:#efbdc5}
+#qmTransferStatus{color:#126777;font-size:14px}

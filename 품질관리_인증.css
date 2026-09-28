@@ -1,0 +1,8 @@
+html:not(.qc-authenticated) body>header,html:not(.qc-authenticated) body>main{display:none!important}
+#qcLogin{min-height:90vh;display:grid;place-items:center;padding:20px}
+#qcLogin form,#qcPasswordDialog{box-sizing:border-box;width:min(100%,430px);padding:24px;border:1px solid #d3dfe6;border-radius:14px;background:#fff}
+#qcLogin label,#qcPasswordDialog label{display:block;margin:14px 0}
+#qcLogin input,#qcPasswordDialog input{width:100%;box-sizing:border-box;margin-top:6px}
+#qcAccountMenu{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;padding:8px 16px;background:#e9f1f5;font-size:13px}
+#qcPasswordDialog::backdrop{background:#0008}
+#qcAuthStatus,#qcPasswordDialog [role=status]{color:#a6273d}
