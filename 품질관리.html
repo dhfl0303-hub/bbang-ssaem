@@ -486,12 +486,38 @@ async function setupQcCodeCatalog(){
 window.qmReady.then(setupQcCodeCatalog).catch(error=>console.warn('코드 목록 초기화 실패',error));
 
 </script><script>
-function qcSetAllStatus(p,value){const floor=$('floor').value;QC_SHEETS.filter(s=>s.floor===floor).forEach(s=>{const prefix=s.sheet+'|'+p;s.rows.filter(item=>itemSpec(item).type==='status').forEach(item=>{if(item.group.replace(/\s/g,'')==='해동'){(values[prefix+'|raws']||['']).forEach((_,i)=>getItemData(item,prefix+'|raw'+i).value=value)}else getItemData(item,prefix).value=value})});render()}
+function qcSetAllStatus(p,value){
+ const floor=$('floor').value;
+ const sheet=QC_SHEETS.find(s=>s.floor===floor&&s.stage===stage);
+ if(!sheet)return;
+ const prefix=sheet.sheet+'|'+p;
+ sheet.rows.filter(item=>itemSpec(item).type==='status').forEach(item=>{
+  if(item.group.replace(/\s/g,'')==='해동'){
+   (values[prefix+'|raws']||['']).forEach((_,i)=>getItemData(item,prefix+'|raw'+i).value=value);
+  }else getItemData(item,prefix).value=value;
+ });
+ render();
+}
 function qcHeatTable(floor){const modal=document.createElement('dialog');modal.style.cssText='max-width:95vw;width:1000px;border:1px solid #cad5df;border-radius:12px';const head=document.createElement('div');head.className='row';head.innerHTML='<h2>'+floor+' 가열조견표</h2>';const close=document.createElement('button');close.textContent='닫기';close.onclick=()=>modal.close();head.append(close);const wrap=document.createElement('div');wrap.style.overflowX='auto';
 const first='<tr><th>분류</th><th>명란바게트</th><th>초코바게트,크로아상</th><th>달리는고구마빵,백두랑이<br>마들렌초코,공주밤빵</th><th>버터떡</th></tr><tr><th>온도</th><td>140 ± 10℃</td><td>210 ± 15℃</td><td>170 ± 15℃</td><td>185 ± 10℃</td></tr><tr><th>시간</th><td>10 ± 3분</td><td>15 ± 3분</td><td>15 ± 3분</td><td>33 ± 3분</td></tr><tr><th>품온</th><td colspan="4">72℃ 이상</td></tr>';
 const second='<tr><th rowspan="2">분류</th><th colspan="3">소금빵(완), 고메버터소금빵, 초코소금빵(완), 앵커버터소금빵(완), 햄치즈소금빵(완), 수제소금빵, 플레인소금빵, 쫀득감자빵, 쫀득고구마빵, 감자빵(완), 고구마빵(완), TATAS 베이글류</th><th colspan="3">햄치즈샌드위치</th><th colspan="3">메가새우토스트</th></tr><tr>'+Array(3).fill('<th>1구간</th><th>2구간</th><th>3구간</th>').join('')+'</tr><tr><th>상단온도</th>'+['200±20℃','200±10℃','160±10℃'].map(v=>Array(3).fill('<td>'+v+'</td>').join('')).join('')+'</tr><tr><th>하단온도</th>'+['175±15℃','165±10℃','160±10℃'].map(v=>Array(3).fill('<td>'+v+'</td>').join('')).join('')+'</tr><tr><th>시간</th><td colspan="3">17 ± 5분</td><td colspan="3">13 ± 1분</td><td colspan="3">13 ± 2분</td></tr><tr><th>품온</th><td colspan="9">72℃ 이상</td></tr>';
 wrap.innerHTML='<table class="qc-heat-table">'+(floor==='1층'?first:second)+'</table>';modal.append(head,wrap);document.body.append(modal);modal.addEventListener('close',()=>modal.remove());modal.showModal()}
-const qcBeforeMeetingRender=render;render=function(){qcBeforeMeetingRender();const intro=$('checks').querySelector('.card');if(intro){const bar=document.createElement('div');bar.className='row';bar.style.marginTop='10px';['오전','오후'].forEach(p=>{const group=document.createElement('div');group.className='row';const label=document.createElement('span');label.textContent=p;group.append(label);[['A','양호'],['B','']].forEach(([name,value])=>{const b=document.createElement('button');b.type='button';b.textContent=name;b.setAttribute('aria-label',p+' '+(value?'전부 양호':'전부 빈칸'));b.onclick=()=>qcSetAllStatus(p,value);group.append(b)});bar.append(group)});intro.append(bar)}
+const qcBeforeMeetingRender=render;render=function(){qcBeforeMeetingRender();const intro=$('checks').querySelector('.card');if(intro){
+ const bar=document.createElement('div');bar.className='row';bar.style.marginTop='10px';bar.dataset.floor=$('floor').value;
+ ['오전','오후'].forEach(p=>{
+  const group=document.createElement('div');group.className='row';
+  const label=document.createElement('span');label.textContent=$('floor').value+' '+p;group.append(label);
+  [['A','양호'],['B','']].forEach(([name,value])=>{
+   const b=document.createElement('button');b.type='button';b.textContent=name;
+   b.dataset.floor=$('floor').value;b.dataset.period=p;b.dataset.quickStatus=name;
+   b.setAttribute('aria-label',$('floor').value+' '+p+' '+(value?'전부 양호':'전부 빈칸'));
+   b.onclick=()=>qcSetAllStatus(p,value);
+   group.append(b);
+  });
+  bar.append(group);
+ });
+ intro.append(bar);
+}
 $('checks').querySelectorAll('.process-head').forEach(head=>{if(head.querySelector('h2')?.textContent.replace(/\s/g,'')==='가열'){const b=document.createElement('button');b.type='button';b.textContent=$('floor').value+' 가열조견표';b.onclick=e=>{e.stopPropagation();qcHeatTable($('floor').value)};head.querySelector('.process-actions').append(b)}});
 $('checks').querySelectorAll('.check').forEach(row=>{const title=row.querySelector('strong')?.textContent||'';if(/냉동/.test(title))row.querySelectorAll('[data-qc-date="temperature"]').forEach(input=>input.addEventListener('blur',()=>{if(input.value!==''&&Number.isFinite(Number(input.value)))input.value=String(-Math.abs(Number(input.value)))}))});
 };
