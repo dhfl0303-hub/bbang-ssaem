@@ -1546,6 +1546,7 @@ function completeBatch(){
     ingredients.push({name,total,exps});
     S.prevData[name]=exps;
   });
+  try{assertBatchLotDates([{date:getWorkDateKey(),batchRecords:[{ingredients}]}]);}catch(error){batchDateWarnings();alert(error.message);return;}
   if(invalid){ alert('배합을 완료할 수 없습니다.\n\n'+invalid); return; }
   const lotNum=S.currentBatch+(S.lotOffset||0);
   const lot=`배합-${S.product}-${getWorkDateKey()}-${String(lotNum).padStart(3,'0')}`;
@@ -1611,6 +1612,7 @@ function syncBatchToLedger(){
 }
 
 function showComplete(){
+  try{assertBatchLotDates([{date:getWorkDateKey(),batchRecords:S.batchRecords}]);}catch(error){alert(error.message);return;}
   const p=DB[S.product];
   const sessionKey=S.product+'-'+getWorkDateKey();
   const existIdx=S.todayRecords.findIndex(r=>r.sessionKey===sessionKey);
@@ -2252,6 +2254,7 @@ function saveInputDispose(){
   if(!extraIngs.length && !disposeIngs.length){
     alert('투입량 또는 폐기량을 입력해주세요'); return;
   }
+  try{assertBatchLotDates([{date:r.date||getWorkDateKey(),extraIngredients:extraIngs}]);}catch(error){alert(error.message);return;}
   r.extraIngredients = [...(r.extraIngredients||[]), ...extraIngs];
   r.disposeIngredients = [...(r.disposeIngredients||[]), ...disposeIngs];
   r._synced = false; // 동기화 리셋
@@ -2271,6 +2274,46 @@ function completeWithSign(){
     alert('배합 기록을 저장하지 못했습니다.\n\n'+(e?.message||e));
   }
 }
+
+
+function batchDateIso(value){
+ const raw=String(value||'').trim();let d=raw.replace(/[.\-/\s]/g,'');if(/^\d{6}$/.test(d))d='20'+d;
+ if(!/^\d{8}$/.test(d))return '';const y=+d.slice(0,4),m=+d.slice(4,6),day=+d.slice(6),dt=new Date(Date.UTC(y,m-1,day));
+ return dt.getUTCFullYear()===y&&dt.getUTCMonth()===m-1&&dt.getUTCDate()===day?d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6):'';
+}
+function batchLotDateError(name,e,workDate,ledger=window._ledgerRecords||[]){
+ if(getIngredientCode(name,e.lot||'')==='M000')return '';
+ const work=batchDateIso(workDate);if(!work)return '배합일자를 확인해주세요.';
+ const lot=String(e.lot||'');if(!lot)return name+': LOT를 선택해주세요.';
+ const entries=(ledger||[]).filter(r=>r.lot===lot&&['init','in'].includes(r.type)&&normalizeIngName(r.name)===normalizeIngName(name));
+ const parts=lot.split('-'),encodedArrival=/^\d{6}$/.test(parts[1]||'')?parts[1]:'';
+ const dates=entries.map(r=>batchDateIso(r.date)).filter(Boolean).sort();
+ const arrival=dates[0]||batchDateIso(e.receivedDate||encodedArrival);
+ const manufacturing=entries.some(r=>r.dateType==='mfg')||e.dateType==='mfg'||lot.endsWith('*');
+ const expiries=manufacturing?[]:entries.map(r=>r.exp).filter(v=>v&&v!=='-');
+ if(!manufacturing)expiries.push(e.exp||(/^\d{6}$/.test(parts[parts.length-1]||'')?parts[parts.length-1]:''));
+ const reasons=[];
+ if(!arrival)reasons.push('입고일 확인 불가');
+ else if(arrival>work)reasons.push('입고일 '+arrival+' > 배합일 '+work);
+ if(!manufacturing){const valid=expiries.filter(v=>v&&v!=='-');const parsed=valid.map(batchDateIso);if(!valid.length||parsed.some(d=>!d))reasons.push('소비기한 확인 불가');else{const expiry=parsed.sort()[0];if(expiry<work)reasons.push('소비기한 '+expiry+' < 배합일 '+work)}}
+ return reasons.length?name+' / '+lot+'\n'+reasons.join(' · '):'';
+}
+function assertBatchLotDates(records,ledger=window._ledgerRecords||[]){
+ const errors=[];(records||[]).forEach(rec=>{const date=rec.date||getWorkDateKey();(rec.batchRecords||[]).forEach(br=>(br.ingredients||[]).forEach(ing=>(ing.exps||[]).forEach(e=>{if(Number(e.amount)>0){const message=batchLotDateError(ing.name,e,date,ledger);if(message)errors.push(message)}})));(rec.extraIngredients||[]).forEach(e=>{if(Number(e.qty)>0){const message=batchLotDateError(e.name,e,date,ledger);if(message)errors.push(message)}})});
+ if(errors.length)throw new Error('원료 날짜 오류로 저장·동기화를 중단했습니다.\n\n'+[...new Set(errors)].join('\n\n'));
+}
+function batchDateWarnings(){
+ document.querySelectorAll('.ing-block').forEach(block=>block.querySelectorAll('.exp-row').forEach(row=>{
+ const sel=row.querySelector('.lot-select'),manual=row.querySelector('.lot-manual-wrap');
+ const direct=manual&&manual.style.display==='flex',opt=sel?.options[sel.selectedIndex];
+ const e=direct?{lot:row.querySelector('.lot-manual-full')?.value,exp:row.querySelector('.lot-manual-exp')?.value,dateType:'exp'}:{lot:sel?.value,exp:sel?.dataset.exp||opt?.dataset.exp,dateType:sel?.dataset.dateType||opt?.dataset.dateType};
+ const error=e.lot?batchLotDateError(block.dataset.name,e,getWorkDateKey()):'';
+ let warning=row.querySelector('.batch-date-warning');if(!warning){warning=document.createElement('div');warning.className='batch-date-warning';warning.style.cssText='color:#b71c1c;background:#ffebee;padding:8px;border-radius:6px;white-space:pre-line;font-size:12px';warning.setAttribute('role','alert');row.append(warning)}
+ warning.textContent=error;warning.hidden=!error;row.style.outline=error?'2px solid #d32f2f':'';
+ }));
+}
+document.addEventListener('change',()=>batchDateWarnings());
+document.addEventListener('input',event=>{if(event.target.closest('.ing-block')||event.target.id==='workDateInput')batchDateWarnings()});
 
 initDB();
 initMain();
@@ -2343,6 +2386,7 @@ async function refreshLedgerRecords(){
 
 // ===== 동기화 =====
 function prepareBatchRecordsForLatestStock(records, ledgerRecords, currentStock=[]){
+  assertBatchLotDates(records,ledgerRecords);
   const copies=JSON.parse(JSON.stringify(records||[]));
   const sourceIds=new Set(copies.map(r=>r.syncId).filter(Boolean));
   // 재시도 중인 자기 출고는 잔량 계산에서 제외한 뒤 새 배분으로 다시 만든다.
@@ -2386,7 +2430,7 @@ function prepareBatchRecordsForLatestStock(records, ledgerRecords, currentStock=
       return;
     }
 
-    const candidates=[...pool.values()].filter(x=>x.remaining>0.0000001).sort((a,b)=>{
+    const candidates=[...pool.values()].filter(x=>x.remaining>0.0000001&&!batchLotDateError(ing.name,x,rec.date||getWorkDateKey(),ledgerRecords)).sort((a,b)=>{
       const ak=normalizeIngName(ing.name)+'|'+a.lot, bk=normalizeIngName(ing.name)+'|'+b.lot;
       const ai=orderMap.has(ak)?orderMap.get(ak):999999, bi=orderMap.has(bk)?orderMap.get(bk):999999;
       if(ai!==bi) return ai-bi;
@@ -2410,6 +2454,7 @@ function prepareBatchRecordsForLatestStock(records, ledgerRecords, currentStock=
     ing.exps=next;
     changes.push(`${br.lot} / ${ing.name}\n${before}\n→ ${after}`);
   })));
+  assertBatchLotDates(copies,ledgerRecords);
   return {records:copies,changes};
 }
 
@@ -2795,5 +2840,6 @@ async function verifyTestMode(){
   </div>
 </div>
 <style>.wm-warn{background:#eaf2ff;border:2px solid #93c5fd;border-radius:10px;padding:12px;margin-bottom:14px;font-weight:700;color:#1e3a8a}.wm-steps{padding-left:28px;margin:0}.wm-steps li{padding:10px 8px;border-bottom:1px solid #e5e7eb}.wm-steps li::marker{font-size:20px;font-weight:900;color:#1d4ed8}.wm-steps b{display:block;font-size:17px}.wm-steps span{display:block;color:#4b5563;margin-top:2px}.wm-danger{margin-top:16px;background:#fff1f2;border:2px solid #fda4af;border-radius:10px;padding:12px;color:#9f1239}</style><script>function openWorkerManual(){document.getElementById('workerManual').style.display='flex'}function closeWorkerManual(){document.getElementById('workerManual').style.display='none'}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeWorkerManual()});</script>
-</body>
+<script>const batchDateOriginalRender=renderBatchPage;renderBatchPage=function(){batchDateOriginalRender.apply(this,arguments);batchDateWarnings()};</script></body>
 </html>
+
