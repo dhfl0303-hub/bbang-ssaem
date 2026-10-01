@@ -917,7 +917,7 @@ function persistCurrentOuterSelection(){
   const filmCode=document.getElementById('filmItemCode')?.value||'';
   const bulkItem=document.getElementById('bulkItem')?.value||'';
   if(filmCode) saveMaterialOuterTemplate('film',filmCode,'',template);
-  else if(bulkItem) saveMaterialOuterTemplate('bulk',bulkItem,S.product||'',template);
+  if(bulkItem) saveMaterialOuterTemplate('bulk',bulkItem,S.product||'',template);
 }
 function collectOuterBoxLots(kind){
   const result=[];
@@ -1271,10 +1271,10 @@ function applyProductPackTemplate(code){
   document.getElementById('startTime').value='08:30';
   document.getElementById('endTime').value='';
   // 제품에는 포장방식과 포장재 품목만 연결하고 외포장은 포장재 기준으로 복원
-  const packType=template.packType||(latest?.filmItemCode?'film':latest?.bulkItem?'bulk':'');
+  const packType=template.packType||(latest?.filmItemCode?(latest?.bulkItem?'both':'film'):latest?.bulkItem?'bulk':'');
   const filmItemCode=template.filmItemCode||latest?.filmItemCode||'';
   const bulkItem=template.bulkItem||latest?.bulkItem||'';
-  if(packType==='film'&&filmItemCode){
+  if((packType==='film'||packType==='both')&&filmItemCode){
     const filmItem=(window._subItemDB||[]).find(i=>i.code===filmItemCode);
     document.getElementById('filmItemCode').value=filmItemCode;
     const parsed=parseFilmSpec(filmItem?.spec||'');
@@ -1285,7 +1285,8 @@ function applyProductPackTemplate(code){
       const seed={boxItems:[...new Set((latest.boxLots||[]).map(x=>x.name).filter(Boolean))],pkgBoxItems:[...new Set((latest.pkgBoxLots||[]).map(x=>x.name).filter(Boolean))]};
       saveMaterialOuterTemplate('film',filmItemCode,'',seed); restoreMaterialOuterSettings('film',filmItemCode,'');
     }
-  }else if(packType==='bulk'&&bulkItem){
+  }
+  if((packType==='bulk'||packType==='both')&&bulkItem){
     const sel=document.getElementById('bulkItem');
     if(sel){
       if(![...sel.options].some(o=>o.value===bulkItem)){ const opt=document.createElement('option'); opt.value=bulkItem; opt.textContent=bulkItem+' [현재 품목목록에 없음]'; sel.appendChild(opt); }
@@ -1874,29 +1875,13 @@ function applyFilmPopup(){
 
 // ===== 필름/비닐 상호 비활성화 =====
 function checkPackTypeConflict(src){
-  const filmQty=parseFloat(document.getElementById('filmQty').value)||0;
-  const filmCode=document.getElementById('filmItemCode').value||'';
-  const bulkLot=document.getElementById('bulkLot').value||'';
-  const bulkItem=document.getElementById('bulkItem')?.value||'';
-  const filmOverlay=document.getElementById('filmDisabledOverlay');
-  const bulkOverlay=document.getElementById('bulkDisabledOverlay');
+  // 필름포장지와 벌크비닐은 함께 사용할 수 있습니다.
+  ['filmDisabledOverlay','bulkDisabledOverlay'].forEach(id=>{
+    const overlay=document.getElementById(id);
+    if(overlay) overlay.style.display='none';
+  });
   const filmBtn=document.getElementById('filmOpenBtn');
-  if(filmCode){
-    // 필름 입력됨 → 비닐 비활성화
-    bulkOverlay.style.display='block';
-    filmOverlay.style.display='none';
-    if(filmBtn)filmBtn.disabled=false;
-  } else if(bulkItem||bulkLot){
-    // 비닐 선택됨 → 필름 비활성화
-    filmOverlay.style.display='block';
-    bulkOverlay.style.display='none';
-    if(filmBtn)filmBtn.disabled=true;
-  } else {
-    // 둘 다 미입력 → 둘 다 활성화
-    filmOverlay.style.display='none';
-    bulkOverlay.style.display='none';
-    if(filmBtn)filmBtn.disabled=false;
-  }
+  if(filmBtn) filmBtn.disabled=false;
 }
 
 // 박스 자동계산
@@ -2200,7 +2185,7 @@ function completePackaging(signImg=''){
     signImg
   };
   saveProductPackTemplate(pCode,{
-    packType:record.filmItemCode?'film':record.bulkItem?'bulk':'',
+    packType:record.filmItemCode?(record.bulkItem?'both':'film'):record.bulkItem?'bulk':'',
     filmItemCode:record.filmItemCode||'',
     bulkItem:record.bulkItem||'',
     expiryMonths:S.expiryMonths||null,
@@ -2213,7 +2198,7 @@ function completePackaging(signImg=''){
     pkgBoxItems:collectOuterBoxItemNames('pkgBox')
   };
   if(record.filmItemCode) saveMaterialOuterTemplate('film',record.filmItemCode,'',outerTemplate);
-  else if(record.bulkItem) saveMaterialOuterTemplate('bulk',record.bulkItem,pCode,outerTemplate);
+  if(record.bulkItem) saveMaterialOuterTemplate('bulk',record.bulkItem,pCode,outerTemplate);
   if(window._testMode) record._isTest = true;
 
   S.todayRecords.push(record);
@@ -2623,3 +2608,4 @@ async function verifyTestMode(){
 </div>
 </body>
 </html>
+
