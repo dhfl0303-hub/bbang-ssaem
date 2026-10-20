@@ -541,54 +541,57 @@ function hideAC(inputId){
   const list = document.getElementById('ac-'+inputId);
   if(list) list.classList.remove('open');
 }
-function filterAC(inputId, type){
-  const input = document.getElementById(inputId);
-  const list = document.getElementById('ac-'+inputId);
-  if(!input||!list) return;
-  const q = input.value.trim().toLowerCase();
-  let items = [];
-  if(type==='supplier'){
-    items = suppliers.map(s=>({label:s, value:s}));
-  } else {
-    items = INGREDIENT_DB.map(i=>({label:i.code+' - '+i.name, value:i.name}));
+function applyACProduct(inputId, ing){
+  const edit=inputId.startsWith('edit-');
+  const rowId=inputId.replace(/^(edit-)?product-/,'');
+  const prefix=edit?'edit-':'';
+  const codeEl=document.getElementById(prefix+'lot-code-'+rowId);
+  const dateEl=document.getElementById(prefix+'lot-date-'+rowId);
+  if(codeEl) codeEl.value=ing.code;
+  if(dateEl && !dateEl.value){
+    const date=edit?document.getElementById('edit-date')?.value:'';
+    dateEl.value=date?date.replace(/-/g,'').slice(2):getInDateYYMMDD();
   }
-  const filtered = q ? items.filter(i=>i.label.toLowerCase().includes(q)||i.value.toLowerCase().includes(q)) : items;
-  list.innerHTML = filtered.slice(0,20).map(i=>
-    `<div class="ac-item" onmousedown="selectAC('${inputId}','${i.value.replace(/'/g,"\\'")}','${type}')">${i.label}</div>`
-  ).join('');
-  if(filtered.length) list.classList.add('open');
-  else list.classList.remove('open');
-
-  // 제품 입력 시 실시간 매칭 → LOT 코드 자동입력
+  if(edit) buildEditLot(rowId);
+  else buildLot(parseInt(rowId));
+}
+function filterAC(inputId, type){
+  const input=document.getElementById(inputId);
+  const list=document.getElementById('ac-'+inputId);
+  if(!input||!list) return;
+  const normalize=v=>String(v||'').replace(/\s+/g,'').toLowerCase();
+  const q=normalize(input.value);
+  const items=type==='supplier'
+    ?suppliers.map(s=>({label:s,value:s}))
+    :INGREDIENT_DB.map(i=>({label:i.code+' - '+i.name,value:i.name,code:i.code}));
+  const filtered=q?items.filter(i=>normalize(i.label).includes(q)||normalize(i.value).includes(q)):items;
+  list.replaceChildren();
+  filtered.slice(0,20).forEach(item=>{
+    const option=document.createElement('div');
+    option.className='ac-item';
+    option.textContent=item.label;
+    // 품명에 줄바꿈·따옴표가 있어도 이벤트 코드에 삽입하지 않습니다.
+    const choose=event=>{
+      event.preventDefault();
+      selectAC(inputId,item.value,type,item.code);
+    };
+    option.addEventListener('pointerdown',choose);
+    option.addEventListener('click',choose);
+    list.appendChild(option);
+  });
+  list.classList.toggle('open',filtered.length>0);
   if(type==='product'){
-    const ing = INGREDIENT_DB.find(i=>i.name===input.value.trim());
-    if(ing){
-      const rowId = inputId.replace('product-','').replace('edit-','');
-      const prefix = inputId.startsWith('edit-') ? 'edit-' : '';
-      const codeEl = document.getElementById(prefix+'lot-code-'+rowId);
-      const dateEl = document.getElementById(prefix+'lot-date-'+rowId);
-      if(codeEl) codeEl.value = ing.code;
-      if(dateEl && !dateEl.value) dateEl.value = getInDateYYMMDD();
-      if(!inputId.startsWith('edit-')) buildLot(parseInt(rowId));
-    }
+    const matches=INGREDIENT_DB.filter(i=>normalize(i.name)===q||normalize(i.code)===q);
+    if(q&&matches.length===1) applyACProduct(inputId,matches[0]);
   }
 }
-function selectAC(inputId, value, type){
-  const input = document.getElementById(inputId);
-  if(input) input.value = value;
+function selectAC(inputId,value,type,code){
+  const input=document.getElementById(inputId);
+  if(input) input.value=value;
   hideAC(inputId);
-  // 제품 선택 시 LOT 코드 자동입력
   if(type==='product'){
-    const ing = INGREDIENT_DB.find(i=>i.name===value);
-    const rowId = inputId.replace('product-','').replace('edit-','');
-    const prefix = inputId.startsWith('edit-') ? 'edit-' : '';
-    if(ing){
-      const codeEl = document.getElementById(prefix+'lot-code-'+rowId);
-      const dateEl = document.getElementById(prefix+'lot-date-'+rowId);
-      if(codeEl) codeEl.value = ing.code;
-      if(dateEl) dateEl.value = getInDateYYMMDD();
-      if(!inputId.startsWith('edit-')) buildLot(parseInt(rowId));
-    }
+    const ing=code?INGREDIENT_DB.find(i=>i.code===code):INGREDIENT_DB.find(i=>i.name===value);
+    if(ing) applyACProduct(inputId,ing);
   }
 }
 
@@ -1750,3 +1753,4 @@ function startNewIncomingForm(){
 </script>
 </body>
 </html>
+
