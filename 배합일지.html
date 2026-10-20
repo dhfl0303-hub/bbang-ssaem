@@ -1058,6 +1058,19 @@ function onExpInput(input){
   updateAutoCalc(input.closest('.ing-block'));
 }
 
+// 입고일 기준 FIFO: 소비기한은 사용 가능 여부 검증에만 사용합니다.
+function fifoReceiptDate(item, ledger=window._ledgerRecords||[]){
+  const code=String(item.lot||'').split('-')[0];
+  const entries=(ledger||[]).filter(r=>['init','in'].includes(r.type)&&r.lot===item.lot&&(!r.code||!code||r.code===code));
+  const dates=entries.map(r=>batchDateIso(r.date)).filter(Boolean).sort();
+  return dates[0]||batchDateIso(item.receivedDate||item.date)||batchDateIso(String(item.lot||'').split('-')[1])||'9999-12-31';
+}
+function compareReceiptFifo(a,b){
+  if(a.remaining>0&&b.remaining<=0) return -1;
+  if(a.remaining<=0&&b.remaining>0) return 1;
+  return String(a.receivedDate||fifoReceiptDate(a)).localeCompare(String(b.receivedDate||fifoReceiptDate(b)))||String(a.lot||'').localeCompare(String(b.lot||''));
+}
+
 function getAdminCurrentLots(ingName){
   if(!Array.isArray(window._currentIngStock)) return null;
   const ingN=(ingName||'').trim().replace(/\n/g,' ');
@@ -1074,7 +1087,8 @@ function getAdminCurrentLots(ingName){
       return {lot:s.lot||'',label:`${s.lot||'LOT 미지정'} (현재재고 ${isMfg?'제조':'소비'}:${dateVal||'-'}) [재고:${Number(s.qty)}kg]`,exp:dateVal,dateType:isMfg?'mfg':'exp',date:'',isOI:false,remaining:Number(s.qty)};
     })
     .filter(s=>s.lot)
-    .sort((a,b)=>(a.exp||'99.99.99').localeCompare(b.exp||'99.99.99'));
+    .map(l=>({...l,receivedDate:fifoReceiptDate(l)}))
+    .sort(compareReceiptFifo);
 }
 
 // 통합관리 현재재고 우선, 없을 때만 ledgerRecords에서 계산
@@ -1158,18 +1172,8 @@ function getIngLots(ingName){
       }
     });
 
-    // 소비기한 짧은 순 (FIFO) - 재고 있는 것 우선
-    lots.sort((a,b)=>{
-      // 재고 있는 것 먼저
-      if(a.remaining>0 && b.remaining<=0) return -1;
-      if(a.remaining<=0 && b.remaining>0) return 1;
-      // 소비기한 오름차순 (짧은 순)
-      const expA=(a.exp||'99.99.99').replace(/\./g,'');
-      const expB=(b.exp||'99.99.99').replace(/\./g,'');
-      if(expA!==expB) return expA<expB?-1:1;
-      // 소비기한 같으면 입고일 오래된 순
-      return (a.date||'') < (b.date||'') ? -1 : 1;
-    });
+    lots.forEach(l=>{ l.receivedDate=fifoReceiptDate(l,ledger); });
+    lots.sort(compareReceiptFifo);
     return lots;
   }catch(e){ return []; }
 }
@@ -1218,13 +1222,8 @@ function getIngLotsByName(ingName){
       const dateLbl=isMfg?'제조:'+fmtExp(dateVal):'소비:'+fmtExp(dateVal);
       lots.push({lot:r.lot,label:r.lot+(r.type==='init'?` (초기재고 ${dateLbl})`:` (입고:${r.date||''} ${dateLbl})`)+stockLbl,exp:fmtExp(dateVal),dateType:isMfg?'mfg':'exp',date:r.date||'',isOI:r.type==='init',remaining});
     });
-    lots.sort((a,b)=>{
-      if(a.remaining>0&&b.remaining<=0) return -1;
-      if(a.remaining<=0&&b.remaining>0) return 1;
-      const expA=(a.exp||'99.99.99').replace(/\./g,'');
-      const expB=(b.exp||'99.99.99').replace(/\./g,'');
-      return expA!==expB?expA<expB?-1:1:(a.date||'')<(b.date||'')?-1:1;
-    });
+    lots.forEach(l=>{ l.receivedDate=fifoReceiptDate(l,ledger); });
+    lots.sort(compareReceiptFifo);
     return lots;
   }catch(e){ return []; }
 }
@@ -1304,8 +1303,8 @@ function renderIngredients(ings){
 function calcFifoDistribution(lots, totalG){
   const totalKg = totalG / 1000;
   const rows = [];
-  // 재고 있는 LOT만 소비기한 순으로 (이미 정렬됨)
-  const available = lots.filter(l=>l.remaining>0);
+  // 재고 있는 LOT를 입고일이 빠른 순서로 배정
+  const available = lots.filter(l=>l.remaining>0).slice().sort(compareReceiptFifo);
   if(!available.length) return [];
 
   // 총 가용 재고 계산
@@ -2409,8 +2408,6 @@ function prepareBatchRecordsForLatestStock(records, ledgerRecords, currentStock=
     if(item) item.remaining-=(parseFloat(r.qty)||0);
   });
 
-  const orderMap=new Map();
-  (currentStock||[]).forEach((s,i)=>{ if(s.lot) orderMap.set(normalizeIngName(s.name)+'|'+s.lot,i); });
   const changes=[];
 
   copies.forEach(rec=>(rec.batchRecords||[]).forEach(br=>(br.ingredients||[]).forEach(ing=>{
@@ -2430,14 +2427,7 @@ function prepareBatchRecordsForLatestStock(records, ledgerRecords, currentStock=
       return;
     }
 
-    const candidates=[...pool.values()].filter(x=>x.remaining>0.0000001&&!batchLotDateError(ing.name,x,rec.date||getWorkDateKey(),ledgerRecords)).sort((a,b)=>{
-      const ak=normalizeIngName(ing.name)+'|'+a.lot, bk=normalizeIngName(ing.name)+'|'+b.lot;
-      const ai=orderMap.has(ak)?orderMap.get(ak):999999, bi=orderMap.has(bk)?orderMap.get(bk):999999;
-      if(ai!==bi) return ai-bi;
-      const ae=String(a.exp||'99.99.99').replace(/\D/g,''), be=String(b.exp||'99.99.99').replace(/\D/g,'');
-      if(ae!==be) return ae.localeCompare(be);
-      return String(a.date||'').localeCompare(String(b.date||''))||String(a.lot).localeCompare(String(b.lot));
-    });
+    const candidates=[...pool.values()].filter(x=>x.remaining>0.0000001&&!batchLotDateError(ing.name,x,rec.date||getWorkDateKey(),ledgerRecords)).map(x=>{x.receivedDate=fifoReceiptDate(x,ledgerRecords);return x;}).sort(compareReceiptFifo);
     let remain=needKg;
     const next=[];
     candidates.forEach(c=>{
@@ -2842,4 +2832,5 @@ async function verifyTestMode(){
 <style>.wm-warn{background:#eaf2ff;border:2px solid #93c5fd;border-radius:10px;padding:12px;margin-bottom:14px;font-weight:700;color:#1e3a8a}.wm-steps{padding-left:28px;margin:0}.wm-steps li{padding:10px 8px;border-bottom:1px solid #e5e7eb}.wm-steps li::marker{font-size:20px;font-weight:900;color:#1d4ed8}.wm-steps b{display:block;font-size:17px}.wm-steps span{display:block;color:#4b5563;margin-top:2px}.wm-danger{margin-top:16px;background:#fff1f2;border:2px solid #fda4af;border-radius:10px;padding:12px;color:#9f1239}</style><script>function openWorkerManual(){document.getElementById('workerManual').style.display='flex'}function closeWorkerManual(){document.getElementById('workerManual').style.display='none'}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeWorkerManual()});</script>
 <script>const batchDateOriginalRender=renderBatchPage;renderBatchPage=function(){batchDateOriginalRender.apply(this,arguments);batchDateWarnings()};</script></body>
 </html>
+
 
