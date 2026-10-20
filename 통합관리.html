@@ -203,7 +203,7 @@ tr:hover td{background:var(--bg);}
 <script defer src="mes-responsive.js"></script>
 </head>
 <body>
-<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.1 · 2026.09.22 10:51</div>
+<div class="mes-version" style="position:fixed;top:4px;right:6px;z-index:10000;pointer-events:none;background:rgba(0,0,0,0.35);color:#fff;font-size:10px;padding:2px 7px;border-radius:8px;">v2.2 · 2026.10.20</div>
 <!-- 로그인 화면 -->
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0d3f75;z-index:9999;align-items:center;justify-content:center;">
   <div style="width:340px;">
@@ -4140,11 +4140,11 @@ async function saveDispose(){
 }
 
 function renderDisposeLog(){
-  const disposed = ledgerRecords.filter(r=>r.type==='dispose');
+  const disposed = ledgerRecords.filter(r=>r.type==='dispose'&&!r._disposeLogDeletedAt);
   document.getElementById('disposeCount').textContent = disposed.length+'건';
   const tbody = document.getElementById('disposeTbody');
   if(!disposed.length){
-    tbody.innerHTML='<tr><td colspan="6" class="tc" style="padding:20px;color:var(--text3)">폐기 이력이 없습니다</td></tr>';
+    tbody.innerHTML='<tr><td colspan="7" class="tc" style="padding:20px;color:var(--text3)">폐기 이력이 없습니다</td></tr>';
     return;
   }
   tbody.innerHTML = disposed.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(r=>`
@@ -4155,12 +4155,48 @@ function renderDisposeLog(){
       <td style="color:var(--danger);font-weight:700">${roundKg3(r.qty).toFixed(3)}kg</td>
       <td style="font-size:11px">${r.lot||'-'}</td>
       <td><span class="badge badge-red">${r.reason||'-'}</span></td>
-      <td class="tc"><button class="btn btn-sm btn-danger" onclick="deleteDispose('${r.date||''}','${(r.name||'').replace(/'/g,'&#39;')}','${r.lot||''}',${r.qty})">삭제</button></td>
+      <td class="tc"><button class="btn btn-sm btn-danger" onclick="deleteDispose('${r.date||''}','${(r.name||'').replace(/'/g,'&#39;')}','${r.lot||''}',${r.qty})">삭제</button> <button class="btn btn-sm btn-outline" onclick="purgeDisposeLog(${ledgerRecords.indexOf(r)})" title="재고 차감 유지 · 폐기대장 내역 삭제">완전 삭제</button></td>
     </tr>`).join('');
 }
 
+
+let disposeLogPurgeBusy=false;
+function disposeLogSameRecord(a,b){
+ if(a.type!=='dispose'||b.type!=='dispose')return false;
+ if(a.processId||b.processId)return !!a.processId&&a.processId===b.processId;
+ return ['date','name','lot','code','batchLot','sourceId','sourceLineId','source','reason'].every(k=>String(a[k]||'')===String(b[k]||''))&&Number(a.qty)===Number(b.qty);
+}
+function compactDisposeLogRecord(record){
+ const next={...record,_disposeLogDeletedAt:new Date().toISOString()};
+ // 차감·동기화 연결키는 그대로 두고 폐기대장 사유만 제거한다.
+ delete next.reason;
+ return next;
+}
+async function purgeDisposeLog(index){
+ if(disposeLogPurgeBusy)return;
+ const target=ledgerRecords[index];
+ if(!target||target.type!=='dispose'||target._disposeLogDeletedAt){alert('삭제할 폐기 내역을 다시 확인해주세요.');return}
+ if(!window._db){alert('서버 연결 후 다시 시도해주세요. 삭제하지 않았습니다.');return}
+ if(!confirm('폐기대장 내역을 완전 삭제할까요?\n\n원료: '+target.name+'\nLOT: '+(target.lot||'-')+'\n폐기량: '+target.qty+'kg\n\n재고 차감은 유지됩니다.\n폐기대장 표시와 사유는 제거되며 복원할 수 없습니다.\n수불부의 차감 기록은 재고 계산을 위해 남습니다.'))return;
+ disposeLogPurgeBusy=true;
+ try{
+  const latest=await MESLedgerStore.load(window._db);
+  const matches=latest.map((r,i)=>disposeLogSameRecord(r,target)?i:-1).filter(i=>i>=0);
+  if(matches.length!==1)throw new Error('서버 기록이 변경되었거나 동일한 기록이 여러 건입니다. 새로 불러온 뒤 다시 확인해주세요.');
+  const i=matches[0],current=latest[i];
+  if(current._disposeLogDeletedAt){ledgerRecords=latest;renderDisposeLog();alert('이미 폐기대장에서 삭제된 내역입니다.');return}
+  if(Number(current.qty)!==Number(target.qty)||current.lot!==target.lot||current.name!==target.name)throw new Error('서버의 폐기량 또는 LOT가 변경되었습니다. 다시 확인해주세요.');
+  const next=latest.slice();next[i]=compactDisposeLogRecord(current);
+  await MESLedgerStore.save(window._db,next);
+  ledgerRecords=next;
+  renderDisposeLog();
+  alert('폐기대장에서 삭제했습니다. 재고와 수불부 차감량은 그대로 유지됩니다.');
+ }catch(error){console.error('폐기대장 완전 삭제 실패',error);alert('완전 삭제를 완료하지 못했습니다.\n'+(error.message||error)+'\n서버 상태를 다시 확인해주세요.')}
+ finally{disposeLogPurgeBusy=false}
+}
+
 async function deleteDispose(date, name, lot, qty){
-  const idx = ledgerRecords.findIndex(r=>r.type==='dispose'&&r.date===date&&r.name===name&&r.lot===lot&&Number(r.qty)===Number(qty));
+  const idx = ledgerRecords.findIndex(r=>r.type==='dispose'&&!r._disposeLogDeletedAt&&r.date===date&&r.name===name&&r.lot===lot&&Number(r.qty)===Number(qty));
   if(idx===-1){ alert('기록을 찾을 수 없습니다'); return; }
   const target = ledgerRecords[idx];
   if(!confirm(`폐기 기록을 삭제하시겠습니까?\n원료: ${target.name}\n수량: ${target.qty}kg\n사유: ${target.reason||'-'}\n\n삭제 시 원료수불부 재고에 다시 반영됩니다.`)) return;
@@ -5088,3 +5124,4 @@ document.addEventListener('click', e => {
 
 </body>
 </html>
+
